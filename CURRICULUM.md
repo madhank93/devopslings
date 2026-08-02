@@ -31,10 +31,11 @@ someone reading `df`, `ps`, or a journal on a machine that is misbehaving.
   command before it runs; behind that, `cron`'s `PATH` is `/usr/bin:/bin` and
   the tool is not in it. The error went to a mailbox nobody reads. Writing a
   script that survives being run by something other than you.
-- **text-at-scale** — pull one number out of a million-line log with `awk`,
-  `sed` and `sort`. The roadmap assumes this skill everywhere and teaches it
-  nowhere; graded on the answer, so a pipeline that is slow but right beats a
-  clever one that is wrong.
+- **text-at-scale** *(shipped)* — three exact answers out of a 390,000-line
+  access log with `awk` and `sort`. The roadmap assumes this skill everywhere
+  and teaches it nowhere; graded on the answers, so a pipeline that is slow but
+  right beats a clever one that is wrong. `grep -c 503` returns 202,127; the
+  answer is 8,493.
 - **permissions-triage** — a service cannot write to a directory it owns.
   Ownership, the sticky bit, setgid, and the umask that made the files wrong on
   creation.
