@@ -80,9 +80,13 @@ and why you mirror.
 - **leaked-secret** *(shipped)* — a deploy token hardcoded in the workflow.
   Remove it, source it from a secret, and **rotate** — the value was published
   the moment it was pushed, and masking only hides it from the next log.
-- Cache and matrix · build → test → push → deploy · **the green pipeline that
-  shouldn't be** · one Jenkinsfile lesson, because enterprises still run it ·
-  the Cloudflare 2019 regex postmortem → staged rollout.
+- **green-pipeline** *(shipped)* — a month of green builds that never ran a
+  test. `npm run test --if-present` against a script called `tests` exits 0 in
+  silence. Make CI honest, watch it go red, and meet the bug the suite has been
+  catching all along.
+- Cache and matrix · build → test → push → deploy · one Jenkinsfile lesson,
+  because enterprises still run it · the Cloudflare 2019 regex postmortem →
+  staged rollout.
 
 ### 08 — IaC: OpenTofu
 `iac-stack`
