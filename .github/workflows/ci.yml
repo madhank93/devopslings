@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Fast feedback: builds, vets, and runs the structural tests over the course
+  # content. No Docker, so it finishes in under a minute.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - run: go build ./...
+      - run: go vet ./...
+      - run: gofmt -l . | tee /dev/stderr | (! read)
+      - run: go test -short ./...
+
+  # The one that matters: every lesson is put through the full
+  # broken -> solved -> still-solved cycle against a live daemon.
+  #
+  # It is slow and it is the reason this repo can claim its exercises work, so
+  # it runs on every PR rather than nightly.
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Host can run the sandboxes
+        run: |
+          go build -o bin/devopslings ./cmd/devopslings
+          ./bin/devopslings doctor
+
+      - name: Lesson contract
+        run: go test ./internal/runner/ -run TestLessonContract -v -timeout 55m
+
+      - name: Tear down
+        if: always()
+        run: |
+          for d in sandboxes/*/; do
+            name=$(basename "$d")
+            [ -f "$d/compose.yaml" ] || continue
+            docker compose -f "$d/compose.yaml" -p "devopslings-$name" \
+              down -v --remove-orphans 2>/dev/null || true
+          done

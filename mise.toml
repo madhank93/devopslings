@@ -1,0 +1,111 @@
+# Reproducible toolchain for devopslings.
+#   mise install     # fetch exactly these versions
+#   mise run setup   # install + sanity-check the host
+#
+# Docker (or Podman) is a host prerequisite rather than a pinned tool — it needs
+# a daemon, which mise does not manage. `devopslings doctor` checks for it.
+#
+# The IaC and config-management tools are pinned here even though the modules
+# that use them land in v2, so that a contributor writing those lessons gets the
+# same versions the lessons were authored against.
+
+[tools]
+go       = "1.25"
+node     = "22"
+
+# Modules 08-10. OpenTofu rather than Terraform: Terraform moved to BUSL-1.1 in
+# 2023 and is no longer open source. OpenTofu is the Linux Foundation MPL-2.0
+# fork and is drop-in compatible for everything these lessons teach.
+opentofu = "latest"
+pulumi   = "latest"
+
+# ansible is a Python package, so mise installs it through its pipx backend —
+# which shells out to a `pipx` that a stock macOS does not have. The failure is
+# a confusing one: mise reports "No such file or directory" against a tool you
+# never asked for. Pinning pipx (aqua ships it as a binary, so this is not a
+# Python bootstrap problem) makes that backend work.
+#
+# pipx has to exist before ansible resolves, so a machine with neither needs two
+# passes. `mise run setup` does both for you.
+pipx     = "latest"
+ansible  = "latest"
+
+# Module 14 and 15. k6's `thresholds` exit non-zero on breach, which is what
+# lets a load test be a lesson's check with no wrapper around it.
+k6       = "latest"
+
+yq       = "4"
+d2       = "0.7"   # diagram source -> ASCII (TUI) + SVG (site)
+
+# Module 20's handoff lessons only.
+kubectl  = "1.36"
+kind     = "0.31"
+
+[env]
+_.path = ["{{config_root}}/bin"]
+
+[tasks.build]
+description = "Build the devopslings binary into ./bin"
+run = "go build -o bin/devopslings ./cmd/devopslings"
+
+[tasks.tui]
+description = "Open the TUI"
+depends = ["build"]
+run = "./bin/devopslings"
+
+[tasks.doctor]
+description = "Check this host can run the sandboxes"
+depends = ["build"]
+run = "./bin/devopslings doctor"
+
+[tasks.list]
+description = "List modules, lessons and progress"
+depends = ["build"]
+run = "./bin/devopslings list"
+
+[tasks.setup]
+description = "Install pinned tools, build, and check the host"
+# `mise install` twice on purpose: the pipx-backed tools need pipx, and pipx is
+# itself one of the tools being installed on the first pass.
+run = [
+  "mise install pipx",
+  "mise install",
+  "go build ./...",
+  "go test -short ./...",
+  "./bin/devopslings doctor",
+]
+
+[tasks.test]
+description = "Fast tests — no Docker required"
+run = "go test -short ./..."
+
+[tasks.contract]
+description = "Prove every lesson is actually broken and actually solvable (slow, needs Docker)"
+run = "go test ./internal/runner/ -run TestLessonContract -v -timeout 60m"
+
+[tasks.lint]
+description = "Vet the tool source (lesson scenarios are broken on purpose)"
+run = "go vet ./..."
+
+[tasks.clean]
+description = "Tear down every sandbox and remove scratch work"
+run = """
+set -e
+for d in sandboxes/*/; do
+  name=$(basename "$d")
+  [ -f "$d/compose.yaml" ] || continue
+  echo "→ $name"
+  docker compose -f "$d/compose.yaml" -p "devopslings-$name" down -v --remove-orphans 2>/dev/null || true
+done
+rm -rf scratch
+echo '✓ clean. Your progress in .devopslings/ was not touched.'
+"""
+
+[tasks.update]
+description = "Pull the latest lessons without losing your scratch work or progress"
+run = """
+set -e
+echo '→ pulling latest…'
+git pull --ff-only
+echo '✓ up to date. scratch/ and .devopslings/ are gitignored and were never touched.'
+"""

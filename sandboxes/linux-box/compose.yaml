@@ -1,0 +1,44 @@
+# linux-box — the substrate for modules 01, 02 and 10.
+#
+# One box, running real systemd, with a size-capped tmpfs standing in for a
+# separate log partition. The cap is what makes "the disk is full" a lesson
+# instead of a hazard: a 64 MiB tmpfs fills in seconds and cannot touch the
+# host's actual disk.
+services:
+  box:
+    build: .
+    container_name: devopslings-linux-box
+    hostname: box
+
+    # systemd needs to own a cgroup subtree and write to /sys/fs/cgroup.
+    # cgroup: host is what makes this work under cgroup v2 without granting
+    # blanket privileges.
+    cgroup: host
+    privileged: true
+
+    tmpfs:
+      - /run
+      - /run/lock
+      # Stands in for a dedicated /var/log partition. Small on purpose.
+      - /var/log/app:size=64m,mode=1777
+
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 10s
+
+    # Healthy means systemd finished booting — not merely that the container
+    # exists. Lessons that race a half-booted box fail for reasons that have
+    # nothing to do with the student's answer.
+    #
+    # `is-system-running` returns "degraded" when any unit failed, which is the
+    # normal state for several lessons here, so degraded counts as booted.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "systemctl is-system-running | grep -qE 'running|degraded'"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s

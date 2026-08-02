@@ -1,0 +1,8 @@
+[
+  {
+    "name": "pricing",
+    "listen": "0.0.0.0:21080",
+    "upstream": "pricing:8080",
+    "enabled": true
+  }
+]

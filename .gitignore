@@ -1,0 +1,21 @@
+bin/
+dist/
+.devopslings/
+node_modules/
+web/dist/
+web/.astro/
+
+# Learner work — scenarios write scratch state here.
+scratch/
+
+# Per-sandbox config the student edits during a lesson. init_scenario is
+# responsible for resetting these; the contract test proves it does, because a
+# leftover .env once made a lesson pass before it had been solved.
+sandboxes/*/.env
+
+# Lesson solutions students produce locally; the shipped reference lives in
+# each lesson's solution/ dir and IS tracked.
+*.local.yaml
+*.local.yml
+
+.DS_Store

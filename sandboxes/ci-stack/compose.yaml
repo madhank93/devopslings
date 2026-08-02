@@ -1,0 +1,110 @@
+# ci-stack — the substrate for modules 06, 07, 11 and 19.
+#
+# A complete, self-hosted delivery pipeline: a git forge that runs
+# GitHub-Actions-compatible workflows, a runner to execute them, and a registry
+# to push images to. No accounts, no tokens, no internet after the first pull.
+#
+# Forgejo Actions rather than GitHub Actions: GHA itself is not open source, but
+# Forgejo runs the same workflow YAML through `act_runner`, so everything a
+# student learns here transfers to a `.github/workflows/` file unchanged.
+#
+# The registry is plain `registry:2` rather than Harbor. Harbor is the right
+# tool for module 06 — retention policies, scanning, signing — and is six
+# containers and about 2 GB. Module 07 only needs somewhere to push, so it gets
+# the 30 MB version and Harbor arrives when its features are the subject.
+services:
+  forge:
+    image: codeberg.org/forgejo/forgejo:11
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      FORGEJO__server__ROOT_URL: "http://forge:3000/"
+      FORGEJO__server__HTTP_PORT: "3000"
+      # Forgejo's CLI reaches the running instance over its *internal* API, and
+      # that URL defaults to localhost — which only resolves inside this
+      # container. forge-init is a sibling, so it has to be addressable by
+      # service name or `generate-runner-token` fails with connection refused.
+      FORGEJO__server__LOCAL_ROOT_URL: "http://forge:3000/"
+      FORGEJO__security__INSTALL_LOCK: "true"
+      # Actions are off by default and are the entire point of this stack.
+      FORGEJO__actions__ENABLED: "true"
+      # A teaching sandbox on a laptop: keep signup closed and the first user
+      # deterministic so lessons can rely on the credentials.
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__repository__DEFAULT_BRANCH: "main"
+      # The runner pushes to the registry over plain HTTP on the compose
+      # network. Fine here, never fine in production.
+      FORGEJO__packages__ENABLED: "true"
+    volumes:
+      - forge-data:/data
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/healthz || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
+
+  # Creates the admin user, a repo, and the runner registration token, then
+  # exits. Lessons need a forge that is already in a known state — making the
+  # student click through a setup wizard teaches nothing.
+  forge-init:
+    image: codeberg.org/forgejo/forgejo:11
+    depends_on:
+      forge:
+        condition: service_healthy
+    volumes:
+      - forge-data:/data
+      - ./init:/init:ro
+      - shared:/shared
+    entrypoint: ["/bin/sh", "/init/bootstrap.sh"]
+    restart: "no"
+
+  runner:
+    image: code.forgejo.org/forgejo/runner:9
+    # Root, because the runner has to talk to the mounted docker socket and the
+    # socket's group id differs between Docker Desktop, colima and a stock Linux
+    # daemon — there is no gid to add the runner user to that is right
+    # everywhere. Mounting the socket at all is already root-equivalent, so this
+    # concedes nothing that was not already conceded.
+    user: "0:0"
+    depends_on:
+      forge-init:
+        condition: service_completed_successfully
+    volumes:
+      - shared:/shared
+      - runner-data:/data
+      # The runner starts sibling containers for each job step on the host
+      # daemon. This is the standard trade-off for local CI: it is fast and it
+      # means a workflow can build images, and it also means a job has root on
+      # the host. Acceptable for a sandbox on your own machine; the reason
+      # production runners are isolated VMs.
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /data
+    entrypoint: ["/bin/sh", "/shared/run-runner.sh"]
+
+  registry:
+    image: registry:2
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5000/v2/ >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  forge-data:
+  runner-data:
+  shared:
+
+# Named explicitly so the runner can put job containers on it. act_runner
+# creates a fresh per-job network by default, and a job on that network cannot
+# resolve `forge` — so `actions/checkout` fails to fetch the very repo that
+# triggered it.
+networks:
+  default:
+    name: devopslings-ci-net

@@ -1,0 +1,65 @@
+# chaos-stack — the substrate for modules 14 and 15.
+#
+# Two healthy services with a programmable network between them. Nothing here
+# is broken: the lessons inject faults at verify time via toxiproxy's admin
+# API, which is what makes "prove it survives" a checkable claim rather than a
+# design review.
+services:
+  pricing:
+    build: ./app
+    command: ["python3", "pricing.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request;urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # All checkout -> pricing traffic is routed through here. Latency, bandwidth
+  # limits, and connection resets are added and removed at runtime over the
+  # admin API on :8474 without restarting anything.
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    command: ["-host=0.0.0.0", "-config=/config/proxies.json"]
+    volumes:
+      - ./toxiproxy:/config:ro
+    ports:
+      - "8474:8474"
+    depends_on:
+      pricing:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/toxiproxy-cli", "list"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  checkout:
+    build: ./app
+    environment:
+      # Points at the proxy, never at pricing directly.
+      PRICING_URL: "http://toxiproxy:21080"
+      # The knobs the student edits. Defaults are the naive choices.
+      PRICING_CONNECT_TIMEOUT: "${PRICING_CONNECT_TIMEOUT:-0}"
+      PRICING_READ_TIMEOUT: "${PRICING_READ_TIMEOUT:-0}"
+      PRICING_FALLBACK: "${PRICING_FALLBACK:-}"
+    ports:
+      - "18090:8080"
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request;urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # k6 is a one-shot load generator, not a service. It sits idle until a check
+  # runs a script through it, so the stack does not wait on it.
+  k6:
+    image: grafana/k6:0.54.0
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - ./k6:/scripts:ro
+    depends_on:
+      checkout:
+        condition: service_healthy
