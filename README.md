@@ -123,7 +123,7 @@ it was drawn.
 | Terraform | **OpenTofu** | Terraform moved to BUSL-1.1 in 2023 |
 | Vault | **OpenBao** | Vault moved to BUSL |
 | AWS | **floci** | Local AWS emulator, MIT. LocalStack archived its repos in March 2026 and gated its images |
-| GitHub Actions | **Forgejo Actions** | GHA isn't OSS; Forgejo runs GHA-compatible YAML, so the skills transfer |
+| GitHub Actions | **Forgejo Actions** | The hosted service is proprietary (its runner is MIT). Forgejo executes GHA-compatible YAML on an open runner, so the syntax transfers |
 | Artifactory | **Harbor** | Artifactory is proprietary; Harbor is CNCF |
 | Elastic Stack | **Loki** (+ OpenSearch) | Loki fits on a laptop; OpenSearch is the opt-in heavy profile |
 

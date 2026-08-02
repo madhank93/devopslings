@@ -26,13 +26,30 @@ someone reading `df`, `ps`, or a journal on a machine that is misbehaving.
 - **systemd-unit-failure** — `status=1/FAILURE` tells you nothing. Get the
   application's own message out of the journal, and make the fix survive a
   reboot.
+- **cron-and-path** — the backup script runs perfectly when you run it and
+  writes nothing at 03:00. `cron` gives you a different `PATH`, no TTY and a
+  different shell, and the error went to a mailbox nobody reads. Writing a
+  script that survives being run by something other than you.
+- **text-at-scale** — pull one number out of a million-line log with `awk`,
+  `sed` and `sort`. The roadmap assumes this skill everywhere and teaches it
+  nowhere; graded on the answer, so a pipeline that is slow but right beats a
+  clever one that is wrong.
+- **permissions-triage** — a service cannot write to a directory it owns.
+  Ownership, the sticky bit, setgid, and the umask that made the files wrong on
+  creation.
+- **blocked-on-a-pipe** — a job that hangs forever with no CPU and no error. A
+  writer whose reader never arrived, found with `lsof` and `/proc/<pid>/wchan`.
 
 ### 02 — Networking & Protocols
 `linux-box`
 
 DNS resolution failure (`resolv.conf`, search domains, ndots) · service bound
 to the wrong interface · nftables silently dropping · expired cert, broken
-chain, SNI mismatch · `curl -v` through a proxy · an OSI-layered triage drill.
+chain, SNI mismatch · `curl -v` through a proxy · an OSI-layered triage drill ·
+**key-based SSH**: turn password auth off without locking yourself out, and
+know what `authorized_keys` permissions have to be · **SPF, DKIM and DMARC**
+against a local MTA — the records are DNS, the failure is silent, and the
+symptom is "our mail goes to spam".
 
 ### 03 — Web Servers & Proxies
 `web-stack`
@@ -94,7 +111,10 @@ and why you mirror.
 First resource against the docker provider · what's actually *in* state, and
 state locking · drift: a resource deleted behind your back · variables, outputs,
 modules · `import` an existing resource · remote backend on MinIO · AWS-shaped
-HCL against floci · `prevent_destroy` and blast radius.
+HCL against floci · `prevent_destroy` and blast radius · **a serverless
+function that times out on a cold start** — floci emulates Lambda, so the one
+part of serverless worth teaching (what "cold" costs, and why the timeout you
+picked is wrong) is reachable without an AWS bill.
 
 ### 09 — IaC: Pulumi (Go)
 `iac-stack`
@@ -213,11 +233,12 @@ postmortem for the incident you caused in module 15**.
 
 Instrument the module 07 pipeline to actually emit the metrics. Deployment
 frequency · lead time for changes · change failure rate · **Failed Deployment
-Recovery Time** — renamed from MTTR in 2025 and moved from stability to
-throughput · **Rework Rate**, added in 2025, where only 7.3% of teams are under
-2% · Reliability as a quasi-metric · **the seven archetypes** that replaced
-Elite/High/Medium/Low · gaming your own metrics, and why the four keys are a
-guardrail rather than a leaderboard · the AI Capabilities Model.
+Recovery Time** — renamed from MTTR in 2025 and redefined to count only
+failures a change caused, so a datacentre outage no longer lands in your
+delivery numbers · **Rework Rate**, added in 2025, where only 7.3% of teams are
+under 2% · Reliability as a quasi-metric · **the seven archetypes** that
+replaced Elite/High/Medium/Low · gaming your own metrics, and why the four keys
+are a guardrail rather than a leaderboard · the AI Capabilities Model.
 
 > The 2025 DORA report changed the model substantially. A course still teaching
 > the four performance tiers in 2026 is teaching something that no longer
@@ -239,3 +260,58 @@ postmortem written.
 → [kubelings](https://github.com/madhank93/kubelings) for Kubernetes, ArgoCD and
 Istio · → [golings](https://github.com/madhank93/golings) for Go ·
 → [learn-cks](https://github.com/madhank93/learn-cks) for Kubernetes security.
+
+---
+
+## Where this comes from, and what is deliberately absent
+
+The module list follows the [roadmap.sh DevOps track](https://roadmap.sh/devops)
+with the open-source rule from the README applied on top. The topic list was
+diffed against the live roadmap in **August 2026**; the gaps that diff exposed —
+scripting, text manipulation, SSH, mail records, serverless — are now folded
+into modules 01, 02 and 08 rather than sitting in a backlog nobody reads.
+
+Not covered, on purpose:
+
+| Absent | Why |
+|---|---|
+| Kubernetes, orchestration, service mesh, GitOps, sealed-secrets | Their own repos — [kubelings](https://github.com/madhank93/kubelings), [learn-cks](https://github.com/madhank93/learn-cks) |
+| Datadog, New Relic, Dynatrace, Splunk, Artifactory | Proprietary. The open-source rule picks Prometheus, Grafana, Loki, Tempo, Harbor instead |
+| Chef, Puppet, Salt | Ansible carries the whole configuration-management idea; three more syntaxes teach nothing extra |
+| The BSDs, Windows, PowerShell | Every sandbox is Debian. Breadth here costs image size and buys a skill most readers will not use |
+| Azure, GCP | floci emulates AWS locally and free. A second cloud means a real account and a real bill |
+| Docker Swarm, Consul, FTP/SFTP | Live topics on the roadmap, low value per hour in 2026 |
+
+### Facts with a shelf life
+
+These were verified in **August 2026** and are the ones most likely to rot.
+Re-check them before quoting the numbers at anyone:
+
+- **DORA 2025** renamed MTTR to Failed Deployment Recovery Time and redefined
+  it; added Rework Rate (7.3% of teams under 2%); replaced the four performance
+  tiers with seven team archetypes.
+- **HashiCorp** moved Terraform and Vault to BUSL-1.1 in August 2023. OpenTofu
+  (Linux Foundation, MPL-2.0) forked in September 2023; OpenBao in December 2023.
+- **LocalStack** archived its GitHub repositories on 23 March 2026 and now
+  requires an auth token on `latest`; the acknowledgement escape hatch expired
+  on 6 April 2026. floci (MIT) is the replacement this course uses.
+- **Forgejo Actions** executes GHA-compatible workflow YAML. GitHub's hosted
+  service is proprietary; its runner is MIT.
+
+### Writing a lesson: originality
+
+Platforms like SadServers and iximiuz Labs solve the same problem this repo
+does, and reading them is a good way to find out which failures are worth
+teaching. **Take the idea, never the artefact.** A lesson here is written from
+scratch: our own scenario text, our own service and file names, our own numbers,
+our own check. Do not paste their scenario descriptions, setup scripts, task
+text or solutions into this repository, and do not reproduce a scenario so
+closely that it is theirs with the names changed — their material is under their
+own terms, and this repo is MIT and has to stay cleanly ours. The same goes for
+any blog post, course or book a lesson draws on: cite it in the walkthrough when
+it earned the credit, and write the words yourself.
+
+Cited incidents (GitLab 2017, Knight Capital 2012, AWS S3 2017, Cloudflare 2019,
+Facebook BGP 2021, GitHub 2018) are a different case: link the published
+postmortem, summarise it in your own words, and keep the reconstruction in the
+sandbox a simplification rather than a facsimile.
