@@ -11,24 +11,25 @@ specified and being built.
 
 ## Foundations
 
-### 01 — Linux & Terminal Triage · *shipped*
+### 01 — Linux & Terminal Triage · *partly shipped*
 `linux-box`
 
 The floor everything else stands on. Every incident eventually bottoms out in
 someone reading `df`, `ps`, or a journal on a machine that is misbehaving.
 
-- **disk-full-triage** — `/var/log/app` is at 91% and `du` can only find 12 KB.
+- **disk-full-triage** *(shipped)* — `/var/log/app` is at 91% and `du` can only find 12 KB.
   Space held by a process rather than a directory entry; and why killing the
   process buys you two seconds.
-- **runaway-process** — four processes, one is eating the box. Work the
+- **runaway-process** *(shipped)* — four processes, one is eating the box. Work the
   60-second checklist, identify it by measurement, and leave the other three
   running. The scariest number on the screen is not the cause.
-- **systemd-unit-failure** — `status=1/FAILURE` tells you nothing. Get the
+- **systemd-unit-failure** *(shipped)* — `status=1/FAILURE` tells you nothing. Get the
   application's own message out of the journal, and make the fix survive a
   reboot.
-- **cron-and-path** — the backup script runs perfectly when you run it and
-  writes nothing at 03:00. `cron` gives you a different `PATH`, no TTY and a
-  different shell, and the error went to a mailbox nobody reads. Writing a
+- **cron-and-path** *(shipped)* — the backup script runs perfectly when you run
+  it and writes nothing at 03:17. An unescaped `%` in the crontab truncates the
+  command before it runs; behind that, `cron`'s `PATH` is `/usr/bin:/bin` and
+  the tool is not in it. The error went to a mailbox nobody reads. Writing a
   script that survives being run by something other than you.
 - **text-at-scale** — pull one number out of a million-line log with `awk`,
   `sed` and `sort`. The roadmap assumes this skill everywhere and teaches it

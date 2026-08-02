@@ -128,11 +128,17 @@ func (r *Runner) workDir(l course.Lesson) string {
 // containers are created. Lessons depend on it: a verify that races a
 // still-starting Postgres fails for a reason that has nothing to do with the
 // student.
+//
+// --build costs a cache check on every start and buys the guarantee that the
+// running box matches its Dockerfile. Without it, a sandbox edited to add a
+// package keeps starting from the image built before the edit, and the lesson
+// that needed the package fails with "command not found" on a machine where
+// the Dockerfile plainly installs it.
 func (r *Runner) Up(ctx context.Context, stack string) (Result, error) {
 	if stack == NoStack {
 		return Result{OK: true}, nil
 	}
-	c, err := r.compose(stack, "up", "-d", "--wait", "--remove-orphans")
+	c, err := r.compose(stack, "up", "-d", "--wait", "--build", "--remove-orphans")
 	if err != nil {
 		return Result{}, err
 	}
