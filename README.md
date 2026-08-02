@@ -99,8 +99,10 @@ that transfers.
 
 ## What it covers
 
-Twenty-one modules from Linux triage to DORA. See
-[CURRICULUM.md](CURRICULUM.md) for the full map.
+Twenty-one modules from Linux triage to DORA, 170 exercises. See
+[CURRICULUM.md](CURRICULUM.md) for the map and [EXERCISES.md](EXERCISES.md) for
+every exercise — what breaks, which obvious fix is wrong, and what the check
+measures.
 
 Three areas are deliberately **not** covered here, because they have their own
 repos:

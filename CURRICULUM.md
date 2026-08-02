@@ -7,6 +7,10 @@ an SLO until you understand percentiles.
 Modules marked **shipped** are complete and pass the contract test. The rest are
 specified and being built.
 
+Exercise-level detail — all 170 of them, each with the scenario, the wrong first
+guess and what the check measures — lives in [EXERCISES.md](EXERCISES.md). This
+file is the map; that one is the itinerary.
+
 ---
 
 ## Foundations
