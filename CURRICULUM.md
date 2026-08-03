@@ -86,8 +86,12 @@ begins.
   the directory's setgid bit chooses the group a new file inherits, and the
   unit's `UMask=` chooses its mode. The check ignores the files already there
   and grades the one the service writes next.
-- **blocked-on-a-pipe** *(next)* — a job that hangs forever with no CPU and no error. A
-  writer whose reader never arrived, found with `lsof` and `/proc/<pid>/wchan`.
+- **blocked-on-a-pipe** *(shipped)* — the nightly export is nine hours in and has
+  burned no CPU. It is not stuck, it is blocked: a FIFO writer whose reader
+  failed at 03:00:04 with a one-character typo in its path, hours before
+  anyone looked. `/proc/<pid>/wchan` names the wait in one word — and
+  restarting the job, which is everyone's instinct, destroys that answer and
+  blocks again in the same place.
 - Then: signals and detachment · a journal that eats the disk · the OOM killer's
   record · `EMFILE` under load · inodes rather than bytes · D-state and zombies ·
   clock skew that only breaks TLS.
