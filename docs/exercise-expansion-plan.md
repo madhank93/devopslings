@@ -1,5 +1,13 @@
 # Expand the exercise inventory to full role and difficulty coverage
 
+> **Status: executed.** `EXERCISES.md`, `CURRICULUM.md` and `README.md` now
+> carry the expansion, and the three module directories were renamed. The
+> shipped result is **274 exercises across 27 exercise-bearing modules** rather
+> than the ~259 estimated below: an `intro` rung was added to every module that
+> lacked one, which the estimate had not accounted for. The per-module counts in
+> this document are therefore the plan's, not the outcome's — `EXERCISES.md` is
+> authoritative. Everything else below was executed as written.
+
 ## Context
 
 `EXERCISES.md` (170 entries, 20 modules) covers everything `CURRICULUM.md`

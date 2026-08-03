@@ -99,10 +99,24 @@ that transfers.
 
 ## What it covers
 
-Twenty-one modules from Linux triage to DORA, 170 exercises. See
-[CURRICULUM.md](CURRICULUM.md) for the map and [EXERCISES.md](EXERCISES.md) for
-every exercise — what breaks, which obvious fix is wrong, and what the check
+Twenty-eight modules from Linux triage to platform engineering, 274 exercises.
+See [CURRICULUM.md](CURRICULUM.md) for the map and [EXERCISES.md](EXERCISES.md)
+for every exercise — what breaks, which obvious fix is wrong, and what the check
 measures.
+
+Every exercise carries a difficulty tier, so you can enter where you actually
+are rather than at exercise one:
+
+| Tier | What it asks | Count |
+|---|---|---|
+| **intro** | One concept, guided. Fluency with a tool, not diagnosis. | 29 |
+| **core** | Already broken, the obvious first guess is wrong, the check measures the cause. | 154 |
+| **deep** | A mechanism below the tool's surface — a profile, a packet capture, a kernel counter. | 60 |
+| **architect** | A written decision or design, graded against a rubric. | 31 |
+
+If you arrive from a job title rather than from the top, `CURRICULUM.md` maps
+nine of them — system administrator, network engineer, DBA, systems engineer,
+DevOps, platform, cloud, SRE, architect — onto the modules that serve them.
 
 Three areas are deliberately **not** covered here, because they have their own
 repos:
