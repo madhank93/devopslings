@@ -36,10 +36,12 @@ Three rules that shaped every entry:
 | **architect** | A written decision or design, graded against a rubric. No single right command, and no way to pass by typing faster. |
 
 **Status**: *(shipped)* passes the contract test · *(next)* queued for the
-current wave · everything else is specified and unbuilt.
+current wave · *(blocked)* specified, and the sandbox cannot currently produce
+the failure honestly — the entry says what it would take · everything else is
+specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 20 shipped, 0 next,
-254 specified. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 21 shipped, 1 blocked,
+252 specified. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -52,7 +54,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 01 — Linux & Terminal Triage
-`linux-box` · 18 exercises · 13 shipped · 4 intro · 11 core · 3 deep
+`linux-box` · 18 exercises · 14 shipped · 1 blocked · 4 intro · 12 core · 2 deep
 
 - **find-the-evidence** *(intro · shipped)* — a service misbehaved an hour ago and its own
   log file is empty. Four places hold evidence: the unit's journal, `dmesg`, the
@@ -131,7 +133,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   pipeline is torn down and re-run to a byte-exact output.
   *Source:* own; a FIFO writer whose reader never arrived.
 
-- **oom-killed** *(core)* — a worker vanishes nightly with no log line of its own.
+- **oom-killed** *(core · shipped)* — a worker vanishes nightly with no log line of its own.
   *First guess:* the app crashed; add a `try/except`.
   *Check:* the kernel's OOM record is quoted correctly and the process survives
   the same workload after the limit or the allocation is fixed.
@@ -148,16 +150,32 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   *Check:* `df -i` usage back under threshold with the payload directory intact.
   *Source:* SadServers-style.
 
-- **d-state-and-zombies** *(deep)* — a process that will not die and one that is already dead.
-  *First guess:* `kill -9` both. One ignores it, the other is not a process.
-  *Check:* the answer file names which is which and why, and the reaping parent
-  is fixed so the zombie table stays empty under load.
-  *Source:* own.
+- **zombies-and-the-reaping-parent** *(core)* — the process table fills with
+  entries that are already dead.
+  *First guess:* `kill -9` them, which does nothing — a zombie is not a process,
+  it is an exit status nobody has collected.
+  *Check:* the answer names why the signal has no effect, and the parent is
+  fixed so the zombie table stays empty under sustained load.
+  *Source:* own. **Rescoped:** this was `d-state-and-zombies`. The D-state half
+  is not reproducible on `linux-box` — the cgroup freezer yields `S` in
+  `do_freezer_trap` and a frozen task still dies from `SIGKILL`, so there is no
+  honest unkillable process without a wedged mount. That half now lives in
+  module 04 as `d-state-and-the-wedged-mount`, where an NFS server can be taken
+  away mid-read.
 
-- **clock-skew** *(core)* — TLS handshakes and tokens fail on one box only.
+- **clock-skew** *(core · blocked)* — TLS handshakes and tokens fail for one
+  service only.
   *First guess:* the certificate is bad; regenerate it.
-  *Check:* skew inside tolerance via a running time sync, not a one-shot `date`.
-  *Source:* own.
+  *Check:* the answer identifies the skew by comparing what the service believes
+  the time is against the box, and the handshake succeeds once the skew source
+  is removed and a time sync is running.
+  *Source:* own. **Blocked on the sandbox.** A container cannot hold its own
+  wall clock: time namespaces virtualise `CLOCK_MONOTONIC` and boottime only,
+  never `CLOCK_REALTIME`, and `date -s` inside a privileged container moves the
+  clock for the whole Docker VM and every other container on it. Shipping this
+  needs `libfaketime` added to the `linux-box` image so the skew can be confined
+  to one service via `LD_PRELOAD` — an injected fault in the same spirit as
+  `chaos-stack`'s latency, and it must say so in the lesson.
 
 ---
 
