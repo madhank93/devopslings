@@ -38,8 +38,8 @@ Three rules that shaped every entry:
 **Status**: *(shipped)* passes the contract test · *(next)* queued for the
 current wave · everything else is specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 18 shipped, 0 next,
-256 specified. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 20 shipped, 0 next,
+254 specified. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -52,7 +52,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 01 — Linux & Terminal Triage
-`linux-box` · 18 exercises · 11 shipped · 4 intro · 11 core · 3 deep
+`linux-box` · 18 exercises · 13 shipped · 4 intro · 11 core · 3 deep
 
 - **find-the-evidence** *(intro · shipped)* — a service misbehaved an hour ago and its own
   log file is empty. Four places hold evidence: the unit's journal, `dmesg`, the
@@ -118,7 +118,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   distinguishes the process group from the session leader.
   *Source:* own.
 
-- **journal-eats-the-disk** *(core)* — a healthy box runs out of space in three weeks.
+- **journal-eats-the-disk** *(core · shipped)* — a healthy box runs out of space in three weeks.
   *First guess:* `rm` the journal files, which the running journald keeps open.
   *Check:* journal size bounded under a sustained write, with the history the
   retention policy promises still queryable.
@@ -143,7 +143,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   fd count stays flat across a second load run.
   *Source:* own.
 
-- **inodes-not-bytes** *(core)* — writes fail with `ENOSPC`, `df -h` says 40% free.
+- **inodes-not-bytes** *(core · shipped)* — writes fail with `ENOSPC`, `df -h` says 40% free.
   *First guess:* look for a big file; there isn't one.
   *Check:* `df -i` usage back under threshold with the payload directory intact.
   *Source:* SadServers-style.
