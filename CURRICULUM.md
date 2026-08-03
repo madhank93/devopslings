@@ -80,9 +80,12 @@ begins.
   and teaches it nowhere; graded on the answers, so a pipeline that is slow but
   right beats a clever one that is wrong. `grep -c 503` returns 202,127; the
   answer is 8,493.
-- **permissions-triage** *(next)* — a service cannot write to a directory it owns.
-  Ownership, the sticky bit, setgid, and the umask that made the files wrong on
-  creation.
+- **permissions-triage** *(shipped)* — `report-writer` cannot create a file in a
+  directory its own group owns. `chmod 777` clears the error and the *next* file
+  is still wrong, because two separate mechanisms decide two separate things:
+  the directory's setgid bit chooses the group a new file inherits, and the
+  unit's `UMask=` chooses its mode. The check ignores the files already there
+  and grades the one the service writes next.
 - **blocked-on-a-pipe** *(next)* — a job that hangs forever with no CPU and no error. A
   writer whose reader never arrived, found with `lsof` and `/proc/<pid>/wchan`.
 - Then: signals and detachment · a journal that eats the disk · the OOM killer's

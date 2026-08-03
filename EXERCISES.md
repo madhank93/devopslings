@@ -38,7 +38,7 @@ Three rules that shaped every entry:
 **Status**: *(shipped)* passes the contract test · *(next)* queued for the
 current wave · everything else is specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 12 shipped, 2 next,
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 13 shipped, 1 next,
 260 specified. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -52,7 +52,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 01 — Linux & Terminal Triage
-`linux-box` · 18 exercises · 5 shipped · 4 intro · 11 core · 3 deep
+`linux-box` · 18 exercises · 6 shipped · 4 intro · 11 core · 3 deep
 
 - **find-the-evidence** *(intro)* — a service misbehaved an hour ago and its own
   log file is empty. Four places hold evidence: the unit's journal, `dmesg`, the
@@ -105,11 +105,12 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   *Check:* the three answers, recomputed from a fingerprinted log.
   *Source:* roadmap.sh gap (text processing is assumed everywhere, taught nowhere).
 
-- **permissions-triage** *(core · next)* — a service cannot write to a directory it owns.
+- **permissions-triage** *(core · shipped)* — a service cannot write to a directory it owns.
   *First guess:* `chmod 777`, which fixes it until the next file is created.
-  *Check:* the service writes, new files land with the right group and mode, and
-  0777 anywhere in the tree fails the check.
-  *Source:* own; setgid + umask.
+  *Check:* the check starts the service and inspects the *new* file — owner,
+  group, mode, and whether the consuming account can read it; world-writable
+  anywhere in the tree fails.
+  *Source:* own; setgid + umask, which are two mechanisms and not one.
 
 - **signals-and-detach** *(core)* — the long job dies every time the SSH session drops.
   *First guess:* `&` on the end of the command, which changes nothing.
