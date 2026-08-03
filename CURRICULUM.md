@@ -55,11 +55,29 @@ modules that title lives in.
 The floor everything else stands on. Every incident eventually bottoms out in
 someone reading `df`, `ps`, or a journal on a machine that is misbehaving.
 
-Four `intro` exercises open the module for readers who have not done this
-before — finding which of four places holds the evidence, a package that `apt`
-kept back without telling you, writing a systemd unit from scratch, and the
-group membership that did not apply until the next login. Then the triage
-begins.
+Four `intro` exercises open the module, all *shipped*, for readers who have not
+done this before:
+
+- **find-the-evidence** — `invoice-sync` died and its log file is 0 bytes, which
+  is a fact rather than an absence. Four places hold evidence about a dead
+  process — the journal, `dmesg`, files under `/var/log`, and a live process's
+  open descriptors — and knowing which answers which question is the assumption
+  every later exercise here makes.
+- **package-held-back** — `apt upgrade` has exited 0 nightly for three weeks and
+  the CVE fix is still not installed. Exit 0 means the job finished, not that
+  the outcome happened; the diagnosis was printed every night into a log nobody
+  reads. State set during an incident outlives the incident.
+- **write-a-unit** — a script that works when you run it, and nothing to start
+  it at boot, bring it back when it exits, or keep it behind its dependency.
+  `Restart=on-failure` looks like the careful choice and silently excludes clean
+  exits; a retry loop reaches the same end state as `After=` and hides a real
+  ordering bug.
+- **users-groups-sudoers** — dana is in the group, `id dana` agrees, and dana's
+  shell says permission denied. Configuration and state diverge: a process's
+  group list is built at login and never revisited. Then grant one command
+  through sudo rather than a shell.
+
+Then the triage begins.
 
 - **disk-full-triage** *(shipped)* — `/var/log/app` is at 91% and `du` can only find 12 KB.
   Space held by a process rather than a directory entry; and why killing the

@@ -38,7 +38,7 @@ Three rules that shaped every entry:
 **Status**: *(shipped)* passes the contract test · *(next)* queued for the
 current wave · everything else is specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 14 shipped, 4 next,
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 18 shipped, 0 next,
 256 specified. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -52,28 +52,28 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 01 — Linux & Terminal Triage
-`linux-box` · 18 exercises · 7 shipped · 4 intro · 11 core · 3 deep
+`linux-box` · 18 exercises · 11 shipped · 4 intro · 11 core · 3 deep
 
-- **find-the-evidence** *(intro · next)* — a service misbehaved an hour ago and its own
+- **find-the-evidence** *(intro · shipped)* — a service misbehaved an hour ago and its own
   log file is empty. Four places hold evidence: the unit's journal, `dmesg`, the
   files under `/var/log`, and the process's open file descriptors.
   *Check:* the answer file names which of the four held the record, and quotes
   the line — a guess that names the right place with the wrong line fails.
   *Source:* own; the skill every later module assumes and none teaches.
 
-- **package-held-back** *(intro · next)* — `apt upgrade` says one package was kept back
+- **package-held-back** *(intro · shipped)* — `apt upgrade` says one package was kept back
   and exits 0. The security fix everyone believes is installed is not.
   *Check:* the package is at the fixed version, the reason it was held is named,
   and `apt-mark showhold` is clean.
   *Source:* own; roadmap.sh package-management gap.
 
-- **write-a-unit** *(intro · next)* — a working script and no unit. Write one.
+- **write-a-unit** *(intro · shipped)* — a working script and no unit. Write one.
   *Check:* the service starts on boot, restarts on failure, comes up after its
   dependency rather than alongside it, and logs to the journal — `Type=`,
   `Restart=`, and `After=` versus `Requires=` all exercised.
   *Source:* own; the counterpart to systemd-unit-failure, from the other side.
 
-- **users-groups-sudoers** *(intro · next)* — the user is in the group and still cannot
+- **users-groups-sudoers** *(intro · shipped)* — the user is in the group and still cannot
   read the file.
   *First guess:* the group membership did not apply — re-add the user.
   *Check:* access works in a fresh login session, and the answer names why the
