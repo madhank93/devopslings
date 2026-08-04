@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 28 shipped,
-246 specified. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 31 shipped,
+243 specified. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -178,7 +178,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 02 — Scripting & Automation
-`linux-box` · 9 exercises · 3 shipped · 2 intro · 5 core · 1 deep · 1 architect
+`linux-box` · 9 exercises · 6 shipped · 2 intro · 5 core · 1 deep · 1 architect
 
 The roadmap says "learn a programming language" and stops. This module is the
 part that actually bites: a script that works on your machine, on your files,
@@ -190,7 +190,7 @@ once, and then runs at 03:00 against input you did not imagine.
   proven against a fixture directory built to contain all three.
   *Source:* own.
 
-- **arguments-and-usage** *(intro)* — a script with three positional arguments
+- **arguments-and-usage** *(intro · shipped)* — a script with three positional arguments
   nobody can remember the order of.
   *Check:* named flags with defaults, a usage message on `-h`, and a non-zero
   exit with a specific message when a required argument is missing.
@@ -211,14 +211,14 @@ once, and then runs at 03:00 against input you did not imagine.
   are each handled, verified by a seeded failure in every one.
   *Source:* own; the most confidently misunderstood line in shell scripting.
 
-- **idempotent-by-construction** *(core)* — the provisioning script works once
+- **idempotent-by-construction** *(core · shipped)* — the provisioning script works once
   and corrupts the box on the second run.
   *First guess:* add a "has this run before" flag file.
   *Check:* running it three times leaves the same end state as running it once,
   including after an interrupted middle run.
   *Source:* own; the property module 15 makes Ansible's whole argument.
 
-- **trap-and-cleanup** *(core)* — every interrupted run leaves a 2 GB temp
+- **trap-and-cleanup** *(core · shipped)* — every interrupted run leaves a 2 GB temp
   directory behind, and there are forty of them.
   *First guess:* delete the temp directory at the end of the script.
   *Check:* the temp directory is gone after a normal exit, after an error exit,
