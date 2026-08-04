@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       sudo \
       openssl \
       jq \
+      lvm2 e2fsprogs \
       faketime \
       vim-tiny nano \
       sysstat \

@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 34 shipped,
-240 specified. Modules 01 and 02 are complete. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 36 shipped,
+238 specified. Modules 01 and 02 are complete. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -248,7 +248,7 @@ once, and then runs at 03:00 against input you did not imagine.
 ---
 
 ## 03 — Storage, Filesystems & the Kernel
-`linux-box` (privileged profile: loop devices, `SYS_ADMIN`) · 10 exercises ·
+`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 2 shipped ·
 1 intro · 4 core · 4 deep · 1 architect
 
 Where "the disk is slow" and "we are out of memory" turn out to be four
@@ -260,7 +260,7 @@ different things each.
   names the field that was wrong and what `nofail` would have changed.
   *Source:* own.
 
-- **lvm-extend-under-pressure** *(core)* — 96% full, a spare disk, and a live service.
+- **lvm-extend-under-pressure** *(core · shipped)* — 96% full, a spare disk, and a live service.
   *First guess:* extend the logical volume and call it done — the filesystem
   never learned about the new space.
   *Check:* free space visible to the application, both steps done in the right
@@ -274,19 +274,28 @@ different things each.
   a `fstab` still keyed on `/dev/sd*` fails.
   *Source:* own.
 
-- **swap-and-swappiness** *(core)* — the box is unusably slow with 30% memory free.
-  *First guess:* add memory, or disable swap entirely.
-  *Check:* the page-fault and page-out rates are quoted as the evidence, and the
-  fix brings latency back without the box going OOM under the same workload.
-  *Source:* own.
+- **swap-and-swappiness** *(core)* — a workload is unusably slow with memory to
+  spare, because it is paging.
+  *First guess:* add memory, or turn swap off.
+  *Check:* the page-in/page-out rate is quoted from the cgroup's `memory.stat`
+  as the evidence, and the fix restores throughput without the workload being
+  OOM-killed under the same input.
+  *Source:* own. **Rescoped to a cgroup.** Swap is machine-wide: a container
+  shares `/proc/swaps` and `vm.swappiness` with its host, so `swapon` or a
+  swappiness change inside the box would alter the whole Docker VM. The lesson
+  therefore works inside a memory cgroup via `memory.max` and `memory.swap.max`,
+  which are genuinely per-container, and says so.
 
 - **sysctl-that-survives** *(core)* — the network tuning works until the reboot.
   *First guess:* put `sysctl -w` in `rc.local`.
-  *Check:* the setting holds across a reboot, is applied by the documented
-  mechanism, and the answer names which vendor file was overriding it.
-  *Source:* own.
+  *Check:* the setting holds across a restart of the sandbox, is applied by the
+  documented mechanism, and the answer names which drop-in was overriding it.
+  *Source:* own. Uses a `net.*` sysctl deliberately: network sysctls are
+  per-network-namespace and therefore genuinely the container's own, while
+  `vm.*` and `kernel.*` are shared with the host and must not be written from a
+  lesson.
 
-- **cgroup-cpu-throttling** *(deep)* — p99 spikes every few seconds and CPU
+- **cgroup-cpu-throttling** *(deep · shipped)* — p99 spikes every few seconds and CPU
   utilisation sits at 40%.
   *First guess:* the graph shows spare CPU, so it is not CPU.
   *Check:* `nr_throttled` and `throttled_time` are quoted as the evidence, and
