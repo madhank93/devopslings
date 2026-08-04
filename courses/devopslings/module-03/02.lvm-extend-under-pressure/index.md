@@ -29,6 +29,11 @@ tasks:
         losetup -d "$l" 2>/dev/null || true
       done
       rm -f /var/lib/devopslings-pv*.img
+      # There is no udev in a container, so /dev/loopN nodes past the handful the
+      # image ships are never created and `losetup --find` fails on them.
+      for i in $(seq 0 15); do
+        [ -e "/dev/loop$i" ] || mknod "/dev/loop$i" b 7 "$i" 2>/dev/null || true
+      done
       install -d /srv/data
 
       # PV 1 becomes the volume group; PV 2 is the "spare disk" the student has

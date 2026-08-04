@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 36 shipped,
-238 specified. Modules 01 and 02 are complete. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 38 shipped,
+236 specified. Modules 01 and 02 are complete. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -248,13 +248,13 @@ once, and then runs at 03:00 against input you did not imagine.
 ---
 
 ## 03 — Storage, Filesystems & the Kernel
-`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 2 shipped ·
+`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 4 shipped ·
 1 intro · 4 core · 4 deep · 1 architect
 
 Where "the disk is slow" and "we are out of memory" turn out to be four
 different things each.
 
-- **mount-and-fstab** *(intro)* — a typo in `/etc/fstab` and a box that stops
+- **mount-and-fstab** *(intro · shipped)* — a typo in `/etc/fstab` and a box that stops
   half way through boot.
   *Check:* the filesystem mounts at boot with the right options, and the answer
   names the field that was wrong and what `nofail` would have changed.
@@ -267,7 +267,7 @@ different things each.
   order, with the service serving throughout.
   *Source:* own.
 
-- **uuid-not-device-name** *(core)* — after a reboot the data volume mounted at
+- **uuid-not-device-name** *(core · shipped)* — after a reboot the data volume mounted at
   the log path and vice versa.
   *First guess:* swap the device names back in `fstab`.
   *Check:* mounts are stable across two reboots with a device added in between —
@@ -303,12 +303,15 @@ different things each.
   *request* alone does not pass.
   *Source:* own; the single most common invisible latency cause in containers.
 
-- **iostat-await-versus-util** *(deep)* — one disk at 100% util that is not the
+- **iostat-await-versus-util** *(deep)* — one device at 100% util that is not the
   bottleneck, and one at 45% that is.
   *First guess:* 100% util means saturated.
   *Check:* the answer names the saturated device from `await` and queue depth,
   and explains why util is a residency measure rather than a capacity one.
-  *Source:* Brendan Gregg's USE method, applied to disks.
+  *Source:* Brendan Gregg's USE method, applied to disks. The contrast is
+  produced with real I/O patterns — deep-queue random O_DIRECT against light
+  sequential — rather than `dm-delay`, which the sandbox kernel does not have
+  (see the note under `fsync-and-the-lie`).
 
 - **page-cache-versus-rss** *(deep)* — "the application is leaking 8 GB".
   *First guess:* restart it nightly.
