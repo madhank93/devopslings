@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 21 shipped, 1 blocked,
-252 specified. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 24 shipped, 1 blocked,
+249 specified. Module 01 is complete apart from the blocked entry. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -54,7 +54,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 01 — Linux & Terminal Triage
-`linux-box` · 18 exercises · 14 shipped · 1 blocked · 4 intro · 12 core · 2 deep
+`linux-box` · 18 exercises · 17 shipped · 1 blocked · 4 intro · 12 core · 2 deep
 
 - **find-the-evidence** *(intro · shipped)* — a service misbehaved an hour ago and its own
   log file is empty. Four places hold evidence: the unit's journal, `dmesg`, the
@@ -114,7 +114,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   anywhere in the tree fails.
   *Source:* own; setgid + umask, which are two mechanisms and not one.
 
-- **signals-and-detach** *(core)* — the long job dies every time the SSH session drops.
+- **signals-and-detach** *(core · shipped)* — the long job dies every time the SSH session drops.
   *First guess:* `&` on the end of the command, which changes nothing.
   *Check:* the job survives a hangup delivered to the session, and the answer
   distinguishes the process group from the session leader.
@@ -139,7 +139,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   the same workload after the limit or the allocation is fixed.
   *Source:* SadServers-style (OOM triage is a staple).
 
-- **too-many-open-files** *(deep)* — `EMFILE` under load, fine when idle.
+- **too-many-open-files** *(deep · shipped)* — `EMFILE` under load, fine when idle.
   *First guess:* raise `ulimit -n` in your shell; the service does not inherit it.
   *Check:* the limit is raised where systemd reads it *and* the fd leak is gone —
   fd count stays flat across a second load run.
@@ -150,7 +150,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   *Check:* `df -i` usage back under threshold with the payload directory intact.
   *Source:* SadServers-style.
 
-- **zombies-and-the-reaping-parent** *(core)* — the process table fills with
+- **zombies-and-the-reaping-parent** *(core · shipped)* — the process table fills with
   entries that are already dead.
   *First guess:* `kill -9` them, which does nothing — a zombie is not a process,
   it is an exit status nobody has collected.
