@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 31 shipped,
-243 specified. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 34 shipped,
+240 specified. Modules 01 and 02 are complete. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -178,7 +178,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 02 — Scripting & Automation
-`linux-box` · 9 exercises · 6 shipped · 2 intro · 5 core · 1 deep · 1 architect
+`linux-box` · 9 exercises · 9 shipped · 2 intro · 5 core · 1 deep · 1 architect
 
 The roadmap says "learn a programming language" and stops. This module is the
 part that actually bites: a script that works on your machine, on your files,
@@ -225,20 +225,20 @@ once, and then runs at 03:00 against input you did not imagine.
   and after `SIGINT` mid-run — all three tested.
   *Source:* own.
 
-- **parse-do-not-scrape** *(core)* — the log parser breaks when a field gains a space.
+- **parse-do-not-scrape** *(core · shipped)* — the log parser breaks when a field gains a space.
   *First guess:* widen the regex, which then matches the wrong field.
   *Check:* the parser reads the structured field correctly for every record in
   the fixture, including the three records with embedded spaces and quotes.
   *Source:* own; the `jq`-not-`awk` boundary.
 
-- **python-for-the-api** *(deep)* — a report script that quietly misses 40% of records.
+- **python-for-the-api** *(deep · shipped)* — a report script that quietly misses 40% of records.
   *First guess:* one request, read the list, done — page one of nine.
   *Check:* all records retrieved across pagination, rate-limit headers respected
   rather than slept through, and a transient 503 retried with backoff — the
   fixture API returns all three conditions.
   *Source:* own; where bash should have stopped.
 
-- **when-bash-stops** *(architect)* — four real scripts, one decision each.
+- **when-bash-stops** *(architect · shipped)* — four real scripts, one decision each.
   *Check:* the answer file picks shell or a program for each and cites the
   constraint that decided it — dependency management, testability, data
   structures, or error handling — graded against a rubric that rejects

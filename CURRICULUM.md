@@ -120,7 +120,7 @@ Then the triage begins.
   they are already dead · and a TLS handshake that fails against a correct
   certificate, because the client and the box disagree about what day it is.
 
-### 02 — Scripting & Automation · *partly shipped*
+### 02 — Scripting & Automation · *shipped*
 `linux-box`
 
 The roadmap says "learn a programming language" and stops. This module is the
