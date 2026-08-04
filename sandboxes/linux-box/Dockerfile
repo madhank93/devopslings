@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       procps psmisc lsof file less \
       iproute2 iputils-ping curl ca-certificates \
       sudo \
+      openssl \
+      faketime \
       vim-tiny nano \
       sysstat \
       python3 \

@@ -95,9 +95,18 @@ tasks:
       fi
 
       want_payload=$(cat /var/lib/devopslings/inodes.payload.sha256)
-      got_payload=$(sha256sum /srv/spool/payload/* 2>/dev/null | sha256sum | awk '{print $1}')
+
+      # Count before checksumming. If the payload was deleted the glob does not
+      # expand, sha256sum exits non-zero, and under `set -euo pipefail` the whole
+      # check would die here without printing anything — leaving the student told
+      # they are wrong with no reason, on the single most likely wrong answer.
+      n=$(find /srv/spool/payload -maxdepth 1 -type f 2>/dev/null | wc -l)
+      if [ "$n" -ne 12 ]; then
+        got_payload="(missing)"
+      else
+        got_payload=$(sha256sum /srv/spool/payload/* 2>/dev/null | sha256sum | awk '{print $1}' || true)
+      fi
       if [ "$got_payload" != "$want_payload" ]; then
-        n=$(find /srv/spool/payload -type f 2>/dev/null | wc -l)
         echo "not yet: /srv/spool/payload is not intact — $n of 12 files present"
         echo "         deleting everything under /srv/spool frees the inodes and destroys"
         echo "         the settlement batch. The stale sessions were the problem, not the"

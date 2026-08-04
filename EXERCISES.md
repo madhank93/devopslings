@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 24 shipped, 1 blocked,
-249 specified. Module 01 is complete apart from the blocked entry. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 25 shipped,
+249 specified. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -54,7 +54,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 01 — Linux & Terminal Triage
-`linux-box` · 18 exercises · 17 shipped · 1 blocked · 4 intro · 12 core · 2 deep
+`linux-box` · 18 exercises · 18 shipped · 4 intro · 12 core · 2 deep
 
 - **find-the-evidence** *(intro · shipped)* — a service misbehaved an hour ago and its own
   log file is empty. Four places hold evidence: the unit's journal, `dmesg`, the
@@ -163,19 +163,17 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   module 04 as `d-state-and-the-wedged-mount`, where an NFS server can be taken
   away mid-read.
 
-- **clock-skew** *(core · blocked)* — TLS handshakes and tokens fail for one
-  service only.
-  *First guess:* the certificate is bad; regenerate it.
-  *Check:* the answer identifies the skew by comparing what the service believes
-  the time is against the box, and the handshake succeeds once the skew source
-  is removed and a time sync is running.
-  *Source:* own. **Blocked on the sandbox.** A container cannot hold its own
-  wall clock: time namespaces virtualise `CLOCK_MONOTONIC` and boottime only,
-  never `CLOCK_REALTIME`, and `date -s` inside a privileged container moves the
-  clock for the whole Docker VM and every other container on it. Shipping this
-  needs `libfaketime` added to the `linux-box` image so the skew can be confined
-  to one service via `LD_PRELOAD` — an injected fault in the same spirit as
-  `chaos-stack`'s latency, and it must say so in the lesson.
+- **clock-skew** *(core · shipped)* — TLS handshakes fail for one service only.
+  *First guess:* the certificate is bad; regenerate it. The certificate is
+  correct, the chain verifies, the SAN matches, and `curl` from the shell works.
+  *Check:* the cause is named, verification is still enabled, and the time the
+  *service itself* reports is within two minutes of the box — so a handshake
+  made to succeed some other way fails.
+  *Source:* own. The skew is injected with `libfaketime` via `LD_PRELOAD` on the
+  one unit, because a container shares the kernel wall clock with its host —
+  time namespaces virtualise only `CLOCK_MONOTONIC` and boottime, and `date -s`
+  inside the box would move the clock for every container on the machine. The
+  lesson says so.
 
 ---
 

@@ -49,7 +49,7 @@ modules that title lives in.
 
 ## Foundations
 
-### 01 — Linux & Terminal Triage · *partly shipped*
+### 01 — Linux & Terminal Triage · *shipped*
 `linux-box`
 
 The floor everything else stands on. Every incident eventually bottoms out in
@@ -110,9 +110,15 @@ Then the triage begins.
   anyone looked. `/proc/<pid>/wchan` names the wait in one word — and
   restarting the job, which is everyone's instinct, destroys that answer and
   blocks again in the same place.
-- Then: signals and detachment · a journal that eats the disk · the OOM killer's
-  record · `EMFILE` under load · inodes rather than bytes · D-state and zombies ·
-  clock skew that only breaks TLS.
+- Then, all *shipped*: a job that dies with the SSH session, because `&`
+  backgrounds within the same session and the hangup is delivered to the
+  session · a healthy service whose journal fills the disk in three weeks · the
+  OOM killer's record, in the three places the application could never have
+  written to · `EMFILE`, where the ceiling and the leak are two separate faults ·
+  `ENOSPC` with the disk empty, because inodes are the other thing a filesystem
+  runs out of · a process table full of entries `kill -9` cannot touch, because
+  they are already dead · and a TLS handshake that fails against a correct
+  certificate, because the client and the box disagree about what day it is.
 
 ### 02 — Scripting & Automation
 `linux-box`
