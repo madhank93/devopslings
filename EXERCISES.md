@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 25 shipped,
-249 specified. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 28 shipped,
+246 specified. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -178,13 +178,13 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 02 — Scripting & Automation
-`linux-box` · 9 exercises · 2 intro · 5 core · 1 deep · 1 architect
+`linux-box` · 9 exercises · 3 shipped · 2 intro · 5 core · 1 deep · 1 architect
 
 The roadmap says "learn a programming language" and stops. This module is the
 part that actually bites: a script that works on your machine, on your files,
 once, and then runs at 03:00 against input you did not imagine.
 
-- **unquoted-and-broken** *(intro)* — the archive script works until a filename
+- **unquoted-and-broken** *(intro · shipped)* — the archive script works until a filename
   gains a space, then deletes the wrong thing.
   *Check:* the script handles spaces, newlines and a leading dash in filenames,
   proven against a fixture directory built to contain all three.
@@ -196,14 +196,14 @@ once, and then runs at 03:00 against input you did not imagine.
   exit with a specific message when a required argument is missing.
   *Source:* own.
 
-- **exit-codes-and-pipefail** *(core)* — the nightly job reports success and
+- **exit-codes-and-pipefail** *(core · shipped)* — the nightly job reports success and
   produced nothing.
   *First guess:* the last command worked, so the script worked.
   *Check:* the pipeline's real failure is surfaced and the script exits non-zero;
   a seeded mid-pipe failure must not pass.
   *Source:* own; `$?` is the last stage only.
 
-- **set-e-does-not-do-that** *(core)* — `set -e` is at the top and the failure
+- **set-e-does-not-do-that** *(core · shipped)* — `set -e` is at the top and the failure
   still sails through.
   *First guess:* add `set -e` harder, or `set -euo pipefail` and assume it is done.
   *Check:* the four contexts where `set -e` is suspended — `if`, `&&`/`||`,

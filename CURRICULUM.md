@@ -120,16 +120,26 @@ Then the triage begins.
   they are already dead · and a TLS handshake that fails against a correct
   certificate, because the client and the box disagree about what day it is.
 
-### 02 — Scripting & Automation
+### 02 — Scripting & Automation · *partly shipped*
 `linux-box`
 
 The roadmap says "learn a programming language" and stops. This module is the
 part that bites: a script that works on your machine, on your files, once, and
 then runs at 03:00 against input you did not imagine.
 
-Quoting and the filename with a space · exit codes and why `$?` is the last
-stage of a pipe only · **the four contexts where `set -e` is silently
-suspended** · idempotency by construction, so the second run is a no-op ·
+- **unquoted-and-broken** *(shipped)* — an archive script correct for a year,
+  because every filename it had seen happened to contain no character the shell
+  treats as syntax. `$(ls)` is one string that gets word-split and glob-expanded
+  before the loop sees it; the run that ate the quarterly report exited 0.
+- **exit-codes-and-pipefail** *(shipped)* — a nightly job that exits 0 and
+  writes `0 0.00`. A pipeline has as many statuses as stages and reports one,
+  and `awk` succeeded at processing nothing.
+- **set-e-does-not-do-that** *(shipped)* — `set -euo pipefail` is on line 2 and
+  the failure went through anyway. Four constructs suspend it, and the one
+  nobody sees is `local x=$(cmd)` — a plain assignment propagates the status,
+  and adding `local` for hygiene is what discards it.
+
+Then: idempotency by construction, so the second run is a no-op ·
 `trap … EXIT` and the 2 GB temp directory times forty · parsing structured data
 rather than widening a regex · **a Python script that quietly misses 40% of the
 records** because pagination, rate limits and transient 503s all exist · and a
