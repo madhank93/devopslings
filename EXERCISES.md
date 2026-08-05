@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 38 shipped,
-236 specified. Modules 01 and 02 are complete. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 40 shipped,
+234 specified. Modules 01 and 02 are complete. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -248,7 +248,7 @@ once, and then runs at 03:00 against input you did not imagine.
 ---
 
 ## 03 — Storage, Filesystems & the Kernel
-`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 4 shipped ·
+`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 6 shipped ·
 1 intro · 4 core · 4 deep · 1 architect
 
 Where "the disk is slow" and "we are out of memory" turn out to be four
@@ -286,7 +286,7 @@ different things each.
   therefore works inside a memory cgroup via `memory.max` and `memory.swap.max`,
   which are genuinely per-container, and says so.
 
-- **sysctl-that-survives** *(core)* — the network tuning works until the reboot.
+- **sysctl-that-survives** *(core · shipped)* — the network tuning works until the reboot.
   *First guess:* put `sysctl -w` in `rc.local`.
   *Check:* the setting holds across a restart of the sandbox, is applied by the
   documented mechanism, and the answer names which drop-in was overriding it.
@@ -313,7 +313,7 @@ different things each.
   sequential — rather than `dm-delay`, which the sandbox kernel does not have
   (see the note under `fsync-and-the-lie`).
 
-- **page-cache-versus-rss** *(deep)* — "the application is leaking 8 GB".
+- **page-cache-versus-rss** *(deep · shipped)* — "the application is leaking 8 GB".
   *First guess:* restart it nightly.
   *Check:* the answer separates page cache from anonymous RSS with evidence from
   `smaps`, and the seeded genuine leak — which is present, and smaller — is

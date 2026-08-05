@@ -149,7 +149,7 @@ tasks:
       p99=$(sort -n /srv/pricing/latency.txt | awk '{a[NR]=$1} END {printf "%.1f", a[int(NR*0.99)]}')
       ok=$(awk -v p="$p99" 'BEGIN {print (p < 40) ? 1 : 0}')
       if [ "$ok" -ne 1 ]; then
-        cg=/sys/fs/cgroup/system.slice/pricing-api.service
+        cg="/sys/fs/cgroup$(systemctl show -p ControlGroup --value pricing-api.service 2>/dev/null)"
         nr=$(awk '/nr_throttled/ {print $2}' "$cg/cpu.stat" 2>/dev/null || echo "?")
         echo "not yet: p99 is ${p99}ms over $n samples, and it needs to be under 40ms"
         echo "         nr_throttled for this unit is currently $nr"
@@ -159,7 +159,7 @@ tasks:
         exit 1
       fi
 
-      cg=/sys/fs/cgroup/system.slice/pricing-api.service
+      cg="/sys/fs/cgroup$(systemctl show -p ControlGroup --value pricing-api.service 2>/dev/null)"
       nr=$(awk '/nr_throttled/ {print $2}' "$cg/cpu.stat" 2>/dev/null || echo 0)
       echo "PASS — cause identified as $want; p99 is ${p99}ms over $n samples with a CPU"
       echo "       limit still in place (nr_throttled: $nr)."
