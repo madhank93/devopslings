@@ -248,7 +248,7 @@ once, and then runs at 03:00 against input you did not imagine.
 ---
 
 ## 03 — Storage, Filesystems & the Kernel
-`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 6 shipped ·
+`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 8 shipped ·
 1 intro · 4 core · 4 deep · 1 architect
 
 Where "the disk is slow" and "we are out of memory" turn out to be four
@@ -274,17 +274,29 @@ different things each.
   a `fstab` still keyed on `/dev/sd*` fails.
   *Source:* own.
 
-- **swap-and-swappiness** *(core)* — a workload is unusably slow with memory to
-  spare, because it is paging.
+- **swap-and-swappiness** *(core · shipped)* — a batch job is nine times slower on a
+  box with gigabytes free, because it is paging against a limit that is not the
+  machine's.
   *First guess:* add memory, or turn swap off.
-  *Check:* the page-in/page-out rate is quoted from the cgroup's `memory.stat`
-  as the evidence, and the fix restores throughput without the workload being
-  OOM-killed under the same input.
+  *Check:* `pswpin` is named from the unit cgroup's `memory.stat` as the
+  evidence that separates a large job from a paging one, and the pass rate
+  recovers under the same input without the job being OOM-killed. Turning swap
+  off fails — the job is killed instead — and so does shrinking the work or
+  touching `vm.swappiness`.
   *Source:* own. **Rescoped to a cgroup.** Swap is machine-wide: a container
   shares `/proc/swaps` and `vm.swappiness` with its host, so `swapon` or a
   swappiness change inside the box would alter the whole Docker VM. The lesson
-  therefore works inside a memory cgroup via `memory.max` and `memory.swap.max`,
-  which are genuinely per-container, and says so.
+  therefore works inside a memory cgroup via `MemoryMax` and `MemorySwapMax`,
+  which are genuinely per-unit, and grades a swappiness change as a wrong answer
+  with the reason given.
+
+  Worth knowing while writing it: a working set that overflows its limit is
+  *not* reliably slow. Read in address order, readahead plus the host's zram
+  swap keep an overflowing job within a few percent of a resident one — the
+  first draft measured a 9x gap that turned out to be first-touch warmup, and
+  in steady state there was no gap at all. The job has to touch its working set
+  in key order for the failure to exist. Sequential overflow is cheap; random
+  overflow is 11x. Any lesson about paging has to say which one it means.
 
 - **sysctl-that-survives** *(core · shipped)* — the network tuning works until the reboot.
   *First guess:* put `sysctl -w` in `rc.local`.
@@ -326,12 +338,41 @@ different things each.
   *Check:* durability is proven by a simulated power loss with the data present,
   and the answer names which layer lied — application buffer, page cache, or
   device write cache.
-  *Source:* own.
+  *Source:* own. **Blocked on the sandbox kernel.** The usual way to simulate a
+  power cut is `dm-flakey`, and the OrbStack kernel the box runs on carries only
+  three device-mapper targets:
 
-- **capacity-from-growth** *(architect)* — size the volume for the next 18 months.
-  *Check:* the answer computes from the seeded growth curve and retention policy,
-  states its assumptions, and is graded against a rubric requiring headroom for
-  the observed variance rather than the mean.
+  ```
+  $ dmsetup targets
+  striped   v1.7.0
+  linear    v1.5.0
+  error     v1.7.0
+  ```
+
+  No `dm-flakey` and no `dm-delay`, which is also why `iostat-await-versus-util`
+  produces its contrast from real I/O patterns instead. There is a plausible
+  route with what is here — a `linear` device swapped for `error` under
+  `dmsetup suspend --noflush --nolockfs`, which drops everything not yet on the
+  disk — and it is unproven. Do not respecify this one until that has actually
+  been run.
+
+- **capacity-from-growth** *(architect · shipped)* — size the volume for the next 18
+  months, from a year of daily ingest and a 90-day retention policy.
+  *First guess:* average daily ingest times the retention window.
+  *Check:* the answer names `peak` rather than `mean`, `trailing` or `median` as
+  the window the volume has to survive, computes the rolling maximum to within
+  3%, projects it with the fitted growth to within 12%, and lands between 1.1x
+  and 1.85x of that — a volume sized to the forecast exactly is rejected, and so
+  is one sized at three times it. The grader recomputes the truth from the
+  seeded CSV rather than holding a literal, so the lesson stays true if the seed
+  moves.
+  *Source:* own. The series carries three separate effects — linear growth, a
+  month-end batch at 2.5x, and a month-long fiscal year-end close at 2.2x — and
+  they are placed so that the mean window (396 GB), the trailing window (470 GB)
+  and the peak window (560 GB) are three different numbers. The year-end close
+  sits clear of the last 90 days deliberately: with monotonic growth the peak
+  window is always the trailing one, and the distinction the lesson is about
+  disappears.
   *Source:* own.
 
 ---

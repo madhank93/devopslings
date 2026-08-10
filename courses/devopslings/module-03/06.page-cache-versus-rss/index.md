@@ -112,8 +112,10 @@ tasks:
         case "$got" in
           anon)
             echo "not yet: anonymous memory is the heap — there is nothing on disk to"
-            echo "         reconstruct it from, so the kernel cannot simply drop it. It can"
-            echo "         only swap it, and this box has no swap of its own."
+            echo "         reconstruct it from, so the kernel cannot simply drop it. The"
+            echo "         most it can do is swap it out, which moves the memory rather"
+            echo "         than reclaiming it, and costs the job every page on the way"
+            echo "         back."
             ;;
           slab)
             echo "not yet: slab is kernel objects — inodes, dentries and so on. Some of it"

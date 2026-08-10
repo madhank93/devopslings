@@ -152,13 +152,15 @@ Where "the disk is slow" and "we are out of memory" each turn out to be four
 different things.
 
 `fstab` and the box that stops half way through boot · extending LVM and the
-filesystem in the right order, live · UUIDs, because `/dev/sdb` moved · swap and
-the page-out rate, on a box with 30% memory free · `sysctl` that survives a
-reboot · **cgroup CPU throttling**: p99 spikes at 40% utilisation, and
-`nr_throttled` is the only thing that says so · `iostat` await versus util, and
-why 100% util is not saturation · **page cache versus RSS**, with a real but
-smaller leak hidden underneath · `fsync` and which layer lied about durability ·
-sizing a volume from a growth curve.
+filesystem in the right order, live · UUIDs, because `/dev/sdb` moved · **swap
+and the page-in rate**: a batch job nine times slower on a box with gigabytes
+free, because the limit it hit was the unit's and not the machine's · `sysctl`
+that survives a reboot · **cgroup CPU throttling**: p99 spikes at 40%
+utilisation, and `nr_throttled` is the only thing that says so · `iostat` await
+versus util, and why 100% util is not saturation · **page cache versus RSS**,
+with a real but smaller leak hidden underneath · `fsync` and which layer lied
+about durability · sizing a volume from a growth curve, where the average is the
+one window it will never have to hold.
 
 ### 04 — Networking I: Packets, Interfaces & the Kernel Path · *shipped*
 `netlab`
