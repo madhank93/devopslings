@@ -1,0 +1,101 @@
+# netlab — the substrate for module 04.
+#
+# It is two boxes rather than one because a routing lesson with a single host is
+# not a routing lesson — an asymmetric return path, a NAT hairpin and a packet
+# capture all need traffic that genuinely leaves the machine and comes back.
+services:
+  box:
+    build: .
+    container_name: devopslings-netlab-box
+    hostname: box
+
+    # cgroup: host and the /sys/fs/cgroup mount are here for the same reason as
+    # linux-box: systemd needs to own a cgroup subtree to boot at all.
+    cgroup: host
+
+    # privileged already implies both capabilities. They are named anyway so the
+    # lesson text can point at the two a real deployment would have to grant —
+    # NET_ADMIN to move interfaces between namespaces and write nftables rules,
+    # NET_RAW for tcpdump. "Run it privileged" is not the lesson.
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    sysctls:
+      # A box that will not forward cannot be turned into a router by hand, and
+      # half of this module turns one into a router.
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.forwarding: "1"
+      net.ipv6.conf.all.disable_ipv6: "0"
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      lab:
+        ipv4_address: 172.31.0.10
+        ipv6_address: fd00:51ee:9000::10
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 10s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "systemctl is-system-running | grep -qE 'running|degraded'"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  peer:
+    build: .
+    container_name: devopslings-netlab-peer
+    hostname: peer
+    cgroup: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.forwarding: "1"
+      net.ipv6.conf.all.disable_ipv6: "0"
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      lab:
+        ipv4_address: 172.31.0.11
+        ipv6_address: fd00:51ee:9000::11
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 10s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "systemctl is-system-running | grep -qE 'running|degraded'"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+# The subnet is pinned and both addresses are static because a lesson that asks
+# the student to read a routing table has to be able to talk about the addresses
+# in it. Docker's default pool moves between runs, which would make every
+# reference in the lesson text wrong on someone's machine.
+#
+# IPv6 is on because one lesson turns on a stall that only exists in a dual-stack
+# world: an AAAA record is answered, the address is not routable, and every
+# connection pays a timeout before falling back to IPv4. With v4 only there is
+# nothing to see. The prefix is ULA (fd00::/8) so it is unroutable off the box by
+# construction and cannot leak anywhere.
+networks:
+  lab:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+        - subnet: fd00:51ee:9000::/64

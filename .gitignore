@@ -19,3 +19,4 @@ sandboxes/*/.env
 *.local.yml
 
 .DS_Store
+.aider*
