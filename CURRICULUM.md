@@ -145,7 +145,7 @@ rather than widening a regex · **a Python script that quietly misses 40% of the
 records** because pagination, rate limits and transient 503s all exist · and a
 written verdict on which of four scripts should have been a program.
 
-### 03 — Storage, Filesystems & the Kernel
+### 03 — Storage, Filesystems & the Kernel · *partly shipped*
 `linux-box` (privileged profile)
 
 Where "the disk is slow" and "we are out of memory" each turn out to be four
@@ -160,7 +160,7 @@ why 100% util is not saturation · **page cache versus RSS**, with a real but
 smaller leak hidden underneath · `fsync` and which layer lied about durability ·
 sizing a volume from a growth curve.
 
-### 04 — Networking I: Packets, Interfaces & the Kernel Path
+### 04 — Networking I: Packets, Interfaces & the Kernel Path · *shipped*
 `netlab`
 
 Module 05 debugs DNS, TLS and proxies. This one is underneath that.

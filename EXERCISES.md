@@ -337,37 +337,45 @@ different things each.
 ---
 
 ## 04 — Networking I: Packets, Interfaces & the Kernel Path
-`netlab` (new) · 10 exercises · 1 intro · 5 core · 3 deep · 1 architect
+`netlab` (two boxes, dual-stack) · 10 exercises · all shipped ·
+1 intro · 5 core · 3 deep · 1 architect
 
 Module 05 debugs DNS, TLS and proxies. This one is underneath that: the routing
 table, the connection tracker, the accept queue, and the packets themselves.
 
-- **read-the-routing-table** *(intro)* — three routes could carry this packet.
-  *Check:* the answer names the interface each of five destinations leaves by and
-  the rule that decided it — longest prefix, then metric — verified against
-  `ip route get`.
+- **which-route-wins** *(intro · shipped)* — three routes match the destination and
+  the correct one is not consulted. Half the partner network answers; the half
+  covered by a decommissioned gateway's leftover `/24` does not.
+  *First guess:* the route is right there in `ip route show`, so the fault is on
+  the far side.
+  *Check:* the stale route is gone rather than the working ones, `ip route get`
+  no longer resolves through the dead nexthop, and both partner addresses serve.
   *Source:* own.
 
-- **two-default-routes** *(core)* — the host answers on one interface and not the other.
+- **two-default-routes** *(core · shipped)* — the host answers on one interface and not the other.
   *First guess:* the second interface is down; it is up and configured.
   *Check:* both interfaces answer from their own address, with the return path
   symmetric — proven from a peer on each network.
   *Source:* own; the asymmetric-routing family.
 
-- **netns-veth-bridge** *(core)* — build a container's network by hand.
+- **netns-veth-bridge** *(core · shipped)* — build a container's network by hand.
   *First guess:* it needs Docker.
   *Check:* two namespaces reach each other and the outside world through a bridge
   the student created, and the answer maps each piece to what Docker does.
   *Source:* own; the exercise that makes module 09 stop being magic.
 
-- **nat-and-hairpin** *(core)* — the service is reachable from every host except
-  the one it runs on.
+- **nat-and-hairpin** *(core · shipped)* — the published address is reachable from
+  everywhere except the subnet the service itself lives on.
   *First guess:* bind to a different address.
-  *Check:* the published name resolves and connects from inside and outside, and
-  the answer names why the packet was not translated on the return path.
-  *Source:* own.
+  *Check:* the published address connects from inside and outside with the DNAT
+  rule still in place, and the answer names why the reply was never
+  un-translated.
+  *Source:* own. The scenario turns off `net.bridge.bridge-nf-call-iptables`,
+  which the Docker daemon enables host-wide: with it on, bridged replies are
+  dragged through the IP hooks and conntrack un-translates them by accident, so
+  the fault does not reproduce. Off is how an ordinary router behaves.
 
-- **ipv6-preferred-and-broken** *(core)* — every connection stalls for exactly
+- **ipv6-preferred-and-broken** *(core · shipped)* — every connection stalls for exactly
   five seconds and then works.
   *First guess:* the DNS server is slow.
   *Check:* connections complete without the stall, with the answer identifying
@@ -375,7 +383,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
   is not "disable IPv6 everywhere".
   *Source:* own.
 
-- **tcp-keepalive-versus-idle-timeout** *(core)* — a pooled connection is dead and
+- **tcp-keepalive-versus-idle-timeout** *(core · shipped)* — a pooled connection is dead and
   both ends believe it is fine, until the next request fails.
   *First guess:* retry the request.
   *Check:* the dead connection is detected within the stated budget, with the
@@ -383,15 +391,22 @@ table, the connection tracker, the accept queue, and the packets themselves.
   actually dropped it.
   *Source:* own.
 
-- **conntrack-table-full** *(deep)* — new connections are refused while the box
+- **conntrack-under-load** *(deep · shipped)* — new connections are refused while the box
   is nearly idle.
   *First guess:* the service is out of workers.
   *Check:* `nf_conntrack_count` against `nf_conntrack_max` is quoted as the
   evidence, and the same load completes after the table or the timeouts are
   sized — raising the service's worker count does not pass.
-  *Source:* own.
+  *Source:* own. **Rescoped to timeouts and contents.** `nf_conntrack_max` is
+  exposed read-only outside the initial network namespace — a container cannot
+  lower it, and cannot lower it inside a namespace it creates either, so the
+  table cannot honestly be driven to full. The lesson therefore works on what is
+  genuinely ownable: the table's contents, the per-protocol timeouts, and the
+  `insert_failed` and `drop` counters from `conntrack -S`. Worth knowing while
+  writing it — `sysctl -w` prints `Operation not permitted` and still exits 0,
+  so a check must read the value back rather than trust the exit status.
 
-- **accept-queue-overflow** *(deep)* — clients see connection timeouts and the
+- **accept-queue-overflow** *(deep · shipped)* — clients see connection timeouts and the
   server logs nothing at all.
   *First guess:* the network is dropping packets.
   *Check:* the overflow counter and `ss -lnt` Recv-Q are quoted, and the drops go
@@ -399,14 +414,14 @@ table, the connection tracker, the accept queue, and the packets themselves.
   fixing only one of the two still fails.
   *Source:* own.
 
-- **read-the-capture** *(deep)* — a capture, three connections, three different
+- **read-the-capture** *(deep · shipped)* — a capture, three connections, three different
   failures.
   *First guess:* they all "timed out".
   *Check:* the answer classifies each as retransmission, reset, or zero-window,
   quotes the packet that proves it, and names which end was at fault.
   *Source:* own.
 
-- **l4-versus-l7** *(architect)* — four requirements, one load balancer choice each.
+- **l4-versus-l7** *(architect · shipped)* — four requirements, one load balancer choice each.
   *Check:* the answer picks a layer per scenario and cites the deciding
   constraint — TLS termination, header routing, source-address preservation, or
   throughput — including the case where L7 cannot help at all. Rubric-graded.
