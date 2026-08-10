@@ -248,7 +248,7 @@ once, and then runs at 03:00 against input you did not imagine.
 ---
 
 ## 03 — Storage, Filesystems & the Kernel
-`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 8 shipped ·
+`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 9 shipped ·
 1 intro · 4 core · 4 deep · 1 architect
 
 Where "the disk is slow" and "we are out of memory" turn out to be four
@@ -332,15 +332,20 @@ different things each.
   identified underneath the noise.
   *Source:* own.
 
-- **fsync-and-the-lie** *(deep)* — the write returned success and the data is gone
-  after a power cut.
+- **fsync-and-the-lie** *(deep · shipped)* — the write returned `committed`, exited 0,
+  and the record is not there after the power cut.
   *First guess:* the application did not write it.
-  *Check:* durability is proven by a simulated power loss with the data present,
-  and the answer names which layer lied — application buffer, page cache, or
-  device write cache.
-  *Source:* own. **Blocked on the sandbox kernel.** The usual way to simulate a
-  power cut is `dm-flakey`, and the OrbStack kernel the box runs on carries only
-  three device-mapper targets:
+  *Check:* six records are appended through the student's own tool, the power is
+  cut, and all six have to survive. The answer names `page-cache` as the layer
+  that lied — `application-buffer` is ruled out by the tool already calling
+  `flush()`, and `device-cache` by the volume being a device-mapper target over
+  a file with no drive in it. The check also requires a durably-written opening
+  balance to come back, so a wiped volume cannot pass as a survived one.
+  *Source:* own. The lesson is `flush()` versus `fsync()`, which read like a
+  pair and are not one.
+
+  **The power cut is real, and getting one on this kernel took a workaround.**
+  `dm-flakey` is the usual instrument and the OrbStack kernel does not have it:
 
   ```
   $ dmsetup targets
@@ -349,12 +354,18 @@ different things each.
   error     v1.7.0
   ```
 
-  No `dm-flakey` and no `dm-delay`, which is also why `iostat-await-versus-util`
-  produces its contrast from real I/O patterns instead. There is a plausible
-  route with what is here — a `linear` device swapped for `error` under
-  `dmsetup suspend --noflush --nolockfs`, which drops everything not yet on the
-  disk — and it is unproven. Do not respecify this one until that has actually
-  been run.
+  Three targets, and `error` is enough. Suspending the mapping with
+  `--noflush --nolockfs` and swapping the table for an `error` target discards
+  everything in flight and refuses everything after, with no filesystem freeze
+  and no chance to write back — which is what distinguishes a power cut from a
+  shutdown. Loading the `linear` table again is the machine coming back up, and
+  ext4 replays its journal on mount. Measured: a `flush()`-only append loses
+  every record, an `fsync()`ed append loses none.
+
+  Also worth knowing, and the reason the first attempt produced no device at
+  all: `systemd-udevd` is masked in this image, so `dmsetup create` makes the
+  mapping without a node under `/dev/mapper`. Every `dmsetup` call that changes
+  the table needs `dmsetup mknodes` after it.
 
 - **capacity-from-growth** *(architect · shipped)* — size the volume for the next 18
   months, from a year of daily ingest and a 90-day retention policy.
