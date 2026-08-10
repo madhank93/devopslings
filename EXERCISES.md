@@ -248,7 +248,7 @@ once, and then runs at 03:00 against input you did not imagine.
 ---
 
 ## 03 — Storage, Filesystems & the Kernel
-`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · 9 shipped ·
+`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · all shipped ·
 1 intro · 4 core · 4 deep · 1 architect
 
 Where "the disk is slow" and "we are out of memory" turn out to be four
@@ -315,15 +315,34 @@ different things each.
   *request* alone does not pass.
   *Source:* own; the single most common invisible latency cause in containers.
 
-- **iostat-await-versus-util** *(deep)* — one device at 100% util that is not the
-  bottleneck, and one at 45% that is.
-  *First guess:* 100% util means saturated.
-  *Check:* the answer names the saturated device from `await` and queue depth,
-  and explains why util is a residency measure rather than a capacity one.
+- **iostat-await-versus-util** *(deep · shipped)* — one volume at ~83% util that is not
+  the bottleneck, and one at ~42% that is.
+  *First guess:* the higher util number is the device to replace.
+  *Check:* the answer names `audit` as the saturated volume, `await` as the
+  column that identifies it, and `residency` as what `%util` measures. Answering
+  `queue-depth` is rejected with the numbers: the two volumes sit within half a
+  request of each other, so queue depth does not separate them either.
   *Source:* Brendan Gregg's USE method, applied to disks. The contrast is
-  produced with real I/O patterns — deep-queue random O_DIRECT against light
-  sequential — rather than `dm-delay`, which the sandbox kernel does not have
-  (see the note under `fsync-and-the-lie`).
+  produced with real I/O patterns rather than `dm-delay`, which the sandbox
+  kernel does not have (see the note under `fsync-and-the-lie`).
+
+  **Rescoped from "await and queue depth" to await alone**, because the measured
+  contrast does not support the other half. Getting a device to look busy while
+  being healthy is easy — cached random reads through a loop device peg `%util`
+  at 83% with 0.04 ms service time. Getting one that is genuinely slow needs
+  writes that reach real storage, and `O_DIRECT|O_SYNC` at a throttled arrival
+  rate gives 42% util at 1.3 ms per write. Measured side by side: 45x the
+  request rate, one thirty-third the service time, and queue depths of 1.93
+  against 1.49. Only `await` separates them, which turns out to be the sharper
+  lesson — util points the wrong way and queue depth says nothing at all.
+
+  Two things the scenario needs. `iostat` reports device-mapper volumes as
+  `dm-1` and `dm-2` regardless of their names, so the probe resolves
+  `/sys/block/dm-*/dm/name` and rewrites the column — a report that cannot say
+  which volume is which teaches nothing. And the loads run on demand from
+  `storage-probe` rather than as always-on services: pegging `%util` from
+  userspace costs a core, and a lesson should not hold one for as long as the
+  student takes to think.
 
 - **page-cache-versus-rss** *(deep · shipped)* — "the application is leaking 8 GB".
   *First guess:* restart it nightly.
