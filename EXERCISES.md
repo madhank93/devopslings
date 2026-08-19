@@ -40,8 +40,9 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 40 shipped,
-234 specified. Modules 01 and 02 are complete. Module 01 is complete: all 18 pass the contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 61 shipped,
+213 specified. Modules 01–04 are complete: all 47 of their exercises pass the
+contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
@@ -501,47 +502,99 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 05 — Networking II: Protocols & Services
-`netlab` · 12 exercises · 1 intro · 8 core · 2 deep · 1 architect
+`netlab` · 12 exercises · 7 shipped · 1 intro · 8 core · 2 deep · 1 architect
 
-- **resolve-connect-request** *(intro)* — one HTTP request, taken apart into its
-  three separate steps: the name resolved, the TCP connection opened, the request
-  written.
-  *Check:* the answer reports which step each of three seeded failures broke,
-  having proven it with `dig`, a bare TCP connect, and `curl -v` in that order.
+- **resolve-connect-request** *(intro · shipped)* — one HTTP request, taken apart
+  into its three separate steps: the name resolved, the TCP connection opened,
+  the request written. Three services, three tickets that all say "connection
+  failed", and three different steps at fault: NXDOMAIN, an instant RST, and a
+  503.
+  *Check:* an answer file records, per service, whether it resolved, whether it
+  connected and what status came back — the outputs of `dig`, a bare TCP connect
+  and `curl -v` — and names the broken step consistently with those three. The
+  check re-probes the box, so an answer describing a scenario that has since been
+  "fixed" is rejected: this one is a diagnosis, not a repair.
   *Source:* own; the decomposition every later exercise in this module assumes.
 
-- **dns-ndots-and-search** *(core)* — resolution is slow and intermittently wrong.
-  *First guess:* the DNS server is broken; `dig @server` works fine.
-  *Check:* the app resolves in one query; `strace`-visible query count drops.
+- **dns-ndots-and-search** *(core · shipped)* — resolution is slow and
+  intermittently wrong: `api.internal` reaches another team's host. `ndots:5`
+  plus a `search` list whose first domain carries a wildcard means the wanted
+  record is never consulted.
+  *First guess:* the DNS server is broken; `dig @server` works fine — because
+  `dig` sends the name as typed and `getaddrinfo` does not.
+  *Check:* `getent hosts` returns the right address, the page is served, and the
+  resolver's own query log shows no suffixed name was asked for. Counting the
+  queries is what separates the fix from reordering the search list, which lands
+  on the right address and leaves the wasted lookup in place. The `search` line
+  and the wildcard must both survive.
   *Source:* roadmap.sh + the Kubernetes ndots folklore, taught on plain Linux.
 
-- **dig-works-app-doesnt** *(core)* — `dig` resolves, `curl` does not.
+- **dig-works-app-doesnt** *(core · shipped)* — `dig` resolves, `curl` does not,
+  on the same box one second apart. The `hosts:` line of `/etc/nsswitch.conf`
+  names no `dns` source, so `getaddrinfo` never reaches the resolver that `dig`
+  has been talking to all along.
   *First guess:* DNS. It is `nsswitch.conf` / `getaddrinfo`, not the resolver.
-  *Check:* both paths resolve, and the answer file names the mechanism.
+  *Check:* `getent hosts` returns the address, the page is served, and the answer
+  file names the file and the missing source. `/etc/hosts` is refused as a fix —
+  it repairs one name and leaves the box with no DNS. `getent hosts localhost`
+  must still work, which rejects dropping `files` while adding `dns`.
   *Source:* own.
 
-- **bound-to-the-wrong-interface** *(core)* — service healthy locally, refused from the peer.
+- **bound-to-the-wrong-interface** *(core · shipped)* — service healthy locally,
+  refused instantly from anywhere else, and an nftables ruleset sitting there
+  accepting 8080 to take the blame.
   *First guess:* firewall. It is listening on 127.0.0.1.
-  *Check:* reachable from the peer container, and still not from the world where
-  the exercise says it must not be.
+  *Check:* a listener on the box's lab address serving the page, nothing on
+  `0.0.0.0` or on the outside `203.0.113.1`, and the outside namespace still
+  refused. `0.0.0.0` is the popular wrong fix and is rejected for exposing the
+  service on the outside network. The listener must also *belong to the service*
+  — a socat relay in front of an unchanged loopback socket serves the page and
+  is rejected.
   *Source:* SadServers-style.
 
-- **drop-versus-reject** *(core)* — one dependency times out, another refuses instantly.
+- **drop-versus-reject** *(core · shipped)* — one dependency times out after six
+  seconds, another refuses in fifteen milliseconds. Measured 6035ms vs 15ms, from
+  the same box to the same network, in the same second.
   *First guess:* both are "the firewall is blocking it" — the difference tells you
   which rule and which direction.
-  *Check:* connectivity restored via the correct rule, and the answer file
-  distinguishes the two signatures.
+  *Check:* both dependencies serving, and the answer file matching each signature
+  to the verdict that produced it. A third rule quarantines a decommissioned host
+  and must survive, so `nft flush ruleset` — which clears both symptoms — is
+  rejected. Rules must be deleted by handle.
   *Source:* own.
 
-- **mtu-blackhole** *(deep)* — small requests fine, large payloads hang forever.
-  *First guess:* the server is slow on big bodies.
-  *Check:* a 1 MB POST completes; the fix is the MTU/MSS path, not a timeout bump.
+- **mtu-blackhole** *(deep · shipped)* — small requests fine, large payloads hang
+  forever. The tunnel's two ends disagree — 1400 leaving the near end, 1500
+  leaving the far one — so only the outbound direction is squeezed, and the one
+  ICMP that would have said so is dropped by the router that generates it.
+  *First guess:* the server is slow on big bodies. A 1 MB *download* from the
+  same host on the same port completes, which kills that reading and points at
+  one direction of one link.
+  *Check:* a 1 MB POST completes, the small request and the 1 MB download still
+  work, traffic still runs through the tunnel, the narrow end is still 1400, and
+  an answer file carries the measured path MTU (1400) and the largest
+  don't-fragment ping payload (1372) — because the ICMP that would have told you
+  is the thing that is missing, so the number has to be measured. Widening the
+  tunnel and relaying around it both make the symptom vanish and are rejected.
+  Three real repairs pass: unblocking the ICMP, a per-route `mtu 1400`, and an
+  MSS clamp — the last only when clamped on the *inbound* SYN-ACK, since
+  clamping your own SYN changes what you receive.
   *Source:* own; the classic overlay/VPN failure.
 
-- **tls-chain-and-sni** *(core)* — works in `curl -k`, fails in the client library.
-  *First guess:* the certificate expired. The leaf is fine; the chain is not.
-  *Check:* full-chain verification succeeds against the system store, and SNI
-  routes to the right vhost.
+- **tls-chain-and-sni** *(core · shipped)* — works in `curl -k`, fails in the
+  client library, and fails differently again when the deploy script dials the
+  gateway by address. Two faults behind one ticket: a vhost serving the leaf
+  without the intermediate that signs it, and an IP literal in a URL, which puts
+  no server name in the ClientHello and so collects the default vhost's
+  certificate.
+  *First guess:* the certificate expired. It expires in 2028. The leaf is fine;
+  the chain is not, and the name never arrived.
+  *Check:* the gateway verifies for a client whose only anchor is the root — so
+  installing the intermediate in this box's trust store is not a way through —
+  the publish step completes with verification on and the gateway logs
+  `sni=artifacts.corp`, and the neighbouring vhost is still the default and still
+  verifies. The answer names the missing intermediate and the vhost that answers
+  a nameless handshake.
   *Source:* own.
 
 - **through-a-proxy** *(core)* — half your egress works.

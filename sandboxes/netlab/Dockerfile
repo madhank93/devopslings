@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       conntrack \
       tcpdump \
       socat netcat-openbsd \
-      curl ca-certificates \
-      bind9-dnsutils \
+      curl ca-certificates openssl \
+      bind9-dnsutils dnsmasq \
       python3 \
       jq \
       vim-tiny nano \
@@ -30,7 +30,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # logins. Masking these keeps boot fast and the journal readable — an unmasked
 # box floods the journal with failures that have nothing to do with the lesson,
 # which is exactly the noise the student is being taught to see through.
-RUN systemctl mask \
+#
+# dnsmasq is installed for module 05 — resolution, search domains and ndots need
+# a resolver that answers for real rather than an /etc/hosts entry pretending to.
+# Debian enables it on install; it is disabled here so that a box which is not
+# running a DNS lesson resolves through Docker's resolver exactly as before.
+RUN systemctl disable dnsmasq.service \
+    && systemctl mask \
       systemd-udevd.service \
       systemd-udev-trigger.service \
       systemd-modules-load.service \

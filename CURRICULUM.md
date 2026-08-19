@@ -178,14 +178,35 @@ overflow**, where the server logs nothing at all · reading a capture and tellin
 a retransmission from a reset from a zero window · and a rubric-graded L4-versus-L7
 decision.
 
-### 05 — Networking II: Protocols & Services
+### 05 — Networking II: Protocols & Services · *partly shipped*
 `netlab`
 
-DNS resolution failure (`resolv.conf`, search domains, ndots) · `dig` resolves
-and the app does not, because `getaddrinfo` is not `dig` · service bound to the
-wrong interface · nftables drop versus reject, and how the difference tells you
-which rule · the MTU black hole where small requests work and large ones hang ·
-expired cert, broken chain, SNI mismatch · `curl -v` through a proxy, and the
+- **resolve-connect-request** *(shipped)* — three tickets, all of them saying
+  "connection failed", broken at three different steps. The decomposition the
+  rest of the module is built on: resolve, connect, request, one tool each.
+- **dns-ndots-and-search** *(shipped)* — the resolver is healthy, `dig` is
+  correct, and the application reaches another team's host. `ndots:5` and a
+  wildcard in the first search domain.
+- **dig-works-app-doesnt** *(shipped)* — the name resolves for you and not for
+  the service on the same box. `getaddrinfo` reads `nsswitch.conf` first, and
+  `dig` never does.
+- **bound-to-the-wrong-interface** *(shipped)* — healthy locally, refused from
+  everywhere else, with a firewall present and innocent. `0.0.0.0` is not the
+  fix: the box faces two networks and the service belongs on one.
+- **drop-versus-reject** *(shipped)* — six seconds against fifteen milliseconds,
+  same firewall, two verdicts. Time-to-failure names the rule before you read
+  one, and flushing the ruleset takes a deliberate quarantine with it.
+- **mtu-blackhole** *(shipped)* — a 1 MB download works and a 1 MB upload to the
+  same host on the same port hangs forever. One direction of one link is narrow,
+  and the ICMP that exists to say so is dropped by the router that generates it.
+  The path MTU has to be measured, because nothing will tell you.
+- **tls-chain-and-sni** *(shipped)* — `curl -k` works, the leaf is valid until
+  2028, and the client library will not have it. The gateway sends the leaf and
+  not the intermediate that signs it, and the deploy script names the host by IP
+  address, which puts no server name in the handshake and collects a neighbour's
+  certificate. Two faults, two error messages, one ticket.
+
+Then: `curl -v` through a proxy, and the
 `NO_PROXY` that internal traffic needs · ephemeral port exhaustion · **key-based
 SSH**: turn password auth off without locking yourself out · **SPF, DKIM and
 DMARC** against a local MTA — the records are DNS, the failure is silent, and
