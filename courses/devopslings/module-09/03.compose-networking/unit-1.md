@@ -48,7 +48,7 @@ means "port 6379 in the api container" — where nothing is listening.
 Prove it:
 
 ```
-docker compose -p devopslings-netlab exec api bash
+docker compose -p devopslings-compose-networking exec api bash
 apt-get update && apt-get install -y iproute2 dnsutils   # or just try the next bit
 python3 -c "import socket; socket.create_connection(('localhost',6379),2)"
 ```
@@ -63,7 +63,7 @@ Each service is resolvable by its **service name** — the key in the compose
 file, not the container name and not the image name.
 
 ```
-docker compose -p devopslings-netlab exec api python3 -c \
+docker compose -p devopslings-compose-networking exec api python3 -c \
   "import socket; print(socket.gethostbyname('cache'))"
 ```
 
@@ -114,7 +114,7 @@ services:
 ```
 
 ```
-$ docker compose -p devopslings-netlab up -d --build
+$ docker compose -p devopslings-compose-networking up -d --build
 $ curl -s localhost:18081/health
 {"redis":"redis://cache:6379","status":"ok"}
 $ curl -s localhost:18081/hits

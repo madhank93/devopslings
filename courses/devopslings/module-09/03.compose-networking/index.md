@@ -79,20 +79,20 @@ tasks:
             - "16379:6379"
       YAML
 
-      docker compose -p devopslings-netlab down -v --remove-orphans >/dev/null 2>&1 || true
-      docker compose -p devopslings-netlab up -d --build >/dev/null 2>&1 || true
+      docker compose -p devopslings-compose-networking down -v --remove-orphans >/dev/null 2>&1 || true
+      docker compose -p devopslings-compose-networking up -d --build >/dev/null 2>&1 || true
 
       echo "scenario ready — files are in $(pwd)"
       echo
       echo "See it fail:"
       echo "  curl -s localhost:18081/health"
-      echo "  docker compose -p devopslings-netlab logs api"
+      echo "  docker compose -p devopslings-compose-networking logs api"
 
   verify_done:
     needs: [init_scenario]
     timeout_seconds: 600
     run: |
-      proj=devopslings-netlab
+      proj=devopslings-compose-networking
 
       if [ ! -f compose.yaml ]; then
         echo "not yet: no compose.yaml in $(pwd)"
