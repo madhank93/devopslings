@@ -205,10 +205,12 @@ decision.
   not the intermediate that signs it, and the deploy script names the host by IP
   address, which puts no server name in the handshake and collects a neighbour's
   certificate. Two faults, two error messages, one ticket.
+- **through-a-proxy** *(shipped)* — the egress proxy is configured in
+  `/etc/environment`, so login shells have it and systemd services do not, and
+  nobody wrote a `NO_PROXY` at all. Each half of the box fails the opposite way,
+  and both halves have to be fixed without editing the job that fails.
 
-Then: `curl -v` through a proxy, and the
-`NO_PROXY` that internal traffic needs · ephemeral port exhaustion · **key-based
-SSH**: turn password auth off without locking yourself out · **SPF, DKIM and
+Then: ephemeral port exhaustion · **key-based SSH**: turn password auth off without locking yourself out · **SPF, DKIM and
 DMARC** against a local MTA — the records are DNS, the failure is silent, and
 the symptom is "our mail goes to spam" · an OSI-layered triage drill whose
 seeded layer changes every run.

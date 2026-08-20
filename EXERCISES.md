@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 61 shipped,
-213 specified. Modules 01–04 are complete: all 47 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 62 shipped,
+212 specified. Modules 01–04 are complete: all 47 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -502,7 +502,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 05 — Networking II: Protocols & Services
-`netlab` · 12 exercises · 7 shipped · 1 intro · 8 core · 2 deep · 1 architect
+`netlab` · 12 exercises · 8 shipped · 1 intro · 8 core · 2 deep · 1 architect
 
 - **resolve-connect-request** *(intro · shipped)* — one HTTP request, taken apart
   into its three separate steps: the name resolved, the TCP connection opened,
@@ -597,10 +597,19 @@ table, the connection tracker, the accept queue, and the packets themselves.
   a nameless handshake.
   *Source:* own.
 
-- **through-a-proxy** *(core)* — half your egress works.
-  *First guess:* set `HTTP_PROXY` everywhere; internal traffic then breaks.
-  *Check:* external calls go through the proxy, internal ones bypass it via
-  `NO_PROXY`, both verified.
+- **through-a-proxy** *(core · shipped)* — half the egress works, and it is a
+  different half depending on who is asking: a login shell reaches the vendor
+  and gets 502 from the internal service, the nightly systemd job is the exact
+  reverse. `/etc/environment` carries the proxy for login sessions, and systemd
+  has never read that file.
+  *First guess:* set `HTTP_PROXY` everywhere; internal traffic then breaks,
+  because the proxy sits on the perimeter and has no route to the inside.
+  *Check:* the job and a login shell both reach the vendor and the internal
+  service, with the proxy's own log showing `api.vendor.example` on every run
+  and `inventory.corp` on none — so teaching the proxy a route inward is not a
+  way through. The vendor's script is checksummed and the perimeter has to
+  survive. The answer names the proxy's status for an unreachable origin and the
+  file a service does not read.
   *Source:* roadmap.sh.
 
 - **ephemeral-port-exhaustion** *(deep)* — a load generator starts failing to connect.
