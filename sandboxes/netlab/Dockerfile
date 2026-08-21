@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       socat netcat-openbsd \
       curl ca-certificates openssl \
       bind9-dnsutils dnsmasq \
+      openssh-server openssh-client \
       python3 \
       jq \
       vim-tiny nano \
@@ -35,7 +36,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # a resolver that answers for real rather than an /etc/hosts entry pretending to.
 # Debian enables it on install; it is disabled here so that a box which is not
 # running a DNS lesson resolves through Docker's resolver exactly as before.
-RUN systemctl disable dnsmasq.service \
+#
+# sshd is installed for the key-based-login lesson and disabled for the same
+# reason dnsmasq is: a box that is not running that lesson should not have a
+# listener on 22 for the student to trip over.
+RUN systemctl disable dnsmasq.service ssh.service \
     && systemctl mask \
       systemd-udevd.service \
       systemd-udev-trigger.service \

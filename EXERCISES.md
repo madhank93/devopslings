@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 63 shipped,
-211 specified. Modules 01–04 are complete: all 47 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 64 shipped,
+210 specified. Modules 01–04 are complete: all 47 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -502,7 +502,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 05 — Networking II: Protocols & Services
-`netlab` · 12 exercises · 9 shipped · 1 intro · 8 core · 2 deep · 1 architect
+`netlab` · 12 exercises · 10 shipped · 1 intro · 8 core · 2 deep · 1 architect
 
 - **resolve-connect-request** *(intro · shipped)* — one HTTP request, taken apart
   into its three separate steps: the name resolved, the TCP connection opened,
@@ -627,10 +627,20 @@ table, the connection tracker, the accept queue, and the packets themselves.
   names the errno in words and which end holds TIME_WAIT.
   *Source:* own.
 
-- **ssh-without-locking-yourself-out** *(core)* — turn off password auth on a live box.
-  *First guess:* edit `sshd_config`, restart, lose your session.
-  *Check:* key auth works from a second container, password auth refused, and the
-  existing session survived the change.
+- **ssh-without-locking-yourself-out** *(core · shipped)* — password auth off by
+  Friday, on the box you are sitting inside, with no `authorized_keys` anywhere
+  yet. Editing `sshd_config` changes nothing: Debian's `Include` is on line one,
+  `sshd_config.d/50-cloud-init.conf` says yes, and sshd keeps the *first* value
+  it reads.
+  *First guess:* edit `sshd_config`, reload, believe the file. `sshd -T` still
+  says `passwordauthentication yes`.
+  *Check:* graded from the peer container — key login as `deploy` works from
+  there, the server offers `(publickey)` and nothing else when asked with
+  `PreferredAuthentications=none`, `sshd -T` agrees, and the session that was
+  open before the change is still writing its heartbeat. A config sshd will not
+  start with shows up as connection refused, which is what being locked out
+  looks like from outside. The answer names the overriding file and the
+  first-match rule.
   *Source:* roadmap.sh gap.
 
 - **spf-dkim-dmarc** *(core)* — mail from the app lands in spam.

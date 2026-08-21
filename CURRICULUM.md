@@ -215,7 +215,12 @@ decision.
   a client that hangs up first, and sixty seconds of TIME_WAIT each: the box runs
   out of source ports and reports it as though the far end had done something.
 
-Then: **key-based SSH**: turn password auth off without locking yourself out · **SPF, DKIM and
+- **ssh-without-locking-yourself-out** *(shipped)* — the change is one line and
+  the danger is the order: no key works yet, and the file everyone edits is
+  outranked by a drop-in that is read first. Graded from the other box, because
+  a key login tested from the box you are already on proves nothing.
+
+Then: **SPF, DKIM and
 DMARC** against a local MTA — the records are DNS, the failure is silent, and
 the symptom is "our mail goes to spam" · an OSI-layered triage drill whose
 seeded layer changes every run.
