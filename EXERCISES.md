@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 62 shipped,
-212 specified. Modules 01–04 are complete: all 47 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 63 shipped,
+211 specified. Modules 01–04 are complete: all 47 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -502,7 +502,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 05 — Networking II: Protocols & Services
-`netlab` · 12 exercises · 8 shipped · 1 intro · 8 core · 2 deep · 1 architect
+`netlab` · 12 exercises · 9 shipped · 1 intro · 8 core · 2 deep · 1 architect
 
 - **resolve-connect-request** *(intro · shipped)* — one HTTP request, taken apart
   into its three separate steps: the name resolved, the TCP connection opened,
@@ -612,10 +612,19 @@ table, the connection tracker, the accept queue, and the packets themselves.
   file a service does not read.
   *Source:* roadmap.sh.
 
-- **ephemeral-port-exhaustion** *(deep)* — a load generator starts failing to connect.
-  *First guess:* the server is out of capacity; it is idle.
-  *Check:* connection reuse or port-range/`TIME_WAIT` handling makes the same run
-  complete cleanly.
+- **ephemeral-port-exhaustion** *(deep · shipped)* — 199 of 400 requests succeed
+  and the rest fail instantly with `Cannot assign requested address`, while the
+  server answers by hand without hesitating. A 200-port ephemeral range, a client
+  that closes every connection itself, and 60 seconds of `TIME_WAIT` per port.
+  *First guess:* the server is out of capacity; it is idle, and the error is
+  errno 99 from the local kernel — no packet was ever sent.
+  *Check:* the same 400-request run completes with no failures. Connection reuse
+  in the generator's config or a wider `ip_local_port_range` both do it;
+  `tcp_tw_reuse` alone does not, because the kernel only reclaims a TIME_WAIT
+  socket over a second old and the whole run fits inside one — the check says so
+  when it sees that knob set. The generator is checksummed, the service has to
+  survive, and grading waits out the previous run's sockets first. The answer
+  names the errno in words and which end holds TIME_WAIT.
   *Source:* own.
 
 - **ssh-without-locking-yourself-out** *(core)* — turn off password auth on a live box.

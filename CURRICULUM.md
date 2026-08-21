@@ -210,7 +210,12 @@ decision.
   nobody wrote a `NO_PROXY` at all. Each half of the box fails the opposite way,
   and both halves have to be fixed without editing the job that fails.
 
-Then: ephemeral port exhaustion · **key-based SSH**: turn password auth off without locking yourself out · **SPF, DKIM and
+- **ephemeral-port-exhaustion** *(shipped)* — the load generator fails to
+  connect and the server it is pointed at is idle. Two hundred ephemeral ports,
+  a client that hangs up first, and sixty seconds of TIME_WAIT each: the box runs
+  out of source ports and reports it as though the far end had done something.
+
+Then: **key-based SSH**: turn password auth off without locking yourself out · **SPF, DKIM and
 DMARC** against a local MTA — the records are DNS, the failure is silent, and
 the symptom is "our mail goes to spam" · an OSI-layered triage drill whose
 seeded layer changes every run.
