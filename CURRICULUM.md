@@ -220,10 +220,12 @@ decision.
   outranked by a drop-in that is read first. Graded from the other box, because
   a key login tested from the box you are already on proves nothing.
 
-Then: **SPF, DKIM and
-DMARC** against a local MTA — the records are DNS, the failure is silent, and
-the symptom is "our mail goes to spam" · an OSI-layered triage drill whose
-seeded layer changes every run.
+- **spf-dkim-dmarc** *(shipped)* — the mail arrives and is filed as spam. A
+  receiving MX checks the message for real and says why: an SPF record naming a
+  relay that was replaced, a DKIM signature with no published key, and no DMARC
+  record to bind either of them to the address the human reads.
+
+Then: an OSI-layered triage drill whose seeded layer changes every run.
 
 ### 06 — Web Servers & Proxies
 `web-stack`

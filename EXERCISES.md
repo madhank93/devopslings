@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 64 shipped,
-210 specified. Modules 01–04 are complete: all 47 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 65 shipped,
+209 specified. Modules 01–04 are complete: all 47 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -502,7 +502,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 05 — Networking II: Protocols & Services
-`netlab` · 12 exercises · 10 shipped · 1 intro · 8 core · 2 deep · 1 architect
+`netlab` · 12 exercises · 11 shipped · 1 intro · 8 core · 2 deep · 1 architect
 
 - **resolve-connect-request** *(intro · shipped)* — one HTTP request, taken apart
   into its three separate steps: the name resolved, the TCP connection opened,
@@ -643,10 +643,19 @@ table, the connection tracker, the accept queue, and the packets themselves.
   first-match rule.
   *Source:* roadmap.sh gap.
 
-- **spf-dkim-dmarc** *(core)* — mail from the app lands in spam.
-  *First guess:* the mail server is misconfigured; it is the DNS records.
-  *Check:* a local MTA authenticates the message on all three, verified by the
-  receiving side's headers.
+- **spf-dkim-dmarc** *(core · shipped)* — the nightly report is delivered and
+  filed as spam. A receiving MX in a namespace verifies the mail for real —
+  pyspf, dkimpy, a DMARC lookup — and writes its verdict into an
+  `Authentication-Results` header: `spf=fail` (the record names a relay that was
+  replaced), `dkim=fail` (the app signs, and no key was ever published) and
+  `dmarc=none` (no record at all).
+  *First guess:* the mail server is misconfigured. It is three DNS records, none
+  of which live on it.
+  *Check:* a message the receiver authenticated itself carries spf=pass,
+  dkim=pass and dmarc=pass, with a policy of quarantine or reject and an SPF
+  record still ending in `-all` — `+all` passes SPF by abandoning it and is
+  rejected. Sender and MX are checksummed. The answer names the selector-derived
+  DKIM record and that DMARC needs *one* aligned pass, not both.
   *Source:* roadmap.sh gap.
 
 - **pattern-layered-triage** *(architect · drill)* — one symptom, cause seeded at

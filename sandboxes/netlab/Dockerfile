@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates openssl \
       bind9-dnsutils dnsmasq \
       openssh-server openssh-client \
+      python3-dkim python3-spf python3-dnspython \
       python3 \
       jq \
       vim-tiny nano \
