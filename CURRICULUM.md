@@ -225,7 +225,12 @@ decision.
   relay that was replaced, a DKIM signature with no published key, and no DMARC
   record to bind either of them to the address the human reads.
 
-Then: an OSI-layered triage drill whose seeded layer changes every run.
+- **pattern-layered-triage** *(shipped)* — one symptom, and the fault is drawn
+  at random from five: a permanent neighbour entry with a MAC nothing answers
+  to, a deleted route, a `drop` for one port on the router in the middle, a name
+  that resolves to an address no interface owns, a certificate for another host.
+  The drill is the ladder — frame, next hop, port, name, certificate — walked in
+  order until a rung answers, and the layer has to be named as well as repaired.
 
 ### 06 — Web Servers & Proxies
 `web-stack`

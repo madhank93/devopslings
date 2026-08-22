@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 65 shipped,
-209 specified. Modules 01–04 are complete: all 47 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 66 shipped,
+208 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -502,7 +502,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 05 — Networking II: Protocols & Services
-`netlab` · 12 exercises · 11 shipped · 1 intro · 8 core · 2 deep · 1 architect
+`netlab` · 12 exercises · 12 shipped · 1 intro · 8 core · 2 deep · 1 architect
 
 - **resolve-connect-request** *(intro · shipped)* — one HTTP request, taken apart
   into its three separate steps: the name resolved, the TCP connection opened,
@@ -658,11 +658,21 @@ table, the connection tracker, the accept queue, and the packets themselves.
   DKIM record and that DMARC needs *one* aligned pass, not both.
   *Source:* roadmap.sh gap.
 
-- **pattern-layered-triage** *(architect · drill)* — one symptom, cause seeded at
-  a random layer.
-  *First guess:* start at the application, as everyone does.
-  *Check:* the layer and the cause named correctly, then repaired. Repeatable:
-  the seeded layer changes each run, so the drill cannot be memorised.
+- **pattern-layered-triage** *(architect · drill · shipped)* — the payments API
+  health check fails, and that is the whole ticket. One fault is seeded per run,
+  drawn from five: a permanent ARP entry for the router with a MAC nothing
+  answers to, the specific route deleted so the default route takes it, a `drop`
+  for tcp/8443 in the router's forward chain, a zone answering with an address
+  no interface owns, and the API serving the certificate for another hostname.
+  Four of the five are logged nowhere.
+  *First guess:* start at the application, as everyone does — where the error
+  message is written by the top of the stack about a failure underneath it.
+  *Check:* the health check passes over verified TLS, and
+  `/root/answers/triage.md` names the layer and the cause. Repairing without
+  naming it does not pass, and neither do the four sidesteps that make the
+  symptom go away — an `/etc/hosts` entry, `insecure` in `.curlrc`, a new CA, or
+  a path that no longer runs through the router. The seeded fault changes every
+  run, so the drill cannot be memorised.
   *Source:* own; OSI-ordered triage as a repeatable drill.
 
 ---
