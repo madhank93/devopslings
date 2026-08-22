@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 66 shipped,
-208 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 67 shipped,
+207 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -678,11 +678,18 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` (new) · 10 exercises · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 10 exercises · 1 shipped · 1 intro · 7 core · 1 deep · 1 architect
 
-- **serve-a-static-site** *(intro)* — nginx is running and every request is 403.
-  *Check:* the site serves, and the answer names why the permission that was
-  missing was on a parent directory rather than on the files themselves.
+- **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
+  happy, the file is 0644 and root can read it, and every request is 403. One
+  directory in the middle of the path lost its world execute bit — the search
+  bit — so the path walk stops above the directory everyone is inspecting.
+  *First guess:* the file's permissions, which are the last check the kernel
+  makes rather than the first.
+  *Check:* index.html and its neighbour both serve, the body matches the file at
+  the deployed path, and `/root/answers/perms.md` names the component and the
+  bit. Four sidesteps are rejected: `chmod 777`, workers running as root, a
+  moved docroot, and loosening the files themselves.
   *Source:* own.
 
 - **trailing-slash-proxy-pass** *(core)* — every path is off by one segment.

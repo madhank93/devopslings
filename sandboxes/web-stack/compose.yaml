@@ -1,0 +1,95 @@
+# web-stack — the substrate for module 06.
+#
+# Three boxes, because the failures in this module are about the seams between
+# them. A proxy that mangles a path, a 502 that belongs to the upstream and a
+# rate limiter that counts every request as coming from one client are all
+# invisible when the proxy and the application are the same process on the same
+# host: there is no hop to get wrong.
+#
+#   client ---> web (nginx) ---> app (the upstream)
+#
+# client exists so that requests arrive from an address that is not the proxy's
+# own. X-Forwarded-For, real_ip and per-client rate limiting are all statements
+# about which address is which, and 127.0.0.1 cannot make them.
+services:
+  web:
+    build: .
+    container_name: devopslings-web-stack-web
+    hostname: web
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      tier:
+        ipv4_address: 172.32.0.10
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 10s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "systemctl is-system-running | grep -qE 'running|degraded'"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  app:
+    build: .
+    container_name: devopslings-web-stack-app
+    hostname: app
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      tier:
+        ipv4_address: 172.32.0.11
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 10s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "systemctl is-system-running | grep -qE 'running|degraded'"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  client:
+    build: .
+    container_name: devopslings-web-stack-client
+    hostname: client
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    networks:
+      tier:
+        ipv4_address: 172.32.0.12
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 10s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "systemctl is-system-running | grep -qE 'running|degraded'"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+# The addresses are pinned for the same reason netlab's are: a lesson that asks
+# what `X-Forwarded-For` should contain has to be able to name the address that
+# belongs in it, and Docker's default pool moves between runs.
+networks:
+  tier:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.32.0.0/24

@@ -235,7 +235,13 @@ decision.
 ### 06 — Web Servers & Proxies
 `web-stack`
 
-nginx serving 403 because of a parent directory · the `proxy_pass`
+- **serve-a-static-site** *(shipped)* — every request is 403 on a file that is
+  0644 and readable by root. Opening a file is one permission check per path
+  component, and the one that refused is a directory above the one being
+  stared at: execute on a directory is permission to traverse it, and without
+  it nothing underneath can be reached however permissive it is.
+
+Then: the `proxy_pass`
 trailing-slash trap · 502 vs 504, which end is broken · the load-balancer health
 check that lies · stale cache serving yesterday's deploy · 413 and buffering, at
 exactly 1 MB · `X-Forwarded-For` and a rate limiter that blocks everyone at once ·
