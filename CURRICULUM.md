@@ -241,8 +241,12 @@ decision.
   stared at: execute on a directory is permission to traverse it, and without
   it nothing underneath can be reached however permissive it is.
 
-Then: the `proxy_pass`
-trailing-slash trap · 502 vs 504, which end is broken · the load-balancer health
+- **trailing-slash-proxy-pass** *(shipped)* — four routes, four 404s, and the
+  404s are the application's own. `proxy_pass` with a URI part replaces the text
+  the location matched; without one it forwards the request URI untouched. Both
+  mistakes are in the file at once, and each fix is one character.
+
+Then: 502 vs 504, which end is broken · the load-balancer health
 check that lies · stale cache serving yesterday's deploy · 413 and buffering, at
 exactly 1 MB · `X-Forwarded-For` and a rate limiter that blocks everyone at once ·
 WebSocket upgrade and the socket that dies at 60 seconds · Caddy automatic HTTPS ·

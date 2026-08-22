@@ -46,6 +46,8 @@ services:
       - /run/lock
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      # The marker that turns on upstream.service. Only this box gets it.
+      - ./app/enabled:/etc/upstream/enabled:ro
     networks:
       tier:
         ipv4_address: 172.32.0.11

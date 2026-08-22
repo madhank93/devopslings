@@ -40,6 +40,18 @@ RUN systemctl disable nginx.service \
     && rm -f /lib/systemd/system/multi-user.target.wants/* \
     && rm -f /etc/systemd/system/*.wants/*
 
+# The upstream application every proxy lesson points at. It ships in the image
+# rather than being written by each lesson's setup because it is the sandbox's
+# other half: eight lessons need the same routes, the same upload endpoint and
+# the same admin control, and a copy per lesson would drift.
+#
+# The admin API on 8081 is what makes a single-box lesson script able to reach
+# across: a lesson's setup runs on the proxy, and this is how it tells the
+# upstream to go slow, go away, or say what it received.
+COPY app/upstream.py /opt/upstream/upstream.py
+COPY app/upstream.service /etc/systemd/system/upstream.service
+RUN systemctl enable upstream.service
+
 # Persist the journal so `journalctl -u nginx` has history rather than only
 # whatever happened since the last restart.
 RUN mkdir -p /var/log/journal && systemd-tmpfiles --create

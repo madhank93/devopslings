@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 67 shipped,
-207 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 68 shipped,
+206 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 10 exercises · 1 shipped · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 10 exercises · 2 shipped · 1 intro · 7 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -692,9 +692,17 @@ table, the connection tracker, the accept queue, and the packets themselves.
   moved docroot, and loosening the files themselves.
   *Source:* own.
 
-- **trailing-slash-proxy-pass** *(core)* — every path is off by one segment.
-  *First guess:* rewrite rules; the answer is one character in `proxy_pass`.
-  *Check:* all four upstream routes return the right body.
+- **trailing-slash-proxy-pass** *(core · shipped)* — four routes through the
+  gateway, four 404s, and the 404 bodies come from the application rather than
+  from nginx. Two traps at once: a `proxy_pass` with no URI part forwards the
+  request URI untouched, so `/api/users` arrives as `/api/users`; and a prefix
+  location written without its trailing slash replaces only the text it matched,
+  so `/docs/intro` arrives as `/pages//intro`.
+  *First guess:* rewrite rules. Each answer is one character.
+  *Check:* all four routes return the upstream's bodies, a tokened request shows
+  up in the upstream's own record — so bodies faked with `return 200` do not
+  pass — no `rewrite` directive, and `/root/answers/proxy.md` names both paths as
+  the upstream received them, double slash included.
   *Source:* own; nginx's most reliable trap.
 
 - **502-vs-504** *(core)* — two failures that look identical in the dashboard.

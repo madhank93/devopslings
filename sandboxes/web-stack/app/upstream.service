@@ -1,0 +1,14 @@
+[Unit]
+Description=the upstream application
+# Only the box that is meant to be the upstream has this marker; compose binds
+# it in. One image serves all three boxes, and a stray listener on 8080 would
+# give the proxy lessons a second place to point at.
+ConditionPathExists=/etc/upstream/enabled
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/upstream/upstream.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
