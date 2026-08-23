@@ -264,8 +264,13 @@ decision.
   rewrite what was stored under the old ones, and "purge on every deploy" is the
   workaround that keeps the bug.
 
-Then: 413 and buffering, at exactly 1 MB · `X-Forwarded-For` and a rate limiter
-that blocks everyone at once · WebSocket upgrade and the socket that dies at 60
+- **413-and-buffering** *(shipped)* — a round-numbered upload limit and an
+  application with no record of the requests that hit it. The proxy answered on
+  its own, because by default it reads the entire body to disk before the
+  upstream is contacted at all. Raise the limit, do not remove it, and decide
+  deliberately between spooling and streaming.
+
+Then: `X-Forwarded-For` and a rate limiter that blocks everyone at once · WebSocket upgrade and the socket that dies at 60
 seconds · Caddy automatic HTTPS · the Cloudflare 2019 regex postmortem.
 
 ### 07 — Security Hardening & Access Control
