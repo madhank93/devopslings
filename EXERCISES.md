@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 70 shipped,
-204 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 71 shipped,
+203 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 10 exercises · 4 shipped · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 10 exercises · 5 shipped · 1 intro · 7 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -736,10 +736,20 @@ table, the connection tracker, the accept queue, and the packets themselves.
   against a sick and a healthy backend and has to disagree with itself.
   *Source:* Google SRE practice, ported to HAProxy.
 
-- **stale-cache** *(core)* — a deploy went out; users still see yesterday.
-  *First guess:* purge the whole cache every deploy.
-  *Check:* correct cache keys and `Vary` handling — new content served, and the
-  cache hit ratio does not collapse.
+- **stale-cache** *(core · shipped)* — a deploy went out and the edge serves
+  yesterday's build at a fingerprinted URL nobody has ever requested, because the
+  cache key uses `$uri` and `$uri` is the path with the query string removed. The
+  same config carries `proxy_ignore_headers Vary`, so one stored copy of a
+  per-user page is handed to every user. Both lines were added on purpose — one
+  to normalise keys, one to rescue a hit ratio.
+  *First guess:* purge the whole cache every deploy, which hides the
+  invalidation bug and stampedes the origin every release.
+  *Check:* two deploys, so warming then busting is what is measured rather than
+  an empty cache; alice and bob must get their own pages; and twenty identical
+  requests must reach the origin at most three times, which rejects
+  `proxy_cache off`, `proxy_no_cache`, a unique value in the key and a zero
+  validity. Fixing the config is not enough on its own — entries stored while
+  `Vary` was ignored are still wrong and have to be removed.
   *Source:* own.
 
 - **413-and-buffering** *(core)* — uploads fail at exactly 1 MB.

@@ -25,12 +25,18 @@ MODE = {"mode": "normal", "ms": 0}
 # only proves the former keeps a useless node in rotation.
 DEPS = {"state": "ok"}
 
+# The build currently deployed. /asset.js changes with it, which is what makes
+# a cache serving yesterday's copy visible rather than theoretical.
+VERSION = {"n": 1}
 
-def respond(handler, code, body, ctype="text/plain"):
+
+def respond(handler, code, body, ctype="text/plain", extra=None):
     handler.send_response(code)
     handler.send_header("Content-Type", ctype)
     handler.send_header("X-Upstream", NAME)
     handler.send_header("Content-Length", str(len(body)))
+    for k, v in (extra or {}).items():
+        handler.send_header(k, v)
     handler.end_headers()
     handler.wfile.write(body)
 
@@ -94,6 +100,27 @@ class Service(BaseHTTPRequestHandler):
                 respond(self, 200, b"ready\n")
             else:
                 respond(self, 503, b"dependency unavailable\n")
+        elif path == "/asset.js":
+            with LOCK:
+                n = VERSION["n"]
+            respond(
+                self,
+                200,
+                ("console.log('build %d');\n" % n).encode(),
+                "application/javascript",
+                {"Cache-Control": "public, max-age=60", "ETag": '"build-%d"' % n},
+            )
+        elif path == "/profile":
+            # The response depends on a request header, and says so. A cache
+            # that does not read Vary will hand one user another's page.
+            user = self.headers.get("X-User", "anonymous")
+            respond(
+                self,
+                200,
+                ("profile: %s\n" % user).encode(),
+                "text/plain",
+                {"Cache-Control": "public, max-age=60", "Vary": "X-User"},
+            )
         elif path == "/whoami":
             respond(self, 200, ("upstream: %s\n" % NAME).encode())
         elif path in ROUTES:
@@ -162,6 +189,16 @@ class Admin(BaseHTTPRequestHandler):
             with LOCK:
                 DEPS["state"] = value
             respond(self, 200, ("deps=%s\n" % value).encode())
+        elif parsed.path == "/admin/deploy":
+            n = qs.get("version", ["1"])[0]
+            try:
+                n = int(n)
+            except ValueError:
+                respond(self, 400, b"bad version\n")
+                return
+            with LOCK:
+                VERSION["n"] = n
+            respond(self, 200, ("version=%d\n" % n).encode())
         elif parsed.path == "/admin/reset":
             with LOCK:
                 del RECEIVED[:]
@@ -169,6 +206,7 @@ class Admin(BaseHTTPRequestHandler):
                 MODE["mode"] = "normal"
                 MODE["ms"] = 0
                 DEPS["state"] = "ok"
+                VERSION["n"] = 1
             respond(self, 200, b"reset\n")
         else:
             respond(self, 404, b"no admin route\n")

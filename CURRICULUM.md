@@ -258,10 +258,15 @@ decision.
   readiness answers "give me traffic", and a load balancer wants the second.
   Then the interval decides how many requests fail before it acts.
 
-Then: stale cache serving yesterday's
-deploy · 413 and buffering, at exactly 1 MB · `X-Forwarded-For` and a rate limiter that blocks everyone at once ·
-WebSocket upgrade and the socket that dies at 60 seconds · Caddy automatic HTTPS ·
-the Cloudflare 2019 regex postmortem.
+- **stale-cache** *(shipped)* — the cache key drops the query string, so every
+  fingerprinted URL is one entry and the deploy is invisible; and `Vary` is
+  ignored, so one user's page is stored for everyone. Fixing the rules does not
+  rewrite what was stored under the old ones, and "purge on every deploy" is the
+  workaround that keeps the bug.
+
+Then: 413 and buffering, at exactly 1 MB · `X-Forwarded-For` and a rate limiter
+that blocks everyone at once · WebSocket upgrade and the socket that dies at 60
+seconds · Caddy automatic HTTPS · the Cloudflare 2019 regex postmortem.
 
 ### 07 — Security Hardening & Access Control
 `linux-box`
