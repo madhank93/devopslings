@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 
 import json
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
+
+# One program, two boxes' worth of roles: the ports and the name come from the
+# environment so the same file can be a second, independently controllable
+# backend. A lesson that needs one upstream dead and another slow needs two
+# processes, because the mode is process-wide.
+NAME = os.environ.get("UPSTREAM_NAME", "a")
+PORT = int(os.environ.get("UPSTREAM_PORT", "8080"))
+ADMIN_PORT = int(os.environ.get("UPSTREAM_ADMIN_PORT", "8081"))
 
 LOCK = threading.Lock()
 RECEIVED = []
@@ -15,6 +24,7 @@ MODE = {"mode": "normal", "ms": 0}
 def respond(handler, code, body, ctype="text/plain"):
     handler.send_response(code)
     handler.send_header("Content-Type", ctype)
+    handler.send_header("X-Upstream", NAME)
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     handler.wfile.write(body)
@@ -67,7 +77,9 @@ class Service(BaseHTTPRequestHandler):
         if not self.gate():
             return
         path = urlsplit(self.path).path
-        if path in ROUTES:
+        if path == "/whoami":
+            respond(self, 200, ("upstream: %s\n" % NAME).encode())
+        elif path in ROUTES:
             respond(self, 200, ROUTES[path])
         else:
             respond(self, 404, ("no route: %s\n" % path).encode())
@@ -134,6 +146,6 @@ class Admin(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    admin = ThreadingHTTPServer(("0.0.0.0", 8081), Admin)
+    admin = ThreadingHTTPServer(("0.0.0.0", ADMIN_PORT), Admin)
     threading.Thread(target=admin.serve_forever, daemon=True).start()
-    ThreadingHTTPServer(("0.0.0.0", 8080), Service).serve_forever()
+    ThreadingHTTPServer(("0.0.0.0", PORT), Service).serve_forever()

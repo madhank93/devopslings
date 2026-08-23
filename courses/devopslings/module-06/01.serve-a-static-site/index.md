@@ -172,7 +172,9 @@ tasks:
         exit 1
       fi
 
-      confuser=$(grep -m1 -E '^[[:space:]]*user[[:space:]]+' /etc/nginx/nginx.conf | awk '{print $2}' | tr -d ';')
+      # A missing user directive is one of the outcomes being checked for, so the
+      # pipeline must not abort the check under pipefail when grep finds nothing.
+      confuser=$(grep -m1 -E '^[[:space:]]*user[[:space:]]+' /etc/nginx/nginx.conf 2>/dev/null | awk '{print $2}' | tr -d ';' || true)
       if [ "$confuser" != "www-data" ]; then
         echo "not yet: nginx.conf now runs the workers as '${confuser:-nothing}'."
         echo "         Running the worker as root does serve the page. It also means"

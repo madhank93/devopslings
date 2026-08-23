@@ -27,6 +27,14 @@ tasks:
       rm -f /root/answers/proxy.md
       install -d /root/answers
 
+      # Put the upstream back to normal before waiting on it. A lesson that ran
+      # earlier may have left it slow or dead on purpose, and a readiness probe
+      # that assumes otherwise times out against a box that is working exactly
+      # as the previous lesson left it.
+      for port in 8081 8091; do
+        curl -s -X POST -m 3 "http://172.32.0.11:$port/admin/mode?value=normal" >/dev/null 2>&1 || true
+      done
+
       # Wait for the upstream box. It is a separate machine and this lesson is
       # meaningless until it answers.
       up=""
@@ -214,7 +222,11 @@ tasks:
         exit 1
       fi
 
-      if [ "$(grep -cE 'proxy_pass[[:space:]]+http://172\.32\.0\.11:8080' "$conf" 2>/dev/null || echo 0)" -lt 2 ]; then
+      # grep -c already prints 0 when it matches nothing; `|| echo 0` would make
+      # the substitution two lines and turn the numeric test into a silent abort.
+      routes=$(grep -cE 'proxy_pass[[:space:]]+http://172\.32\.0\.11:8080' "$conf" 2>/dev/null || true)
+      : "${routes:=0}"
+      if [ "$routes" -lt 2 ]; then
         echo "not yet: $conf no longer has both routes proxying to 172.32.0.11:8080."
         exit 1
       fi

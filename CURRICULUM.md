@@ -246,9 +246,14 @@ decision.
   the location matched; without one it forwards the request URI untouched. Both
   mistakes are in the file at once, and each fix is one character.
 
-Then: 502 vs 504, which end is broken · the load-balancer health
-check that lies · stale cache serving yesterday's deploy · 413 and buffering, at
-exactly 1 MB · `X-Forwarded-For` and a rate limiter that blocks everyone at once ·
+- **502-vs-504** *(shipped)* — one dashboard line covering two failures with
+  nothing in common. A 502 says the upstream could not answer at all; a 504 says
+  the proxy stopped waiting, on a deadline it chose itself. One is repaired at
+  the far end and one on the proxy — per route, because the blanket raise turns
+  a single slow dependency into every worker being held.
+
+Then: the load-balancer health check that lies · stale cache serving yesterday's
+deploy · 413 and buffering, at exactly 1 MB · `X-Forwarded-For` and a rate limiter that blocks everyone at once ·
 WebSocket upgrade and the socket that dies at 60 seconds · Caddy automatic HTTPS ·
 the Cloudflare 2019 regex postmortem.
 

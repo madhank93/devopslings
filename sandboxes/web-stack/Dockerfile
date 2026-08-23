@@ -49,8 +49,12 @@ RUN systemctl disable nginx.service \
 # across: a lesson's setup runs on the proxy, and this is how it tells the
 # upstream to go slow, go away, or say what it received.
 COPY app/upstream.py /opt/upstream/upstream.py
+# Two of them, on different ports with different names. Several lessons need
+# two backends that fail independently — one dead while the other is merely
+# slow, or two nodes behind a load balancer where only one is sick.
 COPY app/upstream.service /etc/systemd/system/upstream.service
-RUN systemctl enable upstream.service
+COPY app/upstream-b.service /etc/systemd/system/upstream-b.service
+RUN systemctl enable upstream.service upstream-b.service
 
 # Persist the journal so `journalctl -u nginx` has history rather than only
 # whatever happened since the last restart.

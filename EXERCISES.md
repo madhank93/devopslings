@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 68 shipped,
-206 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 69 shipped,
+205 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 10 exercises · 2 shipped · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 10 exercises · 3 shipped · 1 intro · 7 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -705,10 +705,19 @@ table, the connection tracker, the accept queue, and the packets themselves.
   the upstream received them, double slash included.
   *Source:* own; nginx's most reliable trap.
 
-- **502-vs-504** *(core)* — two failures that look identical in the dashboard.
+- **502-vs-504** *(core · shipped)* — two routes, two 5xx, one dashboard line.
+  `/orders` fails in two milliseconds because its backend accepts connections and
+  hangs up without answering; `/users` fails after exactly three seconds because
+  the report legitimately takes six and `proxy_read_timeout` is three. The error
+  log names each in one line — `upstream prematurely closed connection` against
+  `upstream timed out (110)` — and a third signature, `connect() failed (111)`,
+  is the other 502.
   *First guess:* restart nginx. Neither is nginx.
-  *Check:* each is diagnosed to the correct end (upstream dead vs upstream slow)
-  and fixed differently.
+  *Check:* both routes serve, `/orders` carries `X-Upstream: b` so it cannot be
+  answered by nginx itself, and `/users` takes its six seconds. An `inject_fault`
+  task puts the slowness back before grading, so "make the backend faster" does
+  not survive; and the grader stalls the orders backend to prove the longer
+  deadline went on one location rather than the whole server.
   *Source:* own.
 
 - **health-check-that-lies** *(core)* — the LB keeps a broken node in rotation.
