@@ -20,6 +20,11 @@ RECEIVED = []
 LAST = {}
 MODE = {"mode": "normal", "ms": 0}
 
+# Liveness and readiness are different questions. A process can be running
+# perfectly while the thing it needs to do its job is gone, and a check that
+# only proves the former keeps a useless node in rotation.
+DEPS = {"state": "ok"}
+
 
 def respond(handler, code, body, ctype="text/plain"):
     handler.send_response(code)
@@ -77,10 +82,25 @@ class Service(BaseHTTPRequestHandler):
         if not self.gate():
             return
         path = urlsplit(self.path).path
-        if path == "/whoami":
+        with LOCK:
+            deps = DEPS["state"]
+
+        # /health answers for the process and nothing else, which is exactly the
+        # trap; /ready answers for whether this node can actually serve.
+        if path == "/health":
+            respond(self, 200, b"ok\n")
+        elif path == "/ready":
+            if deps == "ok":
+                respond(self, 200, b"ready\n")
+            else:
+                respond(self, 503, b"dependency unavailable\n")
+        elif path == "/whoami":
             respond(self, 200, ("upstream: %s\n" % NAME).encode())
         elif path in ROUTES:
-            respond(self, 200, ROUTES[path])
+            if deps == "ok":
+                respond(self, 200, ROUTES[path])
+            else:
+                respond(self, 503, b"dependency unavailable\n")
         else:
             respond(self, 404, ("no route: %s\n" % path).encode())
 
@@ -134,12 +154,21 @@ class Admin(BaseHTTPRequestHandler):
                 MODE["mode"] = value
                 MODE["ms"] = int(ms)
             respond(self, 200, ("mode=%s ms=%d\n" % (value, int(ms))).encode())
+        elif parsed.path == "/admin/deps":
+            value = qs.get("value", ["ok"])[0]
+            if value not in ("ok", "broken"):
+                respond(self, 400, b"bad deps\n")
+                return
+            with LOCK:
+                DEPS["state"] = value
+            respond(self, 200, ("deps=%s\n" % value).encode())
         elif parsed.path == "/admin/reset":
             with LOCK:
                 del RECEIVED[:]
                 LAST.clear()
                 MODE["mode"] = "normal"
                 MODE["ms"] = 0
+                DEPS["state"] = "ok"
             respond(self, 200, b"reset\n")
         else:
             respond(self, 404, b"no admin route\n")

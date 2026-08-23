@@ -14,6 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       systemd systemd-sysv \
       nginx \
+      haproxy \
       procps psmisc lsof file less \
       curl ca-certificates openssl \
       python3 \
@@ -24,10 +25,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# nginx ships enabled and serving the Debian welcome page. Every lesson in this
-# module writes its own site and starts the server itself, so the box begins
-# with no listener and no configuration to unlearn.
-RUN systemctl disable nginx.service \
+# nginx ships enabled and serving the Debian welcome page, and haproxy ships
+# with a config that will not start. Every lesson in this module writes its own
+# and starts what it needs, so the box begins with no listener and no
+# configuration to unlearn.
+#
+# haproxy is here because nginx OSS has no active health checking: it can only
+# take a backend out after a real request fails. A lesson about a check that
+# polls the wrong endpoint needs something that polls.
+RUN systemctl disable nginx.service haproxy.service \
     && rm -f /etc/nginx/sites-enabled/default \
     && systemctl mask \
       systemd-udevd.service \
@@ -52,6 +58,7 @@ COPY app/upstream.py /opt/upstream/upstream.py
 # Two of them, on different ports with different names. Several lessons need
 # two backends that fail independently — one dead while the other is merely
 # slow, or two nodes behind a load balancer where only one is sick.
+COPY app/haproxy-container.conf /etc/systemd/system/haproxy.service.d/container.conf
 COPY app/upstream.service /etc/systemd/system/upstream.service
 COPY app/upstream-b.service /etc/systemd/system/upstream-b.service
 RUN systemctl enable upstream.service upstream-b.service

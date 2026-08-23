@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 69 shipped,
-205 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 70 shipped,
+204 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 10 exercises · 3 shipped · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 10 exercises · 4 shipped · 1 intro · 7 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -720,11 +720,21 @@ table, the connection tracker, the accept queue, and the packets themselves.
   deadline went on one location rather than the whole server.
   *Source:* own.
 
-- **health-check-that-lies** *(core)* — the LB keeps a broken node in rotation.
-  *First guess:* increase the check interval.
-  *Check:* the endpoint reflects dependency health; a broken node leaves rotation
-  within the deadline, and a healthy one is never ejected.
-  *Source:* Google SRE practice, ported to HAProxy/nginx.
+- **health-check-that-lies** *(core · shipped)* — half the requests through
+  HAProxy fail and the pool reads 2/2 healthy throughout. One backend has lost
+  the dependency it needs to answer; its process is fine, so `GET /health`
+  returns 200, so it stays in rotation and 503s everything it is given. The
+  endpoint that knows — `/ready` — was there the whole time.
+  *First guess:* increase the check interval. The check was not too infrequent,
+  it was asking whether the process was alive rather than whether it could serve.
+  *Check:* entirely behavioural. Both healthy backends must serve; the grader
+  then breaks one and requires it out of rotation within 15 seconds, which
+  `inter 10s fall 3` misses even with the right endpoint; then repairs it and
+  requires it back. A stabilisation window ahead of the deadline test resets the
+  failure counter, so what is measured is the configuration and not what the
+  backend was doing beforehand. The path named in the answer file is fetched
+  against a sick and a healthy backend and has to disagree with itself.
+  *Source:* Google SRE practice, ported to HAProxy.
 
 - **stale-cache** *(core)* — a deploy went out; users still see yesterday.
   *First guess:* purge the whole cache every deploy.

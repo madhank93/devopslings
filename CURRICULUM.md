@@ -252,7 +252,13 @@ decision.
   the far end and one on the proxy — per route, because the blanket raise turns
   a single slow dependency into every worker being held.
 
-Then: the load-balancer health check that lies · stale cache serving yesterday's
+- **health-check-that-lies** *(shipped)* — two backends, one that cannot serve
+  a request, and a load balancer that reports both healthy because the endpoint
+  it polls only proves the process is running. Liveness answers "restart me";
+  readiness answers "give me traffic", and a load balancer wants the second.
+  Then the interval decides how many requests fail before it acts.
+
+Then: stale cache serving yesterday's
 deploy · 413 and buffering, at exactly 1 MB · `X-Forwarded-For` and a rate limiter that blocks everyone at once ·
 WebSocket upgrade and the socket that dies at 60 seconds · Caddy automatic HTTPS ·
 the Cloudflare 2019 regex postmortem.
