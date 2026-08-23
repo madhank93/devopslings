@@ -270,7 +270,13 @@ decision.
   upstream is contacted at all. Raise the limit, do not remove it, and decide
   deliberately between spooling and streaming.
 
-Then: `X-Forwarded-For` and a rate limiter that blocks everyone at once · WebSocket upgrade and the socket that dies at 60
+- **real-ip-and-rate-limits** *(shipped)* — `$remote_addr` is the last hop, so
+  every per-client decision made behind a proxy is really a per-proxy decision.
+  The header that carries the client is written by whoever is talking to you:
+  trust only the entries your own proxies appended, walking the chain from the
+  right, or the limiter becomes opt-in.
+
+Then: WebSocket upgrade and the socket that dies at 60
 seconds · Caddy automatic HTTPS · the Cloudflare 2019 regex postmortem.
 
 ### 07 — Security Hardening & Access Control

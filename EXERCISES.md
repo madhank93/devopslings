@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 72 shipped,
-202 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 73 shipped,
+201 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 10 exercises · 6 shipped · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 10 exercises · 7 shipped · 1 intro · 7 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -766,10 +766,15 @@ table, the connection tracker, the accept queue, and the packets themselves.
   separates a raised limit from a raised limit plus streaming.
   *Source:* own.
 
-- **real-ip-and-rate-limits** *(core)* — the rate limiter blocks everyone at once.
-  *First guess:* raise the limit; it is counting the proxy as one client.
-  *Check:* per-client limiting works with a trusted `X-Forwarded-For` chain, and
-  a spoofed header cannot bypass it.
+- **real-ip-and-rate-limits** *(core · shipped)* — a limiter behind an edge keys
+  on `$binary_remote_addr`, which behind a proxy is always the proxy, so the
+  whole internet shares one bucket and a customer who sent three requests gets
+  429s for somebody else's flood.
+  *First guess:* raise the limit. It is counting the proxy as one client.
+  *Check:* a flood is still refused, a quiet client is clean at the same moment,
+  and — the half that separates the two working fixes — a client sending a
+  different `X-Forwarded-For` per request is still limited, which
+  `set_real_ip_from 0.0.0.0/0` is not. Traffic must still reach the origin.
   *Source:* own.
 
 - **websocket-upgrade** *(core)* — the socket connects and dies after 60 seconds.
