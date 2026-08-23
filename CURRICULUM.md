@@ -276,8 +276,12 @@ decision.
   trust only the entries your own proxies appended, walking the chain from the
   right, or the limiter becomes opt-in.
 
-Then: WebSocket upgrade and the socket that dies at 60
-seconds · Caddy automatic HTTPS · the Cloudflare 2019 regex postmortem.
+- **websocket-upgrade** *(shipped)* — a handshake that asks HTTP to stop being
+  HTTP, using two headers a proxy is required to consume rather than pass on;
+  and then a connection whose normal behaviour, saying nothing for minutes, is
+  exactly what every read timeout exists to kill.
+
+Then: Caddy automatic HTTPS · the Cloudflare 2019 regex postmortem.
 
 ### 07 — Security Hardening & Access Control
 `linux-box`

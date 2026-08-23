@@ -58,6 +58,9 @@ COPY app/upstream.py /opt/upstream/upstream.py
 # Two of them, on different ports with different names. Several lessons need
 # two backends that fail independently — one dead while the other is merely
 # slow, or two nodes behind a load balancer where only one is sick.
+# A websocket client, so that "the socket dies after sixty seconds" can be
+# measured from the command line rather than inferred from a browser console.
+COPY app/wsprobe /usr/local/bin/wsprobe
 COPY app/haproxy-container.conf /etc/systemd/system/haproxy.service.d/container.conf
 COPY app/upstream.service /etc/systemd/system/upstream.service
 COPY app/upstream-b.service /etc/systemd/system/upstream-b.service

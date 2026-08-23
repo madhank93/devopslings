@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 73 shipped,
-201 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 11 sandboxes. 74 shipped,
+200 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 10 exercises · 7 shipped · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 10 exercises · 8 shipped · 1 intro · 7 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -777,9 +777,18 @@ table, the connection tracker, the accept queue, and the packets themselves.
   `set_real_ip_from 0.0.0.0/0` is not. Traffic must still reach the origin.
   *Source:* own.
 
-- **websocket-upgrade** *(core)* — the socket connects and dies after 60 seconds.
-  *First guess:* the client reconnect logic.
-  *Check:* upgrade headers and read timeouts pass a 5-minute idle socket.
+- **websocket-upgrade** *(core · shipped)* — two faults under one ticket. The
+  handshake never arrives, because `Upgrade` and `Connection` are hop-by-hop
+  headers a proxy consumes rather than forwards — and cannot forward at all over
+  HTTP/1.0 — so the upstream answers 426. Then, once it opens, an idle socket is
+  indistinguishable from a stalled upstream to `proxy_read_timeout`, which
+  defaults to 60s.
+  *First guess:* the client's reconnect logic, which is what a failure at the
+  same round number of seconds always looks like.
+  *Check:* a real websocket client in the image (`wsprobe`) opens a socket
+  through the proxy, echoes, sits silent for 90 seconds and echoes again; and
+  with the application stalled an ordinary request must still return inside ten
+  seconds, which rejects the server-level timeout raise.
   *Source:* own.
 
 - **caddy-automatic-https** *(deep)* — certificates that renew themselves.

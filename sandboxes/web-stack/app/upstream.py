@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
+import base64
+import hashlib
 import json
 import os
+import struct
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -28,6 +31,45 @@ DEPS = {"state": "ok"}
 # The build currently deployed. /asset.js changes with it, which is what makes
 # a cache serving yesterday's copy visible rather than theoretical.
 VERSION = {"n": 1}
+
+# RFC 6455's fixed GUID: the server proves it understood the handshake by
+# hashing it onto the client's key.
+WS_GUID = "258EAFA5-E914-47DA-95CA-5AB0DC85B39A"
+
+
+def ws_recv(rfile):
+    hdr = rfile.read(2)
+    if not hdr or len(hdr) < 2:
+        return None, b""
+    opcode = hdr[0] & 0x0F
+    masked = hdr[1] & 0x80
+    n = hdr[1] & 0x7F
+    if n == 126:
+        n = struct.unpack(">H", rfile.read(2))[0]
+    elif n == 127:
+        n = struct.unpack(">Q", rfile.read(8))[0]
+    mask = rfile.read(4) if masked else b""
+    data = rfile.read(n) if n else b""
+    if masked:
+        data = bytes(c ^ mask[i % 4] for i, c in enumerate(data))
+    return opcode, data
+
+
+def ws_send(wfile, opcode, data=b""):
+    # Server-to-client frames are never masked, and everything here fits in one
+    # frame, so FIN is always set.
+    head = bytearray([0x80 | opcode])
+    n = len(data)
+    if n < 126:
+        head.append(n)
+    elif n < 65536:
+        head.append(126)
+        head += struct.pack(">H", n)
+    else:
+        head.append(127)
+        head += struct.pack(">Q", n)
+    wfile.write(bytes(head) + data)
+    wfile.flush()
 
 
 def respond(handler, code, body, ctype="text/plain", extra=None):
@@ -100,6 +142,8 @@ class Service(BaseHTTPRequestHandler):
                 respond(self, 200, b"ready\n")
             else:
                 respond(self, 503, b"dependency unavailable\n")
+        elif path == "/ws":
+            self.websocket()
         elif path == "/asset.js":
             with LOCK:
                 n = VERSION["n"]
@@ -130,6 +174,41 @@ class Service(BaseHTTPRequestHandler):
                 respond(self, 503, b"dependency unavailable\n")
         else:
             respond(self, 404, ("no route: %s\n" % path).encode())
+
+    def websocket(self):
+        key = self.headers.get("Sec-WebSocket-Key")
+        upgrade = (self.headers.get("Upgrade") or "").lower()
+
+        # A proxy that forwards the request without the hop-by-hop headers
+        # arrives here looking like an ordinary GET, and this is what the client
+        # then sees instead of a socket.
+        if upgrade != "websocket" or not key:
+            respond(self, 426, b"expected a websocket upgrade\n")
+            return
+
+        accept = base64.b64encode(
+            hashlib.sha1((key + WS_GUID).encode()).digest()
+        ).decode()
+        self.wfile.write(
+            (
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                "Sec-WebSocket-Accept: %s\r\n"
+                "X-Upstream: %s\r\n\r\n" % (accept, NAME)
+            ).encode()
+        )
+        self.wfile.flush()
+        self.close_connection = True
+
+        while True:
+            opcode, data = ws_recv(self.rfile)
+            if opcode is None or opcode == 0x8:
+                break
+            if opcode == 0x9:
+                ws_send(self.wfile, 0xA, data)
+            elif opcode in (0x1, 0x2):
+                ws_send(self.wfile, opcode, data)
 
     def do_POST(self):
         self.record()
