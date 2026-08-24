@@ -70,6 +70,11 @@ COPY app/wsprobe /usr/local/bin/wsprobe
 COPY app/haproxy-container.conf /etc/systemd/system/haproxy.service.d/container.conf
 COPY app/upstream.service /etc/systemd/system/upstream.service
 COPY app/upstream-b.service /etc/systemd/system/upstream-b.service
+# The edge filter nginx consults with auth_request. It ships disabled: only the
+# lesson that needs a WAF starts it, and it is single-threaded on purpose, so a
+# rule that takes seconds to decide is a rule that stops the site.
+COPY app/waf.py /opt/waf/waf.py
+COPY app/waf.service /etc/systemd/system/waf.service
 RUN systemctl enable upstream.service upstream-b.service
 
 # Persist the journal so `journalctl -u nginx` has history rather than only

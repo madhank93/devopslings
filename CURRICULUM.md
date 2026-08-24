@@ -281,7 +281,18 @@ decision.
   and then a connection whose normal behaviour, saying nothing for minutes, is
   exactly what every read timeout exists to kill.
 
-Then: Caddy automatic HTTPS · the Cloudflare 2019 regex postmortem.
+- **caddy-automatic-https** *(shipped)* — a certificate that expired for the
+  third time this year, installed by hand and renewed by remembering to. An
+  internal CA on the same box speaks ACME, which is the protocol a server uses
+  to obtain a certificate rather than be handed one; the proof it worked is the
+  grader throwing the certificate away and getting another without a human.
+
+- **waf-regex-backtracking** *(shipped)* — the Cloudflare 2019 postmortem, on
+  one box. A filter nginx consults with `auth_request` runs one rule per
+  request, and the rule contains two adjacent `.*`: six seconds to decide that
+  an ordinary URL is fine. Rewriting the rule keeps its verdicts and removes the
+  search; a per-rule budget is what makes the next bad rule survivable rather
+  than fatal.
 
 ### 07 — Security Hardening & Access Control
 `linux-box`

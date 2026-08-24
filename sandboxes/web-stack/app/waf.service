@@ -1,0 +1,11 @@
+[Unit]
+Description=the edge WAF nginx asks about every request
+After=network.target
+
+[Service]
+Environment=WAF_PORT=8090 WAF_RULES=/etc/waf/rules.conf WAF_CONF=/etc/waf/waf.conf
+ExecStart=/usr/bin/python3 /opt/waf/waf.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
