@@ -301,7 +301,14 @@ AppArmor, not SELinux: every sandbox is Debian, and SELinux does not enforce
 meaningfully inside a container. The mechanism transfers; the tool differs, and
 each lesson says so.
 
-Predicting who can read a file before running anything · **the NOPASSWD sudoers
+- **predict-who-can-read** *(shipped)* — seven files, two accounts, and the
+  question answered before anything is run. Two cases come out backwards
+  because the kernel consults exactly one permission class — owner, else group,
+  else other — and a file you own with `----r-----` is one you cannot read
+  however many groups you are in. The rest is the path walk: `x` on every
+  directory above a file, and a symlink's own mode meaning nothing at all.
+
+Then: **the NOPASSWD sudoers
 entry with a shell escape behind it** · the setuid hunt that must not break
 `ping` and `sudo` · SSH hardening with the existing session still alive at the
 end · a unit dropped from root to `NoNewPrivileges` and still serving on port 80 ·
