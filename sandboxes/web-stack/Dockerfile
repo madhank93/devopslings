@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       systemd systemd-sysv \
       nginx \
       haproxy \
+      caddy \
       procps psmisc lsof file less \
       curl ca-certificates openssl \
       python3 \
@@ -33,7 +34,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # haproxy is here because nginx OSS has no active health checking: it can only
 # take a backend out after a real request fails. A lesson about a check that
 # polls the wrong endpoint needs something that polls.
-RUN systemctl disable nginx.service haproxy.service \
+#
+# caddy is here for the opposite reason: it is the server that treats a
+# certificate as something to obtain rather than something to install, and it
+# can act as the ACME CA as well as the client, so the whole issuance path fits
+# on one box with no internet.
+RUN systemctl disable nginx.service haproxy.service caddy.service \
     && rm -f /etc/nginx/sites-enabled/default \
     && systemctl mask \
       systemd-udevd.service \
