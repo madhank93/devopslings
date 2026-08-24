@@ -20,3 +20,6 @@ sandboxes/*/.env
 
 .DS_Store
 .aider*
+
+# Python bytecode from running the sandbox apps on the host.
+__pycache__/
