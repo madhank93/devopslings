@@ -315,8 +315,14 @@ each lesson says so.
   it is seeing that the log-reading the grant was for never needed root, and
   keeping only the single-purpose `systemctl restart` line.
 
-Then:  · the setuid hunt that must not break
-`ping` and `sudo` · SSH hardening with the existing session still alive at the
+- **setuid-hunt** *(shipped)* — two setuid-root backdoors planted among nine
+  legitimate setuid binaries that look identical to them. The search is a
+  one-liner; the trap is the fix, because the blunt `find -perm -4000 | chmod
+  u-s` that kills the backdoors kills sudo too. The signal that separates them
+  is provenance: a legitimate setuid binary is owned by a package, and `dpkg -S`
+  says so. Also why `ping` is no longer in the list.
+
+Then: SSH hardening with the existing session still alive at the
 end · a unit dropped from root to `NoNewPrivileges` and still serving on port 80 ·
 fail2ban and the day it bans the load balancer · patching without reboot
 roulette · **an AppArmor denial in enforce mode**, where widening the profile to
