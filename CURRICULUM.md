@@ -308,8 +308,14 @@ each lesson says so.
   however many groups you are in. The rest is the path walk: `x` on every
   directory above a file, and a symlink's own mode meaning nothing at all.
 
-Then: **the NOPASSWD sudoers
-entry with a shell escape behind it** · the setuid hunt that must not break
+- **nopasswd-shell-escape** *(shipped)* — deploybot has two passwordless sudo
+  grants, and the one that reads like the smaller privilege (run `awk`) is a
+  root shell, because `awk` runs a program you hand it and sudo runs it as root.
+  The fix is not tighter arguments — no argument pins a language interpreter —
+  it is seeing that the log-reading the grant was for never needed root, and
+  keeping only the single-purpose `systemctl restart` line.
+
+Then:  · the setuid hunt that must not break
 `ping` and `sudo` · SSH hardening with the existing session still alive at the
 end · a unit dropped from root to `NoNewPrivileges` and still serving on port 80 ·
 fail2ban and the day it bans the load balancer · patching without reboot
