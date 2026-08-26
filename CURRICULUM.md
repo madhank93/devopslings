@@ -336,7 +336,16 @@ each lesson says so.
   it, and sets `NoNewPrivileges` so the reduced privilege sticks — verified by
   reading `CapAmb`/`NoNewPrivs` from `/proc`, not the unit file.
 
-Then: fail2ban and the day it bans the load balancer · patching without reboot
+- **fail2ban-bans-the-lb** *(shipped)* — an sshd jail counting failed logins,
+  where every failure arrives from the load balancer's address because that is
+  the only source the box sees behind it. Twelve failures, one apparent
+  attacker, and it is the address every user shares — so the ban takes the whole
+  site down. `ignoreip` exempts the load balancer and stops the outage; the
+  prose is honest that it also blinds the jail until the real client address is
+  logged. Graded offline via `fail2ban-client -t`/`-d` and `fail2ban-regex`,
+  since the sandbox kernel has no iptables to ban with.
+
+Then: patching without reboot
 roulette · **an AppArmor denial in enforce mode**, where widening the profile to
 `/** rwk` fails the check · auditd answering who changed the file at 02:14 · a
 file-integrity baseline that survives a deploy · and a written threat model.

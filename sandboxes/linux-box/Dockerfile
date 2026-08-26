@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       sysstat \
       python3 \
       openssh-server openssh-client \
+      fail2ban \
     && rm -rf /var/lib/apt/lists/*
 
 # systemd in a container should not try to manage hardware, the network, or
@@ -51,6 +52,11 @@ RUN systemctl mask \
 # has ever started — the lesson has the learner validate the config first.
 RUN systemctl disable ssh.service 2>/dev/null || true \
     && printf 'd /run/sshd 0755 root root -\n' > /etc/tmpfiles.d/sshd.conf
+
+# fail2ban ships enabled and would start a daemon that expects a working
+# firewall backend; its lesson analyses jails with fail2ban-regex and
+# fail2ban-client offline, so the daemon stays off.
+RUN systemctl disable fail2ban.service 2>/dev/null || true
 
 # Persist the journal to disk so `journalctl -b` has history to show. The
 # default volatile journal is wiped on restart, which would erase the evidence
