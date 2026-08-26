@@ -329,8 +329,14 @@ each lesson says so.
   with `reload`, never `restart`, so a mistake cannot drop the daemon you are
   reaching it through.
 
-Then: a unit dropped from root to `NoNewPrivileges` and still serving on port 80 ·
-fail2ban and the day it bans the load balancer · patching without reboot
+- **systemd-drop-privileges** *(shipped)* — a web service runs as root for one
+  reason: to bind port 80. Dropping it to www-data is one line and breaks the
+  bind, because a privileged port needs privilege. The fix grants back exactly
+  `CAP_NET_BIND_SERVICE` through `AmbientCapabilities`, caps the bounding set to
+  it, and sets `NoNewPrivileges` so the reduced privilege sticks — verified by
+  reading `CapAmb`/`NoNewPrivs` from `/proc`, not the unit file.
+
+Then: fail2ban and the day it bans the load balancer · patching without reboot
 roulette · **an AppArmor denial in enforce mode**, where widening the profile to
 `/** rwk` fails the check · auditd answering who changed the file at 02:14 · a
 file-integrity baseline that survives a deploy · and a written threat model.
