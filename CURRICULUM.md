@@ -322,8 +322,14 @@ each lesson says so.
   is provenance: a legitimate setuid binary is owned by a package, and `dpkg -S`
   says so. Also why `ping` is no longer in the list.
 
-Then: SSH hardening with the existing session still alive at the
-end · a unit dropped from root to `NoNewPrivileges` and still serving on port 80 ·
+- **ssh-hardening** *(shipped)* — sshd accepts root and password logins and
+  both have to go, but disabling passwords before the replacement key works
+  locks the account out permanently. The lesson is the order: install the key,
+  prove it, then take passwords away — validating with `sshd -t` and applying
+  with `reload`, never `restart`, so a mistake cannot drop the daemon you are
+  reaching it through.
+
+Then: a unit dropped from root to `NoNewPrivileges` and still serving on port 80 ·
 fail2ban and the day it bans the load balancer · patching without reboot
 roulette · **an AppArmor denial in enforce mode**, where widening the profile to
 `/** rwk` fails the check · auditd answering who changed the file at 02:14 · a

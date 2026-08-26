@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       vim-tiny nano \
       sysstat \
       python3 \
+      openssh-server openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # systemd in a container should not try to manage hardware, the network, or
@@ -39,6 +40,17 @@ RUN systemctl mask \
       console-getty.service \
     && rm -f /lib/systemd/system/multi-user.target.wants/* \
     && rm -f /etc/systemd/system/*.wants/*
+
+# openssh-server ships enabled and would start on every box. Only the SSH
+# hardening lesson wants it, and it enables the service itself; leaving it off
+# keeps the daemon and its host-key generation out of every other lesson's
+# journal.
+#
+# The privilege-separation directory is created by a tmpfiles rule rather than
+# left to the service's RuntimeDirectory, so `sshd -t` works before the daemon
+# has ever started — the lesson has the learner validate the config first.
+RUN systemctl disable ssh.service 2>/dev/null || true \
+    && printf 'd /run/sshd 0755 root root -\n' > /etc/tmpfiles.d/sshd.conf
 
 # Persist the journal to disk so `journalctl -b` has history to show. The
 # default volatile journal is wiped on restart, which would erase the evidence
