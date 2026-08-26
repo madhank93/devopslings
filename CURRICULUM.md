@@ -359,10 +359,16 @@ each lesson says so.
   when it matters. The fix is scope — stop watching what a deploy is built to
   change — not re-baselining over the tampered state, which the grader rejects.
 
-Then, still to build: an AppArmor denial in enforce mode and auditd answering
-who changed the file at 02:14 — both blocked by this sandbox's kernel (no
-AppArmor LSM, no audit subsystem), to be reframed or moved to a VM-backed
-sandbox · and a written threat model.
+- **attack-surface-audit** *(shipped)* — the capstone: two services listen,
+  a public portal on :80 and an unauthenticated internal metrics API bound to
+  every interface on :9000, answering system telemetry to the whole network.
+  The threat model starts by enumerating what a box exposes and to whom;
+  intended exposure versus actual is the finding. Restrict the API to loopback
+  without over-correcting and taking the portal — public by design — offline.
+
+Still to build: an AppArmor denial in enforce mode and auditd answering who
+changed the file at 02:14 — both blocked by this sandbox's kernel (no AppArmor
+LSM, no audit subsystem), to be reframed or moved to a VM-backed sandbox.
 
 ### 08 — Version Control
 no sandbox
