@@ -345,8 +345,14 @@ each lesson says so.
   logged. Graded offline via `fail2ban-client -t`/`-d` and `fail2ban-regex`,
   since the sandbox kernel has no iptables to ban with.
 
-Then: patching without reboot
-roulette · **an AppArmor denial in enforce mode**, where widening the profile to
+- **patch-without-reboot** *(shipped)* — a shared library is patched on disk
+  but every already-running service still has the old copy mapped in memory,
+  marked `(deleted)`, still executing the vulnerable code. Rebooting fixes it and
+  takes the whole box down; the skill is scanning `/proc/*/maps` for the stale
+  mappings, mapping each pid to its service, and restarting exactly the two
+  affected ones — the manual form of what `needrestart` automates.
+
+Then: **an AppArmor denial in enforce mode**, where widening the profile to
 `/** rwk` fails the check · auditd answering who changed the file at 02:14 · a
 file-integrity baseline that survives a deploy · and a written threat model.
 
