@@ -352,9 +352,17 @@ each lesson says so.
   mappings, mapping each pid to its service, and restarting exactly the two
   affected ones — the manual form of what `needrestart` automates.
 
-Then: **an AppArmor denial in enforce mode**, where widening the profile to
-`/** rwk` fails the check · auditd answering who changed the file at 02:14 · a
-file-integrity baseline that survives a deploy · and a written threat model.
+- **file-integrity-baseline** *(shipped)* — an integrity monitor reports
+  sixteen changed files: fifteen are today's deploy rewriting the app, one is a
+  `NOPASSWD: ALL` line an intruder hid in the noise. The monitor watches the one
+  directory guaranteed to change every release, so its report is useless exactly
+  when it matters. The fix is scope — stop watching what a deploy is built to
+  change — not re-baselining over the tampered state, which the grader rejects.
+
+Then, still to build: an AppArmor denial in enforce mode and auditd answering
+who changed the file at 02:14 — both blocked by this sandbox's kernel (no
+AppArmor LSM, no audit subsystem), to be reframed or moved to a VM-backed
+sandbox · and a written threat model.
 
 ### 08 — Version Control
 no sandbox
