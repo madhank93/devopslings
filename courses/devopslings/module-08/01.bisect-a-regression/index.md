@@ -106,11 +106,16 @@ tasks:
       git bisect reset >/dev/null 2>&1 || true
       git checkout -q main 2>/dev/null || true
       first=$(git rev-list --max-parents=0 main 2>/dev/null)
+      # git bisect leaves HEAD checked out at the first bad commit, so read it
+      # from HEAD rather than parsing the run output — the "is the first bad
+      # commit" line's wording and output stream vary across git versions.
+      truth=""
       git bisect start >/dev/null 2>&1
       git bisect bad main >/dev/null 2>&1
       git bisect good "$first" >/dev/null 2>&1
-      truth=$(git bisect run sh test.sh 2>/dev/null \
-        | sed -n 's/^\([0-9a-f]\{40\}\) is the first bad commit.*/\1/p' | head -1)
+      if git bisect run sh test.sh >/dev/null 2>&1; then
+        truth=$(git rev-parse HEAD)
+      fi
       git bisect reset >/dev/null 2>&1
       git checkout -q main 2>/dev/null || true
 
