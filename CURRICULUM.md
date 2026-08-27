@@ -373,8 +373,16 @@ LSM, no audit subsystem), to be reframed or moved to a VM-backed sandbox.
 ### 08 — Version Control
 no sandbox
 
-Branch, commit, merge, done properly once · `git bisect` a regression across 200
-commits · rebase vs merge, where one resolution loses a fix · a secret committed
+Branch, commit, merge, done properly once ·
+
+- **bisect-a-regression** *(shipped)* — a calculator's test passed sixty-five
+  commits ago and fails at the tip, and the breaking commit is titled like an
+  innocent one. `git bisect run` finds it by binary search in about six steps
+  instead of sixty-five, driven by the test's own exit code. The grader runs the
+  same search to compute the true culprit, so only the exact commit passes and a
+  near-miss is told which side of the boundary it is on.
+
+rebase vs merge, where one resolution loses a fix · a secret committed
 → `git-filter-repo` **and rotate it** · `reflog` after `reset --hard` on the
 wrong branch · large files and LFS · a submodule CI keeps building at the wrong
 commit · and a pre-commit hook, with a written answer for what `--no-verify` does
