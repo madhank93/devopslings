@@ -382,6 +382,13 @@ Branch, commit, merge, done properly once ·
   same search to compute the true culprit, so only the exact commit passes and a
   near-miss is told which side of the boundary it is on.
 
+- **reflog-recovery** *(shipped)* — a hard reset on the wrong branch drops
+  three commits from main; the files are off disk and git log shows only the
+  base. reset --hard moves a pointer, it does not delete commits, so the reflog
+  still holds the lost tip and pointing the branch back restores everything. The
+  grader checks the recovered work is committed and reachable (all files in
+  HEAD's tree, VERSION at v2.0), not just typed back by hand.
+
 rebase vs merge, where one resolution loses a fix · a secret committed
 → `git-filter-repo` **and rotate it** · `reflog` after `reset --hard` on the
 wrong branch · large files and LFS · a submodule CI keeps building at the wrong
