@@ -389,11 +389,18 @@ Branch, commit, merge, done properly once ·
   grader checks the recovered work is committed and reachable (all files in
   HEAD's tree, VERSION at v2.0), not just typed back by hand.
 
-rebase vs merge, where one resolution loses a fix · a secret committed
-→ `git-filter-repo` **and rotate it** · `reflog` after `reset --hard` on the
-wrong branch · large files and LFS · a submodule CI keeps building at the wrong
-commit · and a pre-commit hook, with a written answer for what `--no-verify` does
-to your plan.
+- **secret-in-history** *(shipped)* — a gateway token was committed in
+  deploy/config.yml and a later commit deleted the file, so the tip is clean and
+  every clone still carries it. A commit that removes a file leaves the blob
+  reachable; the commits have to be rewritten. `filter-branch --index-filter`
+  does it, and then leaves the pre-rewrite tips under `refs/original/`, where
+  they keep the old commits — and the secret — reachable until they are deleted.
+  The grader scans every object reachable from every ref, and fails an answer
+  that purged the value without recording that the token still had to be rotated.
+
+rebase vs merge, where one resolution loses a fix · large files and LFS · a
+submodule CI keeps building at the wrong commit · and a pre-commit hook, with a
+written answer for what `--no-verify` does to your plan.
 
 ### 09 — Containers · *partly shipped*
 `none` (scratch workspace)
