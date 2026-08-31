@@ -1,0 +1,21 @@
+# git-box — the substrate for module 08's git-lfs lesson.
+#
+# One container holding git, git-lfs and a /work directory. No services, no
+# network: the lesson's "remote" is a bare repository on the same filesystem,
+# which is enough to reproduce every part of the problem — a clone that carries
+# megabytes of dead history, and an LFS store the objects have to reach.
+services:
+  box:
+    build: .
+    container_name: devopslings-git-box
+    hostname: git-box
+    working_dir: /work
+
+    # Nothing to serve; the box exists to be exec'd into.
+    command: ["sleep", "infinity"]
+
+    healthcheck:
+      test: ["CMD-SHELL", "git lfs version >/dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 15

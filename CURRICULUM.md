@@ -371,7 +371,7 @@ changed the file at 02:14 — both blocked by this sandbox's kernel (no AppArmor
 LSM, no audit subsystem), to be reframed or moved to a VM-backed sandbox.
 
 ### 08 — Version Control
-no sandbox
+no sandbox, except `git-box` for the LFS lesson
 
 - **branch-commit-merge** *(shipped)* — the loop everything else in this module
   reads the output of, done once on purpose. main has not moved since the branch
@@ -442,8 +442,18 @@ no sandbox
   the library's origin, a commit off the library's main, and the library copied
   in as plain files each get their own answer.
 
-large files and LFS is what is left — the runner has no `git-lfs`, so it needs
-either an install step in the sandbox or a reframing.
+- **large-files-and-lfs** *(shipped)* — a six-megabyte sprite atlas regenerated
+  every sprint and committed whole, four times: seventeen megabytes of history
+  behind two hundred kilobytes of Python, because regenerated binaries share
+  nothing to delta against. Deleting the file removes it from the tip and leaves
+  every blob reachable, so the clone costs the same and the renderer has lost
+  its atlas. `git lfs track` governs future commits only; `git lfs migrate
+  import --everything` rewrites the commits that already hold the blobs, and the
+  new ids force the push. The grader clones with `--no-local` — a same-disk
+  clone copies the object store wholesale and would measure nothing — and wants
+  the history under 1 MB with the atlas byte-identical at the tip, telling apart
+  a naive delete, tracking without a rewrite, an unpushed rewrite, and pointers
+  whose objects never reached the store.
 
 ### 09 — Containers · *partly shipped*
 `none` (scratch workspace)

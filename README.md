@@ -158,6 +158,7 @@ Each lesson names a compose stack in `sandboxes/`:
 | `linux-box` | One Debian container running **real systemd**, so `systemctl` and `journalctl` are the real thing |
 | `chaos-stack` | Two services with **toxiproxy** between them, plus k6 |
 | `ci-stack` | Forgejo + act_runner + Harbor |
+| `git-box` | Debian with git and **git-lfs**, for the one git lesson that needs a tool a laptop may not have |
 | `none` | No stack — a scratch directory, for lessons where you write the Dockerfile |
 
 Lessons in the resilience modules declare an extra `inject_fault` task that runs
