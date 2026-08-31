@@ -431,7 +431,19 @@ no sandbox
   hook is one `--no-verify` away and `.git/hooks` is not cloned, so it is a fast
   feedback loop and the enforcement belongs server-side.
 
-large files and LFS · and a submodule CI keeps building at the wrong commit.
+- **submodule-detached** *(shipped)* — the vendored library's fix is published,
+  it is checked out in `vendor/liblog`, and the learner's own build passes;
+  every clone still gets the library from before the fix. A submodule is one
+  tree entry of mode 160000 naming a commit, so fetching inside the submodule
+  moves a working directory and changes nothing a clone can read — `git status`
+  reports the disagreement as a modified path. The grader clones the
+  application's origin recursively the way CI does and requires that clone to
+  build: a parent commit that was never pushed, a gitlink whose commit is not in
+  the library's origin, a commit off the library's main, and the library copied
+  in as plain files each get their own answer.
+
+large files and LFS is what is left — the runner has no `git-lfs`, so it needs
+either an install step in the sandbox or a reframing.
 
 ### 09 — Containers · *partly shipped*
 `none` (scratch workspace)
