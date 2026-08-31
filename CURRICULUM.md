@@ -398,9 +398,18 @@ Branch, commit, merge, done properly once ·
   The grader scans every object reachable from every ref, and fails an answer
   that purged the value without recording that the token still had to be rotated.
 
-rebase vs merge, where one resolution loses a fix · large files and LFS · a
-submodule CI keeps building at the wrong commit · and a pre-commit hook, with a
-written answer for what `--no-verify` does to your plan.
+- **rebase-or-merge** *(shipped)* — a hotfix on main caps a discount at ninety
+  percent; a branch cut before it rewrote the same function to add a tier bonus.
+  Each side shipped its own test, so the code and the tests conflict together and
+  `-X theirs` resolves them together — dropping the cap and the test that guards
+  it, which leaves the suite green with the bug back. During a rebase `ours` is
+  the branch being replayed onto, not the branch you are standing on, so the `-X`
+  that looks like it protects your work is the one that discards it. The grader
+  ignores the learner's suite and calls the function itself, including the case
+  that only the two changes in the right order get right.
+
+large files and LFS · a submodule CI keeps building at the wrong commit · and a
+pre-commit hook, with a written answer for what `--no-verify` does to your plan.
 
 ### 09 — Containers · *partly shipped*
 `none` (scratch workspace)
