@@ -408,8 +408,21 @@ Branch, commit, merge, done properly once ·
   ignores the learner's suite and calls the function itself, including the case
   that only the two changes in the right order get right.
 
-large files and LFS · a submodule CI keeps building at the wrong commit · and a
-pre-commit hook, with a written answer for what `--no-verify` does to your plan.
+- **hooks-that-catch-it-earlier** *(shipped)* — the same credential, refused at
+  the commit that would have introduced it. The fixture repo is built to punish a
+  loose pattern: the docs document `api_token`, a test fixture holds a fake
+  `access_token`, the lockfile carries a 64-character hex hash, and the
+  developer's own gitignored `.env` holds a live token — so a hook that scans the
+  working tree blocks every commit in the repository, and one that greps the
+  staged diff for a word blocks a comment, because a diff carries context lines
+  that were already committed. The grader commits six times in a copy of the
+  repository and, when the first allowed commit is refused, probes with an empty
+  commit and with the `.env` moved outside the tree to say which of the three
+  mistakes it is. The written answer has to reach the point of the lesson: the
+  hook is one `--no-verify` away and `.git/hooks` is not cloned, so it is a fast
+  feedback loop and the enforcement belongs server-side.
+
+large files and LFS · and a submodule CI keeps building at the wrong commit.
 
 ### 09 — Containers · *partly shipped*
 `none` (scratch workspace)
