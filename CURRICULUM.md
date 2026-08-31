@@ -373,7 +373,16 @@ LSM, no audit subsystem), to be reframed or moved to a VM-backed sandbox.
 ### 08 — Version Control
 no sandbox
 
-Branch, commit, merge, done properly once ·
+- **branch-commit-merge** *(shipped)* — the loop everything else in this module
+  reads the output of, done once on purpose. main has not moved since the branch
+  was cut, so the default merge fast-forwards: it slides main's pointer to the
+  branch tip and writes nothing, leaving three commits in a row that are
+  indistinguishable from three typed straight onto main. `--no-ff` records the
+  merge instead, and the two-parent commit is what says which commits were a
+  unit, when they landed, and what to revert to undo the feature. The grader
+  requires both branch commits on the tip's *second* parent, so a squash or a
+  re-commit onto main fails, and when the tip has one parent it checks whether
+  the branch still exists before telling the student which mistake they made.
 
 - **bisect-a-regression** *(shipped)* — a calculator's test passed sixty-five
   commits ago and fails at the tip, and the breaking commit is titled like an
