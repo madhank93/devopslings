@@ -936,7 +936,7 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 5 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 6 shipped · 1 intro · 8 core · 3 deep
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -968,9 +968,11 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
   *Source:* own; a named volume rather than a bind mount, because Docker Desktop
   and OrbStack remap bind-mount ownership and the bug does not exist on a Mac.
 
-- **secrets-in-layers** *(deep)* — the build arg is in `docker history`.
+- **secrets-in-layers** *(deep · shipped)* — the license key CI passed with
+  `--build-arg` is readable in `docker history` by anyone who can pull.
   *First guess:* delete the file in a later layer.
-  *Check:* the value appears in no layer of the final image; build still works.
+  *Check:* the build still decrypts the asset, and the key is in neither the
+  history nor any layer of the saved image.
   *Source:* own.
 
 - **dockerignore-and-context** *(core)* — a 40-second build spends 30 sending context.

@@ -489,8 +489,19 @@ A container is a process with an unusual view of the filesystem and the network.
   choice. The written fix is a one-shot `chown` service ordered between the two
   with `service_completed_successfully` — `initContainer` and `fsGroup` in the
   spelling they will meet next.
-- Then: the build arg still in `docker history` ·
-  `.dockerignore` and 30 seconds of context · health checks that mean readiness ·
+- **secrets-in-layers** *(shipped)* — the build decrypts a licensed asset, so CI
+  passes the key with `--build-arg`, and BuildKit records it against every
+  instruction that ran with it: `RUN |1 LICENSE_KEY=...`, readable by anyone who
+  can pull. The two hiding places are graded separately, because the fixes for
+  them are different and each is a plausible half-answer: history and config
+  carry the instructions, the layers carry the bytes, and `rm` in a later layer
+  writes a whiteout over a snapshot it cannot edit. `RUN --mount=type=secret` is
+  the answer; a multi-stage build that copies out only the artefact also passes,
+  with the caveat about the builder stage's cache written up in the lesson.
+  Decrypting on the host and copying the plaintext in is rejected by name, and
+  the lesson closes on rotation: every fix changes the next image, not the one
+  already published.
+- Then: `.dockerignore` and 30 seconds of context · health checks that mean readiness ·
   `exec format error` on the runner · the memory limit and the heap setting that
   must agree · logs that fill the host · one capability instead of `--privileged`.
 
