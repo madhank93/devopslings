@@ -1187,7 +1187,7 @@ carrying a pager for a system they cannot debug.
 ---
 
 ## 12 — CI/CD
-`ci-stack` · 11 exercises · 4 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` · 11 exercises · 5 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1211,9 +1211,12 @@ carrying a pager for a system they cannot debug.
   *Check:* CI runs the suite, goes red on the real bug, and green only once fixed.
   *Source:* own.
 
-- **cache-poisoned-green** *(deep)* — CI passes with a dependency that is not in the lockfile.
-  *First guess:* clear the cache manually forever.
-  *Check:* cache key includes the lockfile hash; a changed lockfile misses the cache.
+- **cache-poisoned-green** *(deep · shipped)* — a dependency upgrade goes through
+  CI green and takes production down; the tests ran against the packages from
+  before it.
+  *First guess:* clear the cache manually forever; or delete the cache step.
+  *Check:* the cache is still there, main is green on the dependency its lockfile
+  names, and a grader-pushed commit that changes only the lockfile now goes red.
   *Source:* own.
 
 - **matrix-and-fail-fast** *(core)* — one shard fails, the report says success.

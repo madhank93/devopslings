@@ -625,7 +625,19 @@ postmortems, and why you mirror.
   test. `npm run test --if-present` against a script called `tests` exits 0 in
   silence. Make CI honest, watch it go red, and meet the bug the suite has been
   catching all along.
-- Then: a cache keyed without the lockfile hash · a matrix where one shard fails
+- **cache-poisoned-green** *(shipped)* — installs were dominating the build, so
+  someone cached `node_modules` under `key: node-modules-${{ runner.os }}` and
+  skipped `npm ci` on a hit. Read as a sentence, that key claims every Linux
+  build forever may share one dependency tree, whatever the repository asks for
+  — so a dependency upgrade is tested against the packages from before it, goes
+  green, and breaks production. The grader measures rather than reads: it pushes
+  a commit changing only package.json and the lockfile, to a vendored version
+  that removes a function the code calls, and requires red. A key hashing the
+  wrong input passes inspection and fails that, and deleting the cache step is
+  refused separately, because the ninety seconds it saves are why it exists.
+  Also measured and written up: `restore-keys` stays safe here, since `cache-hit`
+  is only true on an exact match, so the install still runs.
+- Then: a matrix where one shard fails
   and the report says success · promote the artefact instead of rebuilding it ·
   the branch protection with a path around it · two merges racing to deploy ·
   one Jenkinsfile lesson, because enterprises still run it · and the Cloudflare
