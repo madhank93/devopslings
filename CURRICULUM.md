@@ -510,8 +510,19 @@ A container is a process with an unusual view of the filesystem and the network.
   grader measures what the daemon receives rather than what the image kept.
   `.gitignore` is not consulted, and an exclusion wide enough to take
   `web/dist` is caught by running the image. 106.10 MB becomes 297 bytes.
-- Then: health checks that mean readiness ·
-  `exec format error` on the runner · the memory limit and the heap setting that
+- **healthcheck-semantics** *(shipped)* — the API answers every request and
+  Docker reports it unhealthy, so nothing deploys. The check shells out to
+  `curl`, which is not in `python:3.12-slim`, and a missing command exits 127
+  like any other failure. Fixing that exposes the problem it was hiding: the
+  check asked `/`, which answers from the moment the process listens, while the
+  price cache takes ten seconds to load and `/price` answers 503 throughout —
+  so the honest check goes red during a legitimate warm-up, three retries run
+  out inside it, and `up --wait` fails on unhealthy. `--start-period` is the
+  third change. The grader runs the student's own check command inside the
+  container, cold and then warm, so a check tuned to pass by interval alone
+  cannot fake it, and it tells apart a deleted check, a check on the wrong
+  route, a missing start period, and a warm-up removed from the app.
+- Then: `exec format error` on the runner · the memory limit and the heap setting that
   must agree · logs that fill the host · one capability instead of `--privileged`.
 
 ### 10 — Databases & Data Stores

@@ -936,7 +936,7 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 7 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 8 shipped · 1 intro · 8 core · 3 deep
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -982,9 +982,12 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
   still runs with both files it reads.
   *Source:* own.
 
-- **healthcheck-semantics** *(core)* — the container is `unhealthy` and still serving.
+- **healthcheck-semantics** *(core · shipped)* — the container is `unhealthy`,
+  the API answers every request, and the deploy never finishes.
   *First guess:* remove the health check.
-  *Check:* the check reflects readiness, and compose `--wait` blocks correctly on it.
+  *Check:* the student's own check command, run inside the container, fails
+  during the warm-up and passes once the cache is loaded, and `up --wait`
+  returns 0 having blocked for it.
   *Source:* own.
 
 - **exec-format-error** *(core)* — the image runs on the laptop and not on the runner.
