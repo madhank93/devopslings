@@ -936,7 +936,7 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 8 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 9 shipped · 1 intro · 8 core · 3 deep
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -990,9 +990,11 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
   returns 0 having blocked for it.
   *Source:* own.
 
-- **exec-format-error** *(core)* — the image runs on the laptop and not on the runner.
-  *First guess:* rebuild it; same result.
-  *Check:* a manifest that satisfies both architectures, verified by inspection.
+- **exec-format-error** *(core · shipped)* — the image runs on the laptop and
+  dies on the runner before the program prints anything.
+  *First guess:* rebuild it; then build it multi-platform — same result.
+  *Check:* both platforms in one published manifest, and the ELF header of the
+  binary inside each one matching the platform it is filed under.
   *Source:* own.
 
 - **memory-limit-and-oom** *(deep)* — the container dies at exactly the same input size.

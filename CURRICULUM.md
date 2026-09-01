@@ -522,7 +522,19 @@ A container is a process with an unusual view of the filesystem and the network.
   container, cold and then warm, so a check tuned to pass by interval alone
   cannot fake it, and it tells apart a deleted check, a check on the wrong
   route, a missing start period, and a warm-up removed from the app.
-- Then: `exec format error` on the runner · the memory limit and the heap setting that
+- **exec-format-error** *(shipped)* — `exec /usr/local/bin/app: exec format
+  error` on the runner, and the same tag runs on the laptop, because an arm64
+  binary in an amd64-labelled image runs fine on arm64: the label is not
+  consulted when the file is executed locally. Two bugs in series, and the
+  second is why the first guess fails. Adding `--platform linux/amd64,linux/arm64
+  --push` produces a manifest with both entries and an amd64 image that still
+  dies, because `FROM --platform=$BUILDPLATFORM` pins the toolchain stage to the
+  build machine and nothing told the compiler what it was building for. The
+  grader reads the ELF header of the binary inside each published image rather
+  than trusting the manifest, so a build that satisfies the inspection and ships
+  the wrong bytes is caught. Scenario runs a local registry, because manifest
+  lists live in registries and `--load` cannot hold one.
+- Then: the memory limit and the heap setting that
   must agree · logs that fill the host · one capability instead of `--privileged`.
 
 ### 10 — Databases & Data Stores
