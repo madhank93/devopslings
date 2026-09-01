@@ -547,7 +547,17 @@ A container is a process with an unusual view of the filesystem and the network.
   records must fail with `OutOfMemoryError` instead of 137, because tuning the
   heap under the limit decides which subsystem notices first, and only one of
   them leaves a diagnosis.
-- Then: logs that fill the host · one capability instead of `--privileged`.
+- **logs-that-fill-the-disk** *(shipped)* — a healthy service, unchanged for six
+  weeks, fills the host every Thursday: a container's stdout is a file on the
+  daemon's host that grows for the life of the container and that nothing
+  rotates unless told to. Deleting it frees nothing, because the daemon holds it
+  open and unlinking removes the name rather than the data — `disk-full-triage`
+  from module 01, met from the other side. The grader measures what the image
+  emits by running it itself with no log options, so quieting the service fails
+  instead of passing, then requires the retained log to be a fraction of that,
+  still readable, and still ending on the line the service finished with.
+  `driver: none` bounds the disk perfectly and is refused by name.
+- Then: one capability instead of `--privileged`.
 
 ### 10 — Databases & Data Stores
 `db-stack`

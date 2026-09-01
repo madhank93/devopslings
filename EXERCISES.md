@@ -936,7 +936,7 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 10 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 11 shipped · 1 intro · 8 core · 3 deep
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -1005,9 +1005,11 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
   input now fails with `OutOfMemoryError` rather than 137.
   *Source:* own; pairs with 01's oom-killed.
 
-- **logs-that-fill-the-disk** *(core)* — a healthy service takes the host down in a week.
+- **logs-that-fill-the-disk** *(core · shipped)* — a service nobody has deployed
+  in six weeks fills the host's disk every Thursday.
   *First guess:* delete the log file the container holds open.
-  *Check:* bounded log growth under a sustained write, driver configured.
+  *Check:* the image still emits what it emitted, a fraction of it survives on
+  disk, `docker logs` still reads it, and the last line written is still there.
   *Source:* own; callback to disk-full-triage.
 
 - **rootless-and-capabilities** *(deep)* — the container needs one privileged thing.
