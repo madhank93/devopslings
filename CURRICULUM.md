@@ -460,9 +460,15 @@ no sandbox, except `git-box` for the LFS lesson
 
 A container is a process with an unusual view of the filesystem and the network.
 
-- **build-run-inspect** — build an image, run it, and find the file you wrote
-  after the container exits. The container-is-not-a-VM moment, before anything
-  is broken.
+- **build-run-inspect** *(shipped)* — the job containerises in four lines, runs,
+  prints `wrote /out/report.txt`, exits 0, and the host has no report. The write
+  went to the container's own writable layer, which is not deleted when the
+  process exits — only when the container is, which is what `--rm` would have
+  done. Recover it from the exited container with `docker cp`, then bind-mount
+  `out/` so the next run needs no rescue. The grader runs the learner's image
+  itself and requires both host copies to match what it writes, so a report
+  typed by hand fails; `--rm` on the run fails for the reason the lesson is
+  about.
 - **pid1-signals** *(shipped)* — `docker stop` takes exactly ten seconds, every
   time, and the shutdown handler never runs. What PID 1 means, and what
   shell-form `CMD` really does.

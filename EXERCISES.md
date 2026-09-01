@@ -936,12 +936,13 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 3 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 4 shipped · 1 intro · 8 core · 3 deep
 
-- **build-run-inspect** *(intro)* — build an image, run it, and find the file you
-  wrote after the container exits.
-  *Check:* the image builds and runs, and the answer states where the written
-  file went and why the next `docker run` cannot see it.
+- **build-run-inspect** *(intro · shipped)* — the container printed
+  `wrote /out/report.txt` and the host has no such file.
+  *First guess:* the write failed, or the report needs to be regenerated.
+  *Check:* the image produces the report, the exited container is still there,
+  and the same bytes reach the host both by `docker cp` and by a bind mount.
   *Source:* own; the container-is-not-a-VM moment, before anything is broken.
 
 - **pid1-signals** *(core · shipped)* — `docker stop` always takes ten seconds.
