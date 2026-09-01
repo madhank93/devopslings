@@ -455,7 +455,7 @@ no sandbox, except `git-box` for the LFS lesson
   a naive delete, tracking without a rewrite, an unpushed rewrite, and pointers
   whose objects never reached the store.
 
-### 09 — Containers · *partly shipped*
+### 09 — Containers · *shipped*
 `none` (scratch workspace)
 
 A container is a process with an unusual view of the filesystem and the network.
@@ -557,7 +557,16 @@ A container is a process with an unusual view of the filesystem and the network.
   instead of passing, then requires the retained log to be a fraction of that,
   still readable, and still ending on the line the service finished with.
   `driver: none` bounds the disk perfectly and is refused by name.
-- Then: one capability instead of `--privileged`.
+- **rootless-and-capabilities** *(shipped)* — the egress shaper failed with
+  `Operation not permitted`, someone added `privileged: true`, and that was
+  eighteen months ago. Root in a container is not one privilege but a set of
+  capabilities, of which Docker already withholds most; `NET_ADMIN` is the one
+  `ip link set mtu` and `tc qdisc add` need and the one the default fourteen do
+  not include. The grader requires the effective set to be exactly that single
+  capability, so `cap_add` without `cap_drop: ALL` is rejected with the fourteen
+  defaults decoded and listed, and it proves the reduction behaviourally by
+  requiring a tmpfs mount inside the container to be refused — `CAP_SYS_ADMIN`
+  being what `privileged` was really handing over.
 
 ### 10 — Databases & Data Stores
 `db-stack`

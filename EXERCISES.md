@@ -936,7 +936,7 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 11 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 12 shipped · 1 intro · 8 core · 3 deep
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -1012,10 +1012,11 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
   disk, `docker logs` still reads it, and the last line written is still there.
   *Source:* own; callback to disk-full-triage.
 
-- **rootless-and-capabilities** *(deep)* — the container needs one privileged thing.
-  *First guess:* `--privileged`.
-  *Check:* the workload runs with the single capability it needs and fails a
-  privilege-escalation probe.
+- **rootless-and-capabilities** *(deep · shipped)* — a shaper that needs one
+  capability has been running `privileged: true` for eighteen months.
+  *First guess:* `--privileged`, and leaving it there.
+  *Check:* the shaper still works, effective capabilities are exactly
+  `CAP_NET_ADMIN`, and mounting a tmpfs inside it is refused.
   *Source:* roadmap.sh security basics.
 
 ---
