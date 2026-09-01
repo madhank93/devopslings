@@ -936,7 +936,7 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 6 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 7 shipped · 1 intro · 8 core · 3 deep
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -975,9 +975,11 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
   history nor any layer of the saved image.
   *Source:* own.
 
-- **dockerignore-and-context** *(core)* — a 40-second build spends 30 sending context.
-  *First guess:* faster network.
-  *Check:* context under target and the image still contains everything it runs.
+- **dockerignore-and-context** *(core · shipped)* — 106 MB of context uploaded
+  before the first instruction runs, and copied into the image after it.
+  *First guess:* narrow the COPY lines; faster network.
+  *Check:* context under 1 MB measured independently of any COPY, and the image
+  still runs with both files it reads.
   *Source:* own.
 
 - **healthcheck-semantics** *(core)* — the container is `unhealthy` and still serving.

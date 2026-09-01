@@ -501,7 +501,16 @@ A container is a process with an unusual view of the filesystem and the network.
   Decrypting on the host and copying the plaintext in is rejected by name, and
   the lesson closes on rotation: every fix changes the next image, not the one
   already published.
-- Then: `.dockerignore` and 30 seconds of context · health checks that mean readiness ·
+- **dockerignore-and-context** *(shipped)* — a hundred-line app with 106 MB of
+  build context: `.git`, the frontend's `node_modules`, a virtualenv, fixtures
+  and a build log, uploaded before the first instruction is read and then copied
+  into the image by `COPY . .`. The fix everyone reaches for — narrowing the
+  `COPY` lines — shrinks the image and moves the transfer not at all, because the
+  client packs the directory before the daemon reads the Dockerfile, so the
+  grader measures what the daemon receives rather than what the image kept.
+  `.gitignore` is not consulted, and an exclusion wide enough to take
+  `web/dist` is caught by running the image. 106.10 MB becomes 297 bytes.
+- Then: health checks that mean readiness ·
   `exec format error` on the runner · the memory limit and the heap setting that
   must agree · logs that fill the host · one capability instead of `--privileged`.
 
