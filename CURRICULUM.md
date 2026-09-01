@@ -534,8 +534,20 @@ A container is a process with an unusual view of the filesystem and the network.
   than trusting the manifest, so a build that satisfies the inspection and ships
   the wrong bytes is caught. Scenario runs a local registry, because manifest
   lists live in registries and `--load` cannot hold one.
-- Then: the memory limit and the heap setting that
-  must agree · logs that fill the host · one capability instead of `--privileged`.
+- **memory-limit-and-oom** *(shipped)* — exit 137 with no stack trace, at the
+  same input size every run, which is already the evidence that it is not the
+  leak everyone assumes: a leak grows with time, this grows with input.
+  `mem_limit: 512m` against `-Xmx1g` — the JVM allocates toward its own ceiling,
+  crosses the cgroup on the way, and the kernel removes it before it can react.
+  Both halves are required and each is checked from the running container rather
+  than the compose file: the limit is read from the container's own cgroup and
+  capped at the node pool's 1 GiB, and the heap ceiling is read back out of the
+  JVM and must leave 128 MB for metaspace, stacks, code cache and buffers. The
+  last check is the one that makes the point — the same image with 20,000,000
+  records must fail with `OutOfMemoryError` instead of 137, because tuning the
+  heap under the limit decides which subsystem notices first, and only one of
+  them leaves a diagnosis.
+- Then: logs that fill the host · one capability instead of `--privileged`.
 
 ### 10 — Databases & Data Stores
 `db-stack`

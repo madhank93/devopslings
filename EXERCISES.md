@@ -936,7 +936,7 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 9 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 10 shipped · 1 intro · 8 core · 3 deep
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -997,10 +997,12 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
   binary inside each one matching the platform it is filed under.
   *Source:* own.
 
-- **memory-limit-and-oom** *(deep)* — the container dies at exactly the same input size.
+- **memory-limit-and-oom** *(deep · shipped)* — exit 137, no stack trace, at the
+  same input size every run.
   *First guess:* the app leaks.
-  *Check:* correct limit *and* correct in-container heap setting; the same input
-  now completes.
+  *Check:* limit within the 1 GiB budget, heap ceiling below it with room for
+  everything a JVM keeps outside the heap, the job completes, and an oversized
+  input now fails with `OutOfMemoryError` rather than 137.
   *Source:* own; pairs with 01's oom-killed.
 
 - **logs-that-fill-the-disk** *(core)* — a healthy service takes the host down in a week.
