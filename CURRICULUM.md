@@ -637,8 +637,19 @@ postmortems, and why you mirror.
   refused separately, because the ninety seconds it saves are why it exists.
   Also measured and written up: `restore-keys` stays safe here, since `cache-hit`
   is only true on an exact match, so the install still runs.
-- Then: a matrix where one shard fails
-  and the report says success · promote the artefact instead of rebuilding it ·
+- **matrix-and-fail-fast** *(shipped)* — the suite is sharded three ways and
+  branch protection wants one required check, so a `gate` job waits on the
+  matrix with `if: always()` and a step that echoes. `needs:` is an edge in a
+  graph rather than an assertion, and `always()` removes the one default that
+  was doing the checking, so the gate is a green light wired to nothing. Tangled
+  with it deliberately: the integration shard fails its first attempt in a fresh
+  container, which is why nobody looked hard at the red shard. Both halves are
+  required — fixing the gate alone turns a flaky suite into a red main, and
+  retrying alone leaves the gate lying — and the grader checks them separately,
+  by reading the named check's own status rather than the commit's aggregate,
+  which on Forgejo is honest. Retry versus ignore is the distinction the lesson
+  turns on: three attempts still fail on a test that is genuinely broken.
+- Then: promote the artefact instead of rebuilding it ·
   the branch protection with a path around it · two merges racing to deploy ·
   one Jenkinsfile lesson, because enterprises still run it · and the Cloudflare
   2019 postmortem as a staged rollout.

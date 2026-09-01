@@ -1187,7 +1187,7 @@ carrying a pager for a system they cannot debug.
 ---
 
 ## 12 — CI/CD
-`ci-stack` · 11 exercises · 5 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` · 11 exercises · 6 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1219,10 +1219,11 @@ carrying a pager for a system they cannot debug.
   names, and a grader-pushed commit that changes only the lockfile now goes red.
   *Source:* own.
 
-- **matrix-and-fail-fast** *(core)* — one shard fails, the report says success.
-  *First guess:* read the summary line.
-  *Check:* aggregate status reflects every shard, and a flaky shard is retried
-  without hiding a real failure.
+- **matrix-and-fail-fast** *(core · shipped)* — three shards, one red, and the
+  summary job the branch requires has never been anything but green.
+  *First guess:* read the summary line; or delete `if: always()`.
+  *Check:* `gate` is green on a healthy commit despite a flaky shard, and red on
+  a grader-pushed commit that genuinely breaks one.
   *Source:* own.
 
 - **promote-do-not-rebuild** *(core)* — staging and production run different bytes.
