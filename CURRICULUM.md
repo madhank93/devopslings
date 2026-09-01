@@ -606,8 +606,15 @@ postmortems, and why you mirror.
 ### 12 — CI/CD · *partly shipped*
 `ci-stack`
 
-- **run-it-on-every-push** — one workflow, one command, real exit status. The
-  rung below the next one, where nothing is broken yet.
+- **run-it-on-every-push** *(shipped)* — a workflow that was written during
+  onboarding, reviewed, merged, and has produced no build of either colour in
+  four months: `on: workflow_dispatch` is a list of one event and a push is not
+  on it, and the single step is `npm test || true`. Two defects, each of which
+  leaves a useless pipeline when fixed alone, so the grader checks them
+  separately: the tip of main must carry a finished successful run, and then it
+  pushes a commit whose tests genuinely fail and requires red, force-pushing the
+  repository back afterwards. Green is only worth something where red is
+  reachable, which is the first thing to establish about any new pipeline.
 - **first-pipeline** *(shipped)* — the workflow is valid, the run was created,
   and nothing happens. `runs-on:` names a label, and a label nobody advertises
   queues forever. A job that never starts is quieter than one that fails.

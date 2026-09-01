@@ -1187,11 +1187,13 @@ carrying a pager for a system they cannot debug.
 ---
 
 ## 12 — CI/CD
-`ci-stack` · 11 exercises · 3 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` · 11 exercises · 4 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
-- **run-it-on-every-push** *(intro)* — one workflow, one command, on push.
-  *Check:* a push triggers the run and the run reports the command's real exit
-  status — the rung below first-pipeline, where nothing is broken yet.
+- **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
+  has never produced a red build or a green one.
+  *First guess:* there is CI, because there is a workflow file.
+  *Check:* the tip of main has a finished run reporting success, and a commit
+  the grader pushes with failing tests is reported as a failure.
   *Source:* own.
 
 - **first-pipeline** *(core · shipped)* — the run is created and nothing happens.
