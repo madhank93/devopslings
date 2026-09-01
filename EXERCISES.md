@@ -936,7 +936,7 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 4 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 12 exercises · 5 shipped · 1 intro · 8 core · 3 deep
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -960,10 +960,13 @@ no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 
   *Check:* `/health` green via service DNS, not via published ports.
   *Source:* own.
 
-- **uid-mismatch-on-a-volume** *(core)* — the container writes as root; the host cannot read.
+- **uid-mismatch-on-a-volume** *(core · shipped)* — the app was made non-root and
+  stopped being able to write the volume it has always written.
   *First guess:* `chmod -R 777` the volume.
-  *Check:* files owned by the intended non-root uid, container still able to write.
-  *Source:* own.
+  *Check:* the app exits 0 as a non-root uid of its own, and the whole volume
+  belongs to that uid with nothing on it world-writable.
+  *Source:* own; a named volume rather than a bind mount, because Docker Desktop
+  and OrbStack remap bind-mount ownership and the bug does not exist on a Mac.
 
 - **secrets-in-layers** *(deep)* — the build arg is in `docker history`.
   *First guess:* delete the file in a later layer.

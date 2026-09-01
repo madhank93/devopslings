@@ -478,7 +478,18 @@ A container is a process with an unusual view of the filesystem and the network.
 - **compose-networking** *(shipped)* — the API can't reach Redis and both are
   healthy. What `localhost` means inside a container, and why publishing a port
   didn't help.
-- Then: uid mismatch on a volume · the build arg still in `docker history` ·
+- **uid-mismatch-on-a-volume** *(shipped)* — the security review asked for a
+  non-root user, and the service stopped writing the volume it shares with the
+  exporter. A fresh named volume is root-owned 755 and stays that way until
+  something changes it, so ownership is decided by whichever container writes
+  first — here a vendor image running as root. `chmod -R 777` clears the error
+  and restores exactly the permission model the review objected to, so the
+  grader rejects any world-writable path and requires the whole volume to belong
+  to the uid the app reports at runtime; which uid that is, is the learner's
+  choice. The written fix is a one-shot `chown` service ordered between the two
+  with `service_completed_successfully` — `initContainer` and `fsGroup` in the
+  spelling they will meet next.
+- Then: the build arg still in `docker history` ·
   `.dockerignore` and 30 seconds of context · health checks that mean readiness ·
   `exec format error` on the runner · the memory limit and the heap setting that
   must agree · logs that fill the host · one capability instead of `--privileged`.
