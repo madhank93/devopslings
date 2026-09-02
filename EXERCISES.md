@@ -1187,7 +1187,7 @@ carrying a pager for a system they cannot debug.
 ---
 
 ## 12 — CI/CD
-`ci-stack` · 11 exercises · 6 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` · 11 exercises · 7 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1226,9 +1226,12 @@ carrying a pager for a system they cannot debug.
   a grader-pushed commit that genuinely breaks one.
   *Source:* own.
 
-- **promote-do-not-rebuild** *(core)* — staging and production run different bytes.
-  *First guess:* rebuild per environment from the same commit.
-  *Check:* one artefact digest travels through every stage.
+- **promote-do-not-rebuild** *(core · shipped)* — staging and production run
+  different bytes.
+  *First guess:* rebuild per environment from the same commit; or make the two
+  builds byte-identical instead of building once.
+  *Check:* staging and production resolve to one manifest digest, and a
+  grader-pushed commit moves both to a new one under a new build stamp.
   *Source:* own.
 
 - **branch-protection-bypass** *(core)* — a change reached main without review.

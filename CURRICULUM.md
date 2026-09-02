@@ -649,10 +649,22 @@ postmortems, and why you mirror.
   by reading the named check's own status rather than the commit's aggregate,
   which on Forgejo is honest. Retry versus ignore is the distinction the lesson
   turns on: three attempts still fail on a test that is genuinely broken.
-- Then: promote the artefact instead of rebuilding it ·
-  the branch protection with a path around it · two merges racing to deploy ·
-  one Jenkinsfile lesson, because enterprises still run it · and the Cloudflare
-  2019 postmortem as a staged rollout.
+- **promote-do-not-rebuild** *(shipped)* — build, deploy to staging, deploy to
+  production, all green, and the production job checks the same commit out and
+  builds it a second time. Same source, different bytes: the image stamps the
+  build it came from, and that is only the most visible of the things a rebuild
+  does not hold constant — the base image behind its tag, whatever the package
+  manager resolves today, the builder version. So whatever staging proved, it
+  proved about an artefact production is not serving. The fix is one build under
+  an immutable `git-<sha>` tag and a deploy that is a `docker tag` and a push
+  that uploads no layers. Two wrong answers are refused by name: pinning both
+  environments to one image, which agrees perfectly and never ships anything,
+  and freezing the build stamp so the two rebuilds match, which buys the digest
+  check by destroying the ability to tell two builds apart. Graded against the
+  registry, on the manifest digest each environment's tag resolves to.
+- Then: the branch protection with a path around it · two merges racing to
+  deploy · one Jenkinsfile lesson, because enterprises still run it · and the
+  Cloudflare 2019 postmortem as a staged rollout.
 
 ### 13 — IaC: OpenTofu
 `iac-stack`
