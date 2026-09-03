@@ -1187,7 +1187,7 @@ carrying a pager for a system they cannot debug.
 ---
 
 ## 12 — CI/CD
-`ci-stack` · 11 exercises · 7 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` · 11 exercises · 8 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1234,9 +1234,12 @@ carrying a pager for a system they cannot debug.
   grader-pushed commit moves both to a new one under a new build stamp.
   *Source:* own.
 
-- **branch-protection-bypass** *(core)* — a change reached main without review.
-  *First guess:* add a rule; the path around it is still open.
-  *Check:* the bypass route is closed and the emergency path is auditable.
+- **branch-protection-bypass** *(core · shipped)* — a change reached main
+  without review, and the rule requiring review was in place the whole time.
+  *First guess:* add a rule; the push allowlist beside it is still open.
+  *Check:* a grader-pushed commit to main is rejected by the forge, a review is
+  still required, and a status check is required naming a context the pipeline
+  actually reports.
   *Source:* own.
 
 - **deploy-race** *(core)* — two merges deploy simultaneously and the older wins.

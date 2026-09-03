@@ -662,9 +662,24 @@ postmortems, and why you mirror.
   and freezing the build stamp so the two rebuilds match, which buys the digest
   check by destroying the ability to tell two builds apart. Graded against the
   registry, on the manifest digest each environment's tag resolves to.
-- Then: the branch protection with a path around it · two merges racing to
-  deploy · one Jenkinsfile lesson, because enterprises still run it · and the
-  Cloudflare 2019 postmortem as a staged rollout.
+- **branch-protection-bypass** *(shipped)* — main is protected, the rule
+  requires an approving review, and the last commit on main went through none of
+  it. Approvals govern merging a pull request; pushing to the branch is a
+  separate switch with its own allowlist, and the everyday account is on it —
+  added once for a real reason and permanent since. Graded by trying the push
+  rather than by reading the rule. Deleting the rule and dropping the approval
+  requirement are refused separately. The third objective is the pipeline:
+  required contexts are matched by the name the forge reports — `ci / build
+  (push)`, not `build` — so the common near-miss produces a branch nothing can
+  ever merge, and the grader diffs the required names against the ones the
+  repository actually posts. Measured against the folklore: `apply_to_admins:
+  false` grants no bypass in Forgejo 11, and an admin cannot merge past a
+  required approval either, so there is no built-in break-glass and the
+  auditable emergency path has to be built — a named account, alone on the push
+  allowlist, used for nothing else.
+- Then: two merges racing to deploy · one Jenkinsfile lesson, because
+  enterprises still run it · and the Cloudflare 2019 postmortem as a staged
+  rollout.
 
 ### 13 — IaC: OpenTofu
 `iac-stack`
