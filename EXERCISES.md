@@ -1187,7 +1187,7 @@ carrying a pager for a system they cannot debug.
 ---
 
 ## 12 — CI/CD
-`ci-stack` · 11 exercises · 9 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` · 11 exercises · 10 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1260,9 +1260,15 @@ carrying a pager for a system they cannot debug.
   *Check:* declarative pipeline reproduces build → test → publish with the same gates.
   *Source:* roadmap.sh (Jenkins is still everywhere).
 
-- **staged-rollout** *(architect)* — a bad change reaches 100% of nodes in 40 seconds.
-  *First guess:* faster rollback.
-  *Check:* the rollout halts at the canary stage on the failing signal.
+- **staged-rollout** *(architect · shipped)* — a bad change reaches 100% of
+  nodes in 40 seconds.
+  *First guess:* faster rollback; or gate on the error rate everyone already
+  alerts on, which stayed flat throughout.
+  *Check:* the written policy is executed. It must halt the bad change at no
+  more than 5% of the fleet **and** still ship a healthy change to 100%, with
+  the abort action and the written rationale graded alongside.
+  *Note:* stackless — the fleet and the signals are a small simulator the
+  lesson ships, and the grader runs its own copy so editing it proves nothing.
   *Source:* Cloudflare 2019, as the delivery-side lesson.
 
 ---

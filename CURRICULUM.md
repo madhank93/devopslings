@@ -695,8 +695,22 @@ postmortems, and why you mirror.
   superseded run on the same ref, which is why two merges to main cannot race
   and why nobody looked: a safety property that holds for the case you tested
   and not the case you shipped.
-- Then: one Jenkinsfile lesson, because enterprises still run it · and the
-  Cloudflare 2019 postmortem as a staged rollout.
+- **staged-rollout** *(architect · shipped)* — the delivery side of Cloudflare
+  2019. A WAF rule that backtracks catastrophically passes review and the test
+  suite, because what is wrong with it is a *cost*, and cost only appears
+  against real traffic. Forty seconds to the whole fleet. The student writes a
+  rollout policy — stages, signal, threshold, bake time — plus the written half,
+  and the grader executes the policy rather than reading it. Two-sided by
+  design: it must halt the bad change inside the canary **and** ship a healthy
+  change to 100%, because a gate tuned so tight that good changes trip it gets
+  socially disabled and is worse than none. Three traps, each hand-verified:
+  gating on `http_5xx_per_10k`, which stayed flat because the rule made requests
+  expensive rather than wrong; a bake shorter than the signal's ~30s detection
+  latency, which reads a healthy number off an already-broken node; and an
+  abort that freezes or drains instead of reverting, leaving the canary on the
+  change whose evidence stopped the rollout. Stackless, so it costs no Docker.
+- Then: one Jenkinsfile lesson, because enterprises still run it — which needs a
+  Jenkins in the sandbox that `ci-stack` does not yet have.
 
 ### 13 — IaC: OpenTofu
 `iac-stack`
