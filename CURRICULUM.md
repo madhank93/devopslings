@@ -677,9 +677,26 @@ postmortems, and why you mirror.
   required approval either, so there is no built-in break-glass and the
   auditable emergency path has to be built — a named account, alone on the push
   allowlist, used for nothing else.
-- Then: two merges racing to deploy · one Jenkinsfile lesson, because
-  enterprises still run it · and the Cloudflare 2019 postmortem as a staged
-  rollout.
+- **deploy-race** *(shipped)* — `main` deploys to production and so does
+  `hotfix/**`, an emergency path added during a previous incident and never
+  removed. Both jobs write one mutable tag. The hotfix carries a schema change,
+  so its deploy runs migrations, finishes second, and leaves production on a
+  commit that is on no branch anyone merged — last-writer-wins, which is not
+  newest-wins, because the slow deploys are exactly the ones carrying the
+  careful changes. Graded on the invariant rather than on timing: a change
+  merged to main must reach production, and a push to a hotfix branch must not
+  be able to replace it, which accepts both the structural fix and a
+  compare-and-swap guard while rejecting "make the hotfix deploy faster".
+  Measured while building it, and taught explicitly because the module promises
+  to flag the divergences: **Forgejo 11 / act_runner v9.1.1 accepts, parses and
+  ignores `concurrency:`** at workflow and job level alike — two deploys under
+  one `group: production` still overlapped — so the roadmap's answer cannot be
+  the graded one here. What Forgejo does have is auto-cancellation of a
+  superseded run on the same ref, which is why two merges to main cannot race
+  and why nobody looked: a safety property that holds for the case you tested
+  and not the case you shipped.
+- Then: one Jenkinsfile lesson, because enterprises still run it · and the
+  Cloudflare 2019 postmortem as a staged rollout.
 
 ### 13 — IaC: OpenTofu
 `iac-stack`

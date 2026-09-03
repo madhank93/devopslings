@@ -1187,7 +1187,7 @@ carrying a pager for a system they cannot debug.
 ---
 
 ## 12 — CI/CD
-`ci-stack` · 11 exercises · 8 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` · 11 exercises · 9 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1242,9 +1242,17 @@ carrying a pager for a system they cannot debug.
   actually reports.
   *Source:* own.
 
-- **deploy-race** *(core)* — two merges deploy simultaneously and the older wins.
-  *First guess:* tell people to merge slower.
-  *Check:* concurrency group serialises deploys; the newest commit ends up live.
+- **deploy-race** *(core · shipped)* — main and a hotfix branch both deploy to
+  production; the hotfix runs migrations, finishes second, and leaves production
+  on a commit nobody merged.
+  *First guess:* tell people to merge slower; or drop the migration step so the
+  hotfix deploy stops being the slow one.
+  *Check:* a change merged to main reaches production, and a push to a hotfix
+  branch cannot replace it.
+  *Note:* the roadmap answer is a `concurrency` group. Forgejo 11 with
+  act_runner v9.1.1 accepts, parses and ignores `concurrency:` — measured, at
+  both workflow and job level — so the graded fix is structural: one deploy
+  path. The prose teaches the GitHub block and says it does not work here.
   *Source:* own.
 
 - **jenkinsfile** *(core)* — the same pipeline in the tool the enterprise actually runs.
