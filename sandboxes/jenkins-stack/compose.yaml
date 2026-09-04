@@ -1,0 +1,33 @@
+# jenkins-stack — the substrate for module 12's Jenkinsfile exercise.
+#
+# Separate from ci-stack on purpose. ci-stack is already the heaviest sandbox
+# in the repo, and every other module 12 lesson would pay a JVM's start-up on
+# every `devopslings start` if Jenkins lived in it. This one exists for a
+# single lesson, so it stays a single container.
+#
+# Jenkins rather than Forgejo Actions because the exercise is precisely about
+# the tool the enterprise actually runs: same pipeline, different syntax, and
+# the differences are the lesson.
+services:
+  jenkins:
+    build: .
+    environment:
+      # No agents: everything runs on the controller. Wrong in production for
+      # obvious reasons, and it keeps this sandbox to one container.
+      JENKINS_SLAVE_AGENT_PORT: "50000"
+    volumes:
+      - jenkins-data:/var/jenkins_home
+    ports:
+      # 18080 rather than 8080: the repo's other sandboxes publish web apps on
+      # 8080 internally, and a student running two stacks should not have to
+      # stop one to start the other.
+      - "18080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/json >/dev/null || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
+
+volumes:
+  jenkins-data:

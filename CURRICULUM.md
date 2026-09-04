@@ -603,7 +603,7 @@ image by digest · **dependency confusion**, where an internal name resolves to 
 public package · scoped robot accounts · the left-pad and event-stream
 postmortems, and why you mirror.
 
-### 12 — CI/CD · *partly shipped*
+### 12 — CI/CD · *shipped*
 `ci-stack`
 
 - **run-it-on-every-push** *(shipped)* — a workflow that was written during
@@ -709,8 +709,20 @@ postmortems, and why you mirror.
   latency, which reads a healthy number off an already-broken node; and an
   abort that freezes or drains instead of reverting, leaving the canary on the
   change whose evidence stopped the rollout. Stackless, so it costs no Docker.
-- Then: one Jenkinsfile lesson, because enterprises still run it — which needs a
-  Jenkins in the sandbox that `ci-stack` does not yet have.
+- **jenkinsfile** *(shipped)* — the same pipeline in the tool the enterprise
+  actually runs, and the reason to move it into the repository is governance
+  rather than syntax. A freestyle job builds, tests and publishes through three
+  shell steps configured in a web form, and its test step is `./tests.sh ||
+  true` — added eighteen months ago for a flaky test that was fixed a fortnight
+  later, never reviewed, because a change made by clicking Save has no diff and
+  no author. The replacement is a Declarative Pipeline in the repo, where the
+  gate is not something you add but something you get by *not* suppressing the
+  error. Graded end to end against a real Jenkins: a healthy commit goes green
+  and is published, a commit whose tests genuinely fail goes red and is not,
+  and the freestyle job must no longer be buildable — because a migration that
+  leaves the old path enabled has made it unwatched rather than safe. Runs on
+  `jenkins-stack`, a new one-container sandbox: Jenkins inside ci-stack would
+  put a JVM start-up in front of every other lesson in the module.
 
 ### 13 — IaC: OpenTofu
 `iac-stack`

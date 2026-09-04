@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 11 sandboxes. 74 shipped,
-200 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 274 exercises across 27 modules and 12 sandboxes. 92 shipped,
+182 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
@@ -1187,7 +1187,7 @@ carrying a pager for a system they cannot debug.
 ---
 
 ## 12 — CI/CD
-`ci-stack` · 11 exercises · 10 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` + `jenkins-stack` · 11 exercises · 11 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1255,9 +1255,17 @@ carrying a pager for a system they cannot debug.
   path. The prose teaches the GitHub block and says it does not work here.
   *Source:* own.
 
-- **jenkinsfile** *(core)* — the same pipeline in the tool the enterprise actually runs.
-  *First guess:* freestyle jobs and manual steps.
-  *Check:* declarative pipeline reproduces build → test → publish with the same gates.
+- **jenkinsfile** *(core · shipped)* — the same pipeline in the tool the
+  enterprise actually runs. A freestyle job whose test step is `./tests.sh ||
+  true`, added through a web form eighteen months ago, so the change that broke
+  the gate never appeared in a diff.
+  *First guess:* freestyle jobs and manual steps; or carry the `|| true` across
+  into the Jenkinsfile.
+  *Check:* a healthy commit goes green and is published; a commit whose tests
+  fail goes red and is **not** published; and the freestyle job can no longer
+  build.
+  *Note:* runs on `jenkins-stack`, a new single-container sandbox — Jenkins in
+  ci-stack would put a JVM start-up in front of every other module 12 lesson.
   *Source:* roadmap.sh (Jenkins is still everywhere).
 
 - **staged-rollout** *(architect · shipped)* — a bad change reaches 100% of
