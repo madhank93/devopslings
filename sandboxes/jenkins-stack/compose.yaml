@@ -18,10 +18,10 @@ services:
     volumes:
       - jenkins-data:/var/jenkins_home
     ports:
-      # 18080 rather than 8080: the repo's other sandboxes publish web apps on
+      # 18083 rather than 8080: the repo's other sandboxes publish web apps on
       # 8080 internally, and a student running two stacks should not have to
       # stop one to start the other.
-      - "18080:8080"
+      - "18083:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/json >/dev/null || exit 1"]
       interval: 3s

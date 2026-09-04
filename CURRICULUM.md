@@ -178,7 +178,7 @@ overflow**, where the server logs nothing at all · reading a capture and tellin
 a retransmission from a reset from a zero window · and a rubric-graded L4-versus-L7
 decision.
 
-### 05 — Networking II: Protocols & Services · *partly shipped*
+### 05 — Networking II: Protocols & Services · *shipped*
 `netlab`
 
 - **resolve-connect-request** *(shipped)* — three tickets, all of them saying
@@ -232,7 +232,7 @@ decision.
   The drill is the ladder — frame, next hop, port, name, certificate — walked in
   order until a rung answers, and the layer has to be named as well as repaired.
 
-### 06 — Web Servers & Proxies
+### 06 — Web Servers & Proxies · *shipped*
 `web-stack`
 
 - **serve-a-static-site** *(shipped)* — every request is 403 on a file that is
@@ -294,7 +294,7 @@ decision.
   search; a per-rule budget is what makes the next bad rule survivable rather
   than fatal.
 
-### 07 — Security Hardening & Access Control
+### 07 — Security Hardening & Access Control · *partly shipped*
 `linux-box`
 
 AppArmor, not SELinux: every sandbox is Debian, and SELinux does not enforce
@@ -370,7 +370,7 @@ Still to build: an AppArmor denial in enforce mode and auditd answering who
 changed the file at 02:14 — both blocked by this sandbox's kernel (no AppArmor
 LSM, no audit subsystem), to be reframed or moved to a VM-backed sandbox.
 
-### 08 — Version Control
+### 08 — Version Control · *shipped*
 no sandbox, except `git-box` for the LFS lesson
 
 - **branch-commit-merge** *(shipped)* — the loop everything else in this module

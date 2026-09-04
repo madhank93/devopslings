@@ -40,11 +40,11 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 274 exercises across 27 modules and 12 sandboxes. 92 shipped,
-182 specified. Modules 01–05 are complete: all 59 of their exercises pass the
-contract test. By tier: 29 intro · 154 core · 60 deep · 31 architect.
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 110 shipped,
+165 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
-Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/11 · 08/8 · 09/12 ·
+Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
 20/15 · 21/13 · 22/11 · 23/10 · 24/13 · 25/7 · 26/9 · 27/4.
 
@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 10 exercises · 8 shipped · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 10 exercises · 10 shipped · 1 intro · 7 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -791,53 +791,54 @@ table, the connection tracker, the accept queue, and the packets themselves.
   seconds, which rejects the server-level timeout raise.
   *Source:* own.
 
-- **caddy-automatic-https** *(deep)* — certificates that renew themselves.
+- **caddy-automatic-https** *(deep · shipped)* — certificates that renew themselves.
   *First guess:* copy the nginx TLS config over.
   *Check:* served over HTTPS from an ACME-issued cert (local CA), renewal path
   proven by forcing one.
   *Source:* roadmap.sh.
 
-- **incident-cloudflare-2019** *(architect · replay)* — one regex, global CPU exhaustion.
+- **waf-regex-backtracking** *(architect · replay · shipped)* — one regex, global CPU exhaustion.
   *First guess:* scale out.
-  *Check:* the pathological pattern is identified and bounded, and the staged
-  rollout gate stops it reaching all nodes.
+  *Check:* the rule still blocks what it was written to block, a long but
+  legitimate request returns in under two seconds, and /health stays up with six
+  of them in flight.
   *Source:* published Cloudflare postmortem, simplified.
 
 ---
 
 ## 07 — Security Hardening & Access Control
-`linux-box` · 11 exercises · 1 intro · 6 core · 3 deep · 1 architect
+`linux-box` · 12 exercises · 9 shipped · 1 intro · 7 core · 3 deep · 1 architect
 
 AppArmor, not SELinux: every sandbox is Debian, and SELinux does not enforce
 meaningfully inside a container. The mechanism transfers; the tool differs, and
 each lesson says so.
 
-- **who-can-read-this** *(intro)* — one file, three users, and a prediction made
+- **predict-who-can-read** *(intro · shipped)* — one file, three users, and a prediction made
   before anything is run.
   *Check:* the answer predicts access correctly for all three from the mode,
   owner and group alone, then confirms it — including the user who is denied by
   a directory's execute bit rather than by the file's own mode.
   *Source:* own; the rung below permissions-triage in module 01.
 
-- **sudoers-that-grants-root** *(core)* — a NOPASSWD entry that looks narrow.
+- **nopasswd-shell-escape** *(core · shipped)* — a NOPASSWD entry that looks narrow.
   *First guess:* it only allows one command, so it is safe.
   *Check:* the escalation path is demonstrated, then closed, and the operator can
   still do the legitimate task — removing the entry entirely fails the check.
   *Source:* own; the shell-escape family (`less`, `find -exec`, editors).
 
-- **setuid-hunt** *(core)* — the estate has one setuid binary that should not exist.
+- **setuid-hunt** *(core · shipped)* — the estate has one setuid binary that should not exist.
   *First guess:* strip setuid from everything found.
   *Check:* the planted binary is neutralised while `ping`, `sudo` and `su` still
   work, and the answer justifies each one kept.
   *Source:* own.
 
-- **ssh-hardening** *(core)* — an inherited box with password auth and root login.
+- **ssh-hardening** *(core · shipped)* — an inherited box with password auth and root login.
   *First guess:* change the config, restart, and hope.
   *Check:* key-only auth from a second host, root login refused, `authorized_keys`
   permissions correct, and the pre-existing session still alive at the end.
   *Source:* roadmap.sh; pairs with 05's ssh-without-locking-yourself-out.
 
-- **least-privilege-service** *(core)* — the unit runs as root because it once
+- **systemd-drop-privileges** *(core · shipped)* — the unit runs as root because it once
   needed port 80.
   *First guess:* leave it; it works.
   *Check:* the service runs as a non-root user with `NoNewPrivileges=`,
@@ -845,14 +846,14 @@ each lesson says so.
   seeded write outside its allowed paths is denied.
   *Source:* own.
 
-- **fail2ban-and-the-false-positive** *(core)* — the ban rule eventually bans the
+- **fail2ban-bans-the-lb** *(core · shipped)* — the ban rule eventually bans the
   load balancer.
   *First guess:* raise the threshold.
   *Check:* the attacker is banned, the health-checking peer never is, and the
   answer names why counting by source address failed behind a proxy.
   *Source:* own.
 
-- **patch-without-reboot-roulette** *(core)* — 40 pending updates and a service
+- **patch-without-reboot** *(core · shipped)* — 40 pending updates and a service
   that cannot take unplanned downtime.
   *First guess:* apply everything and reboot on Friday.
   *Check:* security updates applied unattended, the set genuinely requiring a
@@ -873,10 +874,19 @@ each lesson says so.
   trail, having first written the watch rule that would have caught it.
   *Source:* own.
 
-- **file-integrity-baseline** *(deep)* — a baseline that cries wolf every deploy.
+- **file-integrity-baseline** *(deep · shipped)* — a baseline that cries wolf every deploy.
   *First guess:* baseline everything under `/`.
   *Check:* a legitimate deploy produces no alert, the planted binary
   modification does, and the answer justifies what was excluded and why.
+  *Source:* own.
+
+- **attack-surface-audit** *(core · shipped)* — an internal metrics API,
+  unauthenticated because it was only ever meant to be read locally, bound to
+  every interface.
+  *First guess:* firewall the port and move on.
+  *Check:* the metrics API answers on loopback and nowhere else, the public
+  portal is still public, and every listening port is classified in a written
+  audit — so the fix is a decision about each one, not a blanket deny.
   *Source:* own.
 
 - **threat-model-this-box** *(architect)* — one host, written up properly.
@@ -888,45 +898,45 @@ each lesson says so.
 ---
 
 ## 08 — Version Control
-no sandbox (scratch git repos) · 8 exercises · 1 intro · 5 core · 1 deep · 1 architect
+no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core · 1 deep · 1 architect
 
-- **branch-commit-merge** *(intro)* — the loop, done properly once.
+- **branch-commit-merge** *(intro · shipped)* — the loop, done properly once.
   *Check:* a feature branch is merged with its history intact, and the answer
   states what the merge commit records that a fast-forward does not.
   *Source:* roadmap.sh.
 
-- **bisect-the-regression** *(core)* — 200 commits, one broke checkout totals.
+- **bisect-a-regression** *(core · shipped)* — 200 commits, one broke checkout totals.
   *First guess:* read the diff of the suspicious-looking commit.
   *Check:* the correct commit hash, found with an automated `git bisect run`.
   *Source:* roadmap.sh.
 
-- **rebase-or-merge** *(core)* — a conflict resolved two ways, one of which loses a fix.
+- **rebase-or-merge** *(core · shipped)* — a conflict resolved two ways, one of which loses a fix.
   *First guess:* accept theirs and move on.
   *Check:* the resulting tree contains both changes and the test suite passes.
   *Source:* own.
 
-- **secret-in-history** *(deep)* — a token committed three weeks ago.
+- **secret-in-history** *(deep · shipped)* — a token committed three weeks ago.
   *First guess:* `git rm` the file and push.
   *Check:* the value is absent from every reachable object *and* the answer file
   records the rotation — history rewriting alone fails the check.
   *Source:* own; pairs with module 12's leaked-secret.
 
-- **reflog-recovery** *(core)* — `reset --hard` on the wrong branch.
+- **reflog-recovery** *(core · shipped)* — `reset --hard` on the wrong branch.
   *First guess:* re-clone and redo the work.
   *Check:* the lost commits are back with their original hashes.
   *Source:* own.
 
-- **large-files-and-lfs** *(core)* — the clone takes nine minutes.
+- **large-files-and-lfs** *(core · shipped)* — the clone takes nine minutes.
   *First guess:* delete the file in a new commit; the objects stay.
   *Check:* fresh-clone size under target with the asset still available via LFS.
   *Source:* roadmap.sh.
 
-- **submodule-detached** *(core)* — CI builds an old version of a vendored library.
+- **submodule-detached** *(core · shipped)* — CI builds an old version of a vendored library.
   *First guess:* `git pull` in the submodule.
   *Check:* the parent records the intended commit and a clean clone builds it.
   *Source:* own.
 
-- **hooks-that-catch-it-earlier** *(architect)* — the same secret, stopped before the push.
+- **hooks-that-catch-it-earlier** *(architect · shipped)* — the same secret, stopped before the push.
   *First guess:* trust everyone to remember.
   *Check:* the hook blocks the bad commit and permits the good one, with no
   false positive on the fixture repo; the written rationale must address what

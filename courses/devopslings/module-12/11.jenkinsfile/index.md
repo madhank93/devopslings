@@ -174,7 +174,7 @@ tasks:
 
       echo "scenario ready"
       echo
-      echo "  jenkins:  http://localhost:18080   (no login)"
+      echo "  jenkins:  http://localhost:18083   (no login)"
       echo "  repo:     $home/repo.git — your clone is at $home/checkout"
       echo
       echo "  rate-legacy    the freestyle job, three shell steps"

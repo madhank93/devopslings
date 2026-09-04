@@ -130,6 +130,18 @@ tasks:
       # The state of one named check on a commit, newest entry first. Forgejo
       # records every transition, so the first line for a context is its current
       # state. Empty means no such check ran.
+      # What the forge thinks the job itself did. A commit status can sit at
+      # pending for good when its run is superseded, so this is what
+      # distinguishes "the workflow is wrong" from "the run never finished".
+      job_state() {
+        curl -fsS $auth "${api}/repos/${repo}/actions/tasks?limit=20" 2>/dev/null \
+          | tr '{' '\n' \
+          | grep "\"head_sha\":\"$1\"" \
+          | grep "\"name\":\"$2\"" \
+          | sed -n 's/.*"status":"\([a-z]*\)".*/\1/p' \
+          | head -1 || true
+      }
+
       context_status() {
         _sha=$1
         _match=$2
@@ -137,14 +149,20 @@ tasks:
         _seen=0
         while [ "$_i" -lt 100 ]; do
           _body=$(curl -fsS $auth "${api}/repos/${repo}/commits/${_sha}/statuses" 2>/dev/null || true)
+          # Take the newest *settled* entry rather than the newest entry.
+          # Forgejo supersedes a run when another push lands on the same ref,
+          # and a superseded run leaves its context pending for good — so the
+          # newest entry for a context can be a pending one that will never
+          # resolve, sitting on top of the verdict actually wanted.
           _state=$(printf '%s' "$_body" \
             | tr '}' '\n' \
             | grep "$_match" \
             | sed -n 's/.*"status":"\([a-z]*\)".*/\1/p' \
-            | head -1)
-          case "$_state" in
-            success|failure|error) printf '%s' "$_state"; return 0 ;;
-            pending) _seen=1 ;;
+            | grep -m1 -E '^(success|failure|error)$' || true)
+          if [ -n "$_state" ]; then printf '%s' "$_state"; return 0; fi
+          case "$(printf '%s' "$_body" | tr '}' '\n' | grep -c "$_match" || true)" in
+            0) ;;
+            *) _seen=1 ;;
           esac
           _i=$((_i + 1))
           if [ "$_seen" = "0" ] && [ "$_i" -ge 20 ]; then break; fi
@@ -188,9 +206,11 @@ tasks:
 
       gate=$(context_status "$head_sha" 'gate')
       if [ -z "$gate" ]; then
-        echo "not yet: no check called 'gate' reported on the tip of main. Branch"
-        echo "protection requires that context by name, so a workflow that no longer"
-        echo "produces it leaves the branch with nothing to require."
+        echo "not yet: no settled result for a check called 'gate' on the tip of main."
+        echo "Branch protection requires that context by name, so a workflow that no"
+        echo "longer produces it leaves the branch with nothing to require. If the"
+        echo "workflow does still define 'gate', the run may not have finished — check"
+        echo "the actions tab before changing anything."
         exit 1
       fi
       if [ "$gate" != "success" ]; then
@@ -232,7 +252,18 @@ tasks:
       fi
 
       if [ "$probe_gate" != "failure" ]; then
-        echo "not yet: the contract shard failed and 'gate' reported '${probe_gate:-nothing}'."
+        # 'pending' is not a verdict about the student's workflow — it means the
+        # run never finished, and blaming `needs:` for that would send them to
+        # rewrite something that is already correct.
+        if [ -z "$probe_gate" ] || [ "$probe_gate" = "pending" ]; then
+          echo "not yet: the 'gate' check on the grader's commit never reached a result"
+          echo "(last seen: ${probe_gate:-nothing}). The forge says its job is:"
+          echo "  $(job_state "$probe_sha" 'gate')"
+          echo "This is a stuck or superseded run rather than a verdict on your workflow."
+          echo "Check the actions tab, and run the check again once it has finished."
+          exit 1
+        fi
+        echo "not yet: the contract shard failed and 'gate' reported '${probe_gate}'."
         echo "'needs:' orders jobs, it does not import their verdict, and 'if: always()'"
         echo "asks the gate to run even when what it needs did not succeed. A summary job"
         echo "that never reads the result of what it waited for is a green light wired to"
