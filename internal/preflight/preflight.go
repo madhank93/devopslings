@@ -73,7 +73,11 @@ func Run(ctx context.Context) Report {
 		return r
 	}
 	r.Checks = append(r.Checks, composeV2(ctx), memory(ctx))
-	r.Checks = append(r.Checks, ports(3000, 5000, 8080, 8474, 9090)...)
+	r.Checks = append(r.Checks, ports(
+		3000, 5000, 8080, 8474, 9090,
+		// db-stack (module 10) and jenkins-stack (module 12).
+		15432, 15433, 16380, 16432, 18083,
+	)...)
 	return r
 }
 

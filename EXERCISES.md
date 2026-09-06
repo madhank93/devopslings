@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 110 shipped,
-165 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 112 shipped,
+163 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -1032,7 +1032,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` (new) · 14 exercises · 2 intro · 5 core · 6 deep · 1 architect
+`db-stack` · 14 exercises · 2 shipped · 2 intro · 5 core · 6 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1042,14 +1042,18 @@ carrying a pager for a system they cannot debug.
 `db-stack`: Postgres primary and replica, pgbouncer, Redis, a seeded 10M-row
 `orders` table, `pg_stat_statements` enabled.
 
-- **connect-and-grant** *(intro)* — the application user can drop every table.
-  *Check:* the app works with a role that can read and write its own tables and
-  nothing else; a seeded `DROP TABLE` attempt is denied and the denial recorded.
+- **connect-and-grant** *(intro · shipped)* — the application user can drop every table.
+  *First guess:* revoke the privileges; ownership carries DROP regardless.
+  *Check:* the app still reads and writes its own tables, no longer owns them,
+  is refused a DROP, and cannot create tables of its own.
   *Source:* own.
 
-- **read-the-plan** *(intro)* — one query, 10M rows, eleven seconds.
-  *Check:* the answer quotes the scan type, the estimated versus actual row
-  counts, and the point in the plan where the estimate went wrong.
+- **read-the-plan** *(intro · shipped)* — one query, 10M rows, over a second.
+  *First guess:* add an index; there already is one, on the column the query
+  does not actually filter on.
+  *Check:* the answer names the scan type and the estimated against actual row
+  counts, graded against a plan the checker runs itself, plus the reason — a
+  cast the planner holds no statistics for.
   *Source:* own.
 
 - **the-index-that-is-not-used** *(core)* — the index exists and the planner

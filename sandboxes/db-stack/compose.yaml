@@ -1,0 +1,140 @@
+# db-stack — the substrate for module 10, Databases & Data Stores.
+#
+# Postgres appears elsewhere in this course only as something to fail over and
+# restore. This stack exists so it can be *operated*: a primary that keeps
+# statement statistics, a streaming replica to be stale against, a connection
+# pooler to exhaust, and a Redis to evict from.
+#
+# The seed is deliberately large. Query plans on a thousand rows are a
+# different subject from query plans on ten million — the planner picks a
+# sequential scan on small tables no matter what you index, so a small seed
+# would teach the opposite of the lesson.
+services:
+  primary:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_PASSWORD: devopslings
+      POSTGRES_DB: shop
+      # Replication needs a role and the replica needs to be allowed in. Trust
+      # on the compose network only; this stack publishes Postgres to localhost
+      # and is not something to copy into an environment with other people on
+      # it.
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    command:
+      - postgres
+      # pg_stat_statements is the whole point of the n-plus-one exercise: the
+      # slow-query log cannot find a statement that is individually fast.
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=4
+      - -c
+      - max_replication_slots=4
+      - -c
+      - hot_standby=on
+      # Small enough that lock waits and plan choices are reachable on a
+      # laptop, large enough that the seed does not thrash.
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=8MB
+      # The lock-contention lesson needs to see an idle-in-transaction session
+      # sitting there, so nothing may reap it automatically.
+      - -c
+      - idle_in_transaction_session_timeout=0
+      - -c
+      - log_min_duration_statement=1000
+    volumes:
+      - primary-data:/var/lib/postgresql/data
+      # Only the primary's own init scripts. Everything in this directory is
+      # executed by the postgres entrypoint on first start, so the replica's
+      # entrypoint lives outside it — dropped in here it would run during the
+      # primary's initialisation and try to start a second postmaster.
+      - ./init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shop"]
+      interval: 3s
+      # The seed is ~35s on a warm laptop. The budget is deliberately several
+      # times that: Postgres runs its init scripts before it opens the port, so
+      # a slow first start looks exactly like an unhealthy container, and
+      # everything downstream waits on this condition.
+      timeout: 5s
+      retries: 120
+      start_period: 30s
+
+  # Brought up by pg_basebackup against the primary the first time, then run as
+  # a hot standby. Kept in its own script rather than an image so the mechanism
+  # is readable — replication being magic is how people end up unable to debug
+  # lag.
+  replica:
+    image: postgres:17-bookworm
+    depends_on:
+      primary:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: replicate
+    entrypoint: ["/bin/bash", "/replica-entrypoint.sh"]
+    volumes:
+      - replica-data:/var/lib/postgresql/data
+      - ./replica-entrypoint.sh:/replica-entrypoint.sh:ro
+    ports:
+      - "15433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shop"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.23.1-p2
+    depends_on:
+      primary:
+        condition: service_healthy
+    environment:
+      DB_HOST: primary
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: devopslings
+      DB_NAME: shop
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      # Deliberately small. A pooler with a comfortable pool teaches nothing
+      # about what happens when connections outnumber it.
+      MAX_CLIENT_CONN: "100"
+      DEFAULT_POOL_SIZE: "5"
+      ADMIN_USERS: postgres
+    ports:
+      - "16432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5432 || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    # No maxmemory and no persistence configured on purpose: the eviction
+    # lesson starts from the defaults people actually ship with.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "16380:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  primary-data:
+  replica-data:
+
+networks:
+  default:
+    name: devopslings-db-net

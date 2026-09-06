@@ -568,7 +568,7 @@ A container is a process with an unusual view of the filesystem and the network.
   requiring a tmpfs mount inside the container to be refused — `CAP_SYS_ADMIN`
   being what `privileged` was really handing over.
 
-### 10 — Databases & Data Stores
+### 10 — Databases & Data Stores · *partly shipped*
 `db-stack`
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
