@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 112 shipped,
-163 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 113 shipped,
+162 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -1032,7 +1032,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 14 exercises · 2 shipped · 2 intro · 5 core · 6 deep · 1 architect
+`db-stack` · 14 exercises · 3 shipped · 2 intro · 5 core · 6 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1056,8 +1056,8 @@ carrying a pager for a system they cannot debug.
   cast the planner holds no statistics for.
   *Source:* own.
 
-- **the-index-that-is-not-used** *(core)* — the index exists and the planner
-  ignores it.
+- **the-index-that-is-not-used** *(core · shipped)* — the index exists and the
+  planner ignores it.
   *First guess:* the planner is wrong; force it with a hint.
   *Check:* the query uses the index and returns in budget, with the answer naming
   the cause — an implicit cast, or a function wrapped around the column —
