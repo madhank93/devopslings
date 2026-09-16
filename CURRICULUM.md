@@ -232,7 +232,7 @@ decision.
   The drill is the ladder — frame, next hop, port, name, certificate — walked in
   order until a rung answers, and the layer has to be named as well as repaired.
 
-### 06 — Web Servers & Proxies · *shipped*
+### 06 — Web Servers & Proxies · *partly shipped*
 `web-stack`
 
 - **serve-a-static-site** *(shipped)* — every request is 403 on a file that is
@@ -293,6 +293,12 @@ decision.
   an ordinary URL is fine. Rewriting the rule keeps its verdicts and removes the
   search; a per-rule budget is what makes the next bad rule survivable rather
   than fatal.
+
+- **api-gateway-route-precedence** — two routes match one request and the
+  gateway picks the other one. A proxy file is read top to bottom; a gateway
+  matches by specificity, so moving a route up changes nothing. Authentication
+  and the rate limit hang off whichever route wins, which is why the wrong match
+  is more than the wrong backend.
 
 ### 07 — Security Hardening & Access Control · *partly shipped*
 `linux-box`
@@ -586,7 +592,10 @@ prevent it · **bloat and autovacuum starvation** · the XID wraparound warning
 nobody reads · replication lag and read-your-writes · **a zero-downtime schema
 migration** by expand, backfill in batches, contract · Redis eviction policy
 silently discarding a queue that was never a cache · and a written choice of
-store for four workloads.
+store for four workloads · **a hot shard**, where four shards hold the data and
+one takes most of the traffic, because of what the shard key was · an LSM store
+stalling writes while compaction falls behind · quorum reads across three
+replicas, and why R + W > N is what lets a client read its own write.
 
 ---
 
@@ -862,6 +871,8 @@ behind HAProxy · **the health check that lies** — 200 while the database is
 down · streaming replication and promoting a replica without losing a committed
 transaction · **quorum and split-brain**: three-node etcd, kill two · leader
 election across a partition · graceful degradation: serve stale, not 500 ·
+**rotating a certificate behind a VIP**, where renewing on one node leaves the
+other presenting the old chain and moving the address rotates neither ·
 **GitHub 2018**, where failing back was harder than failing over · **Facebook
 BGP 2021**, where the path to roll back the change was inside the thing the
 change removed.

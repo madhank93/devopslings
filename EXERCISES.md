@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 10 exercises · 10 shipped · 1 intro · 7 core · 1 deep · 1 architect
+`web-stack` · 11 exercises · 10 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -803,6 +803,17 @@ table, the connection tracker, the accept queue, and the packets themselves.
   legitimate request returns in under two seconds, and /health stays up with six
   of them in flight.
   *Source:* published Cloudflare postmortem, simplified.
+
+- **api-gateway-route-precedence** *(core)* — two routes match the same request
+  and the gateway sends it to the wrong one.
+  *First guess:* move the route higher in the file; the gateway matches by
+  specificity, not by the order the routes are written in.
+  *Check:* four requests each reach the backend they were meant for, the
+  authenticated route still refuses a request with no token, the rate limit
+  still counts per client rather than per gateway, and the answer names the
+  order the gateway applies its rules in — host, then path length, then method
+  and headers.
+  *Source:* own.
 
 ---
 
@@ -1032,7 +1043,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 14 exercises · 4 shipped · 2 intro · 5 core · 6 deep · 1 architect
+`db-stack` · 17 exercises · 4 shipped · 2 intro · 6 core · 8 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1137,6 +1148,35 @@ carrying a pager for a system they cannot debug.
   *Check:* the column exists and is populated with the application serving
   throughout, via expand → backfill in bounded batches → contract; a single
   statement that holds an exclusive lock past the budget fails.
+  *Source:* own.
+
+- **hot-shard** *(deep)* — four shards, and one of them serves most of the
+  traffic.
+  *First guess:* add a fifth shard; the router sends the same keys to the same
+  place and the hot one stays hot.
+  *Check:* the load is measured per shard, the answer names what the shard key
+  did — a monotonic id that sends every new row to the last shard, or a tenant
+  id where one tenant dwarfs the rest — and the rebalanced scheme spreads the
+  writes while keeping the common read on one shard; a key that spreads
+  perfectly and turns every read into a scatter-gather fails.
+  *Source:* own.
+
+- **lsm-write-stall** *(deep)* — writes that took a millisecond stop for
+  seconds at a time, and the disk is neither full nor busy.
+  *First guess:* the storage is slow; move it to faster disk.
+  *Check:* the pause is attributed to compaction falling behind — level-0 files
+  past the stall trigger, and the write-stall counter rising — and after the fix
+  the same ingest holds p99 write latency inside the budget with the backlog
+  draining; deleting data to make the symptom go away does not pass.
+  *Source:* own.
+
+- **quorum-and-eventual-consistency** *(core)* — three replicas, a write that
+  was acknowledged, and a read that cannot see it.
+  *First guess:* the replica is broken; restart it.
+  *Check:* the answer states the replication factor and the read and write
+  quorums, and explains why R + W > N is what makes a read see the write that
+  preceded it; the reconfigured client then reads its own write with one replica
+  still down.
   *Source:* own.
 
 - **pick-the-store** *(architect)* — four workloads, four choices.
@@ -1787,7 +1827,7 @@ failures transfer to any provider.
 ---
 
 ## 22 — High Availability
-`ha-stack` (new) · 11 exercises · 1 intro · 6 core · 2 deep · 2 architect
+`ha-stack` (new) · 12 exercises · 1 intro · 7 core · 2 deep · 2 architect
 
 - **two-nodes-one-name** *(intro)* — put a load balancer in front of two servers.
   *Check:* both backends receive traffic under a spread of requests, and stopping
@@ -1839,6 +1879,16 @@ failures transfer to any provider.
   *Check:* the reconstruction demonstrates why failing back was harder than
   failing over; the runbook produced is graded against required steps.
   *Source:* published GitHub postmortem, simplified.
+
+- **cert-rotation-behind-a-vip** *(core)* — the certificate was renewed, and
+  half the handshakes still present the old one.
+  *First guess:* restart the node holding the VIP; that is the node with the new
+  certificate, and the stale one is behind the same address.
+  *Check:* both nodes present the same renewed chain, a rotation performed under
+  load drops no connection and leaves no failed handshake, and the answer
+  separates what has to be rotated on each instance from what moving the VIP
+  rotates on its own — which is nothing.
+  *Source:* own.
 
 - **incident-facebook-bgp-2021** *(architect · replay)* — a routing withdrawal
   that removes the network the operators needed to reach the network.
