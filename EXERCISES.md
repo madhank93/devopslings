@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 115 shipped,
-160 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 116 shipped,
+159 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -1043,7 +1043,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 17 exercises · 5 shipped · 2 intro · 6 core · 8 deep · 1 architect
+`db-stack` · 17 exercises · 6 shipped · 2 intro · 6 core · 8 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1092,12 +1092,15 @@ carrying a pager for a system they cannot debug.
   script to give up rather than wait — a `lock_timeout`, proven by behaviour.
   *Source:* own.
 
-- **replication-lag-stale-read** *(core)* — the write succeeded and the next read
-  cannot find it.
+- **replication-lag-stale-read** *(core · shipped)* — the write succeeded and the
+  next read cannot find it.
   *First guess:* the write did not commit; retry it.
-  *Check:* lag is quantified from the replication position, and the read-your-
-  writes case is correct afterwards — routing every read to the primary fails the
-  check, because it defeats the replica's purpose.
+  *Check:* the replica is replaying again, and the answer names the replay
+  position lag is measured from. Then the grader puts a known delay between
+  primary and replica — four seconds, then twelve — and requires the app to be
+  right against both while the read still lands on the replica: routing every
+  read to the primary fails the check, and so does a fixed sleep, because the
+  second run must cost more than the first.
   *Source:* own.
 
 - **redis-eviction-and-persistence** *(core)* — the cache is cold after every

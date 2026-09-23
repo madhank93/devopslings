@@ -171,6 +171,6 @@ the moment you had the rows.
 
 **Ordering matters at every scale here.** This is one transaction blocking one
 migration; the same queue with two transactions taking the same locks in
-opposite orders is a deadlock, which is the next exercise.
+opposite orders is a deadlock, which is its own exercise later in this module.
 
 </details>
