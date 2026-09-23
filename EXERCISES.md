@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 114 shipped,
-161 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 115 shipped,
+160 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -1043,7 +1043,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 17 exercises · 4 shipped · 2 intro · 6 core · 8 deep · 1 architect
+`db-stack` · 17 exercises · 5 shipped · 2 intro · 6 core · 8 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1082,12 +1082,14 @@ carrying a pager for a system they cannot debug.
   `pg_stat_statements`, and the page loads in budget after the fix.
   *Source:* own.
 
-- **lock-contention** *(core)* — a migration has been "running" for 40 minutes and
-  the whole queue is behind it.
+- **lock-contention** *(core · shipped)* — a migration has been "running" for 40
+  minutes and the whole queue is behind it.
   *First guess:* cancel and retry the migration.
-  *Check:* the blocking transaction is identified from `pg_locks` and
-  `pg_stat_activity`, the queue drains, and the answer names why the migration
-  waited on a session that was idle in transaction.
+  *Check:* the column lands, nothing is left idle in transaction, and the answer
+  names the blocker's state, the `AccessExclusiveLock` the migration waited for,
+  and why readers queue behind an ungranted request rather than beside the held
+  one. Then the grader holds a read lock of its own and requires the migration
+  script to give up rather than wait — a `lock_timeout`, proven by behaviour.
   *Source:* own.
 
 - **replication-lag-stale-read** *(core)* — the write succeeded and the next read
