@@ -119,10 +119,23 @@ services:
       retries: 30
 
   redis:
-    image: redis:7-alpine
-    # No maxmemory and no persistence configured on purpose: the eviction
-    # lesson starts from the defaults people actually ship with.
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    image: redis:7
+    # Started from a config file in its own volume rather than from flags.
+    # Flags cannot be rewritten, and a fix to eviction or persistence that
+    # does not survive a restart is not a fix — so CONFIG REWRITE needs
+    # somewhere to write, owned by redis rather than by the host.
+    #
+    # The file is seeded once with the defaults people actually ship with: no
+    # maxmemory, no persistence. Re-entering docker-entrypoint.sh hands the
+    # volume and the seeded file to the redis user before the server starts.
+    command:
+      - sh
+      - -c
+      - |
+        [ -f /data/redis.conf ] || printf 'dir /data\nsave ""\nappendonly no\n' > /data/redis.conf
+        exec docker-entrypoint.sh redis-server /data/redis.conf
+    volumes:
+      - redis-data:/data
     ports:
       - "16380:6379"
     healthcheck:
@@ -134,6 +147,7 @@ services:
 volumes:
   primary-data:
   replica-data:
+  redis-data:
 
 networks:
   default:
