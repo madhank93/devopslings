@@ -45,6 +45,12 @@ const NoStack = "none"
 // on first run and CI stacks are slow to become healthy, so this is generous.
 const DefaultTimeout = 240 * time.Second
 
+// upTimeout is a backstop on a compose start, not a budget for one. It must
+// stay above the slowest stack's own healthcheck budget — db-stack's primary
+// and replica chain to 600s — or the backstop fires first and replaces
+// compose's diagnosable "container is unhealthy" with an opaque kill.
+const upTimeout = 15 * time.Minute
+
 // shellPrelude is prepended to every task script.
 const shellPrelude = "set -euo pipefail\n"
 
@@ -142,7 +148,7 @@ func (r *Runner) Up(ctx context.Context, stack string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	out, ok := run(ctx, c, 10*time.Minute, r.Out)
+	out, ok := run(ctx, c, upTimeout, r.Out)
 	return Result{Output: out, OK: ok}, nil
 }
 
