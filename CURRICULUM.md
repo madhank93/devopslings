@@ -584,18 +584,19 @@ carrying a pager for a system they cannot debug.
 
 Roles and `GRANT`, so the app user cannot drop tables · `EXPLAIN ANALYZE` on
 10M rows, and where the estimate went wrong · **the index that exists and the
-planner ignores**, because of an implicit cast · six indexes and halved write
-throughput · N+1, found by `calls` rather than by duration · lock contention
-behind a session that is idle in transaction · deadlocks fixed by ordering
-rather than by retrying · a lost update, and the measured cost of each way to
-prevent it · **bloat and autovacuum starvation** · the XID wraparound warning
-nobody reads · replication lag and read-your-writes · **a zero-downtime schema
-migration** by expand, backfill in batches, contract · Redis eviction policy
-silently discarding a queue that was never a cache · and a written choice of
-store for four workloads · **a hot shard**, where four shards hold the data and
-one takes most of the traffic, because of what the shard key was · an LSM store
-stalling writes while compaction falls behind · quorum reads across three
-replicas, and why R + W > N is what lets a client read its own write.
+planner ignores**, because of an implicit cast · six indexes and a write path
+at a third of its old rate · N+1, found by `calls` rather than by duration ·
+lock contention behind a session that is idle in transaction · deadlocks fixed
+by ordering rather than by retrying · a lost update, and the measured cost of
+each way to prevent it · **bloat and autovacuum starvation** · the XID
+wraparound warning nobody reads · replication lag and read-your-writes · **a
+zero-downtime schema migration** by expand, backfill in batches, contract ·
+Redis eviction policy silently discarding a queue that was never a cache · and
+a written choice of store for four workloads · **a hot shard**, where four
+shards hold the data and one takes most of the traffic, because of what the
+shard key was · an LSM store stalling writes while compaction falls behind ·
+quorum reads across three replicas, and why R + W > N is what lets a client
+read its own write.
 
 ---
 
