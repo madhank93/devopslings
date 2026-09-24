@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 124 shipped,
-151 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 125 shipped,
+150 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -1043,7 +1043,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 17 exercises · 14 shipped · 2 intro · 6 core · 8 deep · 1 architect
+`db-stack` · 17 exercises · 15 shipped · 2 intro · 6 core · 8 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1187,7 +1187,7 @@ carrying a pager for a system they cannot debug.
   still down.
   *Source:* own.
 
-- **pick-the-store** *(architect)* — four workloads, four choices.
+- **pick-the-store** *(architect · shipped)* — four workloads, four choices.
   *Check:* the answer picks a store per workload and cites the deciding
   constraint — access pattern, consistency requirement, durability, or
   cardinality — graded against a rubric that rejects "it scales better".
