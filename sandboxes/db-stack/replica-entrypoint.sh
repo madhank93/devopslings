@@ -41,4 +41,8 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   echo "replica: base backup complete"
 fi
 
-exec docker-entrypoint.sh postgres
+# A hot standby refuses to start if any of the primary's transaction-slot
+# limits are lower here, and the basebackup's copied postgresql.conf does not
+# carry settings the primary passes on its command line. max_prepared_transactions
+# is one of those — see the primary's command in compose.yaml. Keep them equal.
+exec docker-entrypoint.sh postgres -c max_prepared_transactions=10

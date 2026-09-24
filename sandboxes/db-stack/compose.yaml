@@ -48,6 +48,14 @@ services:
       - idle_in_transaction_session_timeout=0
       - -c
       - log_min_duration_statement=1000
+      # The xid-wraparound lesson needs a transaction id that outlives the
+      # session holding it. A prepared transaction is the only thing that does:
+      # no backend, no timeout, and nothing reaps it.
+      #
+      # A hot standby will not start with a lower value than its primary, so
+      # replica-entrypoint.sh passes the same one. Change both or neither.
+      - -c
+      - max_prepared_transactions=10
     volumes:
       - primary-data:/var/lib/postgresql/data
       # Only the primary's own init scripts. Everything in this directory is
