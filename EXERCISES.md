@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 121 shipped,
-154 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 122 shipped,
+153 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -1043,7 +1043,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 17 exercises · 11 shipped · 2 intro · 6 core · 8 deep · 1 architect
+`db-stack` · 17 exercises · 12 shipped · 2 intro · 6 core · 8 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1142,8 +1142,8 @@ carrying a pager for a system they cannot debug.
   cause.
   *Source:* own.
 
-- **xid-wraparound-warning** *(deep)* — a warning in the log that becomes a
-  refusal to accept writes.
+- **xid-wraparound-warning** *(deep · shipped)* — a warning in the log that
+  becomes a refusal to accept writes.
   *First guess:* ignore it; the database is fine.
   *Check:* the oldest frozen XID age is brought back under threshold and the
   answer explains what would have happened at the limit.
