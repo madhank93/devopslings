@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 127 shipped,
-148 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 128 shipped,
+147 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -678,7 +678,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 11 exercises · 10 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`web-stack` · 11 exercises · 11 shipped · 1 intro · 8 core · 1 deep · 1 architect
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -804,8 +804,8 @@ table, the connection tracker, the accept queue, and the packets themselves.
   of them in flight.
   *Source:* published Cloudflare postmortem, simplified.
 
-- **api-gateway-route-precedence** *(core)* — two routes match the same request
-  and the gateway sends it to the wrong one.
+- **api-gateway-route-precedence** *(core · shipped)* — two routes match the
+  same request and the gateway sends it to the wrong one.
   *First guess:* move the route higher in the file; the gateway matches by
   specificity, not by the order the routes are written in.
   *Check:* four requests each reach the backend they were meant for, the
@@ -2173,7 +2173,7 @@ Not exercises. Pointers to [kubelings](https://github.com/madhank93/kubelings),
 | `ci-stack` | built | 11, 12, 16, 25, 26 |
 | `chaos-stack` | built | 20, 21 |
 | `netlab` | **to build** | 04, 05 — two hosts, a resolver, an MTA, controllable nftables, a second network |
-| `web-stack` | **to build** | 06 — nginx, Caddy, two upstreams, a cache |
+| `web-stack` | built | 06 — nginx, Caddy, two upstreams, a cache |
 | `db-stack` | built | 10 — Postgres primary/replica, pgbouncer, Redis, a seeded 10M-row table, an LSM sidecar |
 | `iac-stack` | **to build** | 13, 14, 17 — MinIO, floci, docker provider target |
 | `obs-stack` | **to build** | 18, 19, 20, 24, 25, 26 — Prometheus, Grafana, Loki, Tempo, OTel, Vector |

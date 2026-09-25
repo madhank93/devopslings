@@ -89,6 +89,13 @@ ROUTES = {
     "/version": b"upstream 1.0\n",
     "/health": b"ok\n",
     "/pages/intro": b"docs: introduction\n",
+    # The four services behind a gateway. Each answers with its own name, so a
+    # request that arrives at the wrong one says so in the body rather than
+    # only in the access log.
+    "/v1/orders": b"legacy api: orders 1001 1002\n",
+    "/v2/orders": b"v2 api: orders 1001 1002\n",
+    "/reports/daily": b"reports: daily rollup\n",
+    "/admin/users": b"admin api: users alice bob carol\n",
 }
 
 

@@ -232,7 +232,7 @@ decision.
   The drill is the ladder — frame, next hop, port, name, certificate — walked in
   order until a rung answers, and the layer has to be named as well as repaired.
 
-### 06 — Web Servers & Proxies · *partly shipped*
+### 06 — Web Servers & Proxies · *shipped*
 `web-stack`
 
 - **serve-a-static-site** *(shipped)* — every request is 403 on a file that is
@@ -294,11 +294,13 @@ decision.
   search; a per-rule budget is what makes the next bad rule survivable rather
   than fatal.
 
-- **api-gateway-route-precedence** — two routes match one request and the
-  gateway picks the other one. A proxy file is read top to bottom; a gateway
-  matches by specificity, so moving a route up changes nothing. Authentication
-  and the rate limit hang off whichever route wins, which is why the wrong match
-  is more than the wrong backend.
+- **api-gateway-route-precedence** *(shipped)* — two routes match one request
+  and the gateway picks the other one. Locations are chosen by the kind of match
+  rather than by where they sit: an exact match, then the longest prefix, then
+  the regexes — which are the only ones read in file order, and which beat a
+  longer prefix that is not marked `^~`. So moving the route up changes nothing.
+  Authentication and the rate limit hang off whichever route wins, which is why
+  the wrong match is more than the wrong backend.
 
 ### 07 — Security Hardening & Access Control · *partly shipped*
 `linux-box`
