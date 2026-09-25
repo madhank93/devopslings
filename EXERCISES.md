@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 126 shipped,
-149 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 127 shipped,
+148 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -1043,7 +1043,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 17 exercises · 16 shipped · 2 intro · 6 core · 8 deep · 1 architect
+`db-stack` · 17 exercises · 17 shipped · 2 intro · 6 core · 8 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1051,7 +1051,8 @@ engineer who cannot read a query plan or recognise autovacuum starvation is
 carrying a pager for a system they cannot debug.
 
 `db-stack`: Postgres primary and replica, pgbouncer, Redis, a seeded 10M-row
-`orders` table, `pg_stat_statements` enabled.
+`orders` table, `pg_stat_statements` enabled, and an idle container with an LSM
+engine (`db_bench`) for the write-stall exercise.
 
 - **connect-and-grant** *(intro · shipped)* — the application user can drop every table.
   *First guess:* revoke the privileges; ownership carries DROP regardless.
@@ -1169,8 +1170,8 @@ carrying a pager for a system they cannot debug.
   perfectly and turns every read into a scatter-gather fails.
   *Source:* own.
 
-- **lsm-write-stall** *(deep)* — writes that took a millisecond stop for
-  seconds at a time, and the disk is neither full nor busy.
+- **lsm-write-stall** *(deep · shipped)* — writes that took a millisecond stop
+  for seconds at a time, and the disk is neither full nor busy.
   *First guess:* the storage is slow; move it to faster disk.
   *Check:* the pause is attributed to compaction falling behind — level-0 files
   past the stall trigger, and the write-stall counter rising — and after the fix
@@ -2173,7 +2174,7 @@ Not exercises. Pointers to [kubelings](https://github.com/madhank93/kubelings),
 | `chaos-stack` | built | 20, 21 |
 | `netlab` | **to build** | 04, 05 — two hosts, a resolver, an MTA, controllable nftables, a second network |
 | `web-stack` | **to build** | 06 — nginx, Caddy, two upstreams, a cache |
-| `db-stack` | **to build** | 10 — Postgres primary/replica, pgbouncer, Redis, a seeded 10M-row table |
+| `db-stack` | built | 10 — Postgres primary/replica, pgbouncer, Redis, a seeded 10M-row table, an LSM sidecar |
 | `iac-stack` | **to build** | 13, 14, 17 — MinIO, floci, docker provider target |
 | `obs-stack` | **to build** | 18, 19, 20, 24, 25, 26 — Prometheus, Grafana, Loki, Tempo, OTel, Vector |
 | `ha-stack` | **to build** | 22, 23, 24 — HAProxy, keepalived, Postgres primary/replica, etcd |

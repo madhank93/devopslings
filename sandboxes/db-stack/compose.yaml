@@ -152,10 +152,31 @@ services:
       timeout: 5s
       retries: 30
 
+  # The LSM engine for the write-stall lesson. Idle until a lesson task execs
+  # into it — db_bench is the ingest and the store at once, so the level-0
+  # triggers and the compaction concurrency are the real engine's.
+  #
+  # Capped, because the point of the lesson is an ingest that saturates what it
+  # is given: uncapped, a stalled run competes with the rest of the stack for
+  # the laptop.
+  lsm:
+    build: ./lsm
+    command: ["sleep", "infinity"]
+    cpus: 2.0
+    mem_limit: 1g
+    volumes:
+      - lsm-data:/work
+    healthcheck:
+      test: ["CMD-SHELL", "command -v db_bench >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
 volumes:
   primary-data:
   replica-data:
   redis-data:
+  lsm-data:
 
 networks:
   default:
