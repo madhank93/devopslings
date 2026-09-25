@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 125 shipped,
-150 specified. Modules 01–05 are complete: all 59 of their exercises pass the
+**Counts**: 275 exercises across 27 modules and 13 sandboxes. 126 shipped,
+149 specified. Modules 01–05 are complete: all 59 of their exercises pass the
 contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
 
 Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
@@ -1043,7 +1043,7 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 17 exercises · 15 shipped · 2 intro · 6 core · 8 deep · 1 architect
+`db-stack` · 17 exercises · 16 shipped · 2 intro · 6 core · 8 deep · 1 architect
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1178,8 +1178,8 @@ carrying a pager for a system they cannot debug.
   draining; deleting data to make the symptom go away does not pass.
   *Source:* own.
 
-- **quorum-and-eventual-consistency** *(core)* — three replicas, a write that
-  was acknowledged, and a read that cannot see it.
+- **quorum-and-eventual-consistency** *(core · shipped)* — three nodes, a write
+  that was acknowledged, and a read that cannot see it.
   *First guess:* the replica is broken; restart it.
   *Check:* the answer states the replication factor and the read and write
   quorums, and explains why R + W > N is what makes a read see the write that
