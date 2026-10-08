@@ -456,8 +456,8 @@ different things each.
 ---
 
 ## 04 — Networking I: Packets, Interfaces & the Kernel Path
-`netlab` (two boxes, dual-stack) · 10 exercises · all shipped ·
-1 intro · 5 core · 3 deep · 1 architect
+`netlab` (two boxes, dual-stack) · 11 exercises · all shipped ·
+1 intro · 5 core · 3 deep · 1 architect · 1 drill
 
 Module 05 debugs DNS, TLS and proxies. This one is underneath that: the routing
 table, the connection tracker, the accept queue, and the packets themselves.
@@ -545,6 +545,27 @@ table, the connection tracker, the accept queue, and the packets themselves.
   constraint — TLS termination, header routing, source-address preservation, or
   throughput — including the case where L7 cannot help at all. Rubric-graded.
   *Source:* own.
+
+- **packet-path-drill** *(deep · drill)* — the storefront's order lookups miss
+  their 750ms budget; the cause is one of five, drawn at random each run, each a
+  different place on the kernel's packet path through one box: a stale `/28` in
+  the static routes outranking the bridge's `/24`, a CIS sysctl file setting
+  `ip_forward = 0` that sorts after the router's own, a NAT table that lost its
+  hairpin masquerade, a AAAA record nothing holds, and a namespace `somaxconn`
+  of 8 under a backlog of 1024. On every draw `lb-health` logs orders DOWN and
+  fills the capture with resets — from a retired health check on a port orders
+  no longer uses.
+  *First guess:* the resets and the DOWN line; or the runtime fix that does not
+  survive — `sysctl -w`, `ip route del`, `nft add rule`, `br_netfilter` back on,
+  deleting the AAAA.
+  *Check:* with `ip_forward` and `somaxconn` set to boot defaults, `sysctl.d`
+  re-applied and `shopnet`/`orders` restarted, 50 concurrent lookups all land
+  inside budget through the published address; a repair that only passed live
+  is named as such; every AAAA answers, the baseline keeps its other controls,
+  no hand-added routes, tables or addresses; `lb-health` is untouched;
+  `triage.md` names the drawn cause, its kernel evidence, and a detection
+  signal with a threshold.
+  *Source:* own; the module's failure modes as one repeatable triage order.
 
 ---
 
