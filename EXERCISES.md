@@ -1954,7 +1954,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 4 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 13 exercises · 5 shipped · 1 intro · 8 core · 2 deep · 2 architect
 
 - **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -1977,7 +1977,7 @@ failures transfer to any provider.
   *Check:* request arrivals are spread; recovery time drops measurably.
   *Source:* own.
 
-- **circuit-breaker** *(core)* — failing fast beats failing slowly.
+- **circuit-breaker** *(core · shipped)* — failing fast beats failing slowly.
   *Check:* breaker opens under sustained failure, half-opens, and closes on
   recovery — all three transitions observed.
   *Source:* own.
