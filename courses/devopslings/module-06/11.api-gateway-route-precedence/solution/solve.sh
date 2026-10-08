@@ -13,6 +13,13 @@ grep -n 'location' /etc/nginx/sites-available/gateway
 nginx -t
 systemctl reload nginx.service
 
+# reload returns before the master has swapped its workers; wait for the new
+# config to be the one answering.
+for _ in $(seq 1 20); do
+  curl -s -m 2 http://127.0.0.1/api/v2/reports/daily | grep -q '^reports:' && break
+  sleep 0.5
+done
+
 install -d /root/answers
 cat > /root/answers/gateway.md <<'MD'
 # The gateway

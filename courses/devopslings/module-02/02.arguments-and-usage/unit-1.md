@@ -12,13 +12,16 @@ $ head -2 /usr/local/bin/rotate-logs
 
 The only documentation is a comment in the file. To use it you have to open it.
 To use it correctly you have to open it and read carefully, because getting the
-order wrong is not an error:
+order wrong is barely an error:
 
 ```
 $ rotate-logs 7 /srv/logs yes
+find: invalid argument `+/srv/logs' to `-mtime'
 ```
 
-That is `dir=7`, `days=/srv/logs`. It will not complain about either.
+That is `dir=7`, `days=/srv/logs`. The only complaint comes from `find`, about
+`-mtime`, after the script has already created `./7/archive` in whatever
+directory you ran it from. Nothing mentions the argument order.
 
 ## Your objective
 

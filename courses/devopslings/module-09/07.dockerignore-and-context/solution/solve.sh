@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Reference solution — used by the contract test, not by students.
 #
-# .dockerignore is read by the client before anything is uploaded, so what it
-# excludes is never sent. Narrowing the COPY lines would not have helped: the
-# context is assembled before the Dockerfile is read.
+# .dockerignore bounds the context itself, whatever any COPY line asks for and
+# whichever builder reads it; narrowing COPY only trims what one Dockerfile pulls.
 set -euo pipefail
 
 cat > .dockerignore <<'IGNORE'

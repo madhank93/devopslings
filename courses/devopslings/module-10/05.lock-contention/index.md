@@ -36,10 +36,7 @@ tasks:
 
       cat > /work/app/reporting-export.sh <<'SH'
       #!/usr/bin/env bash
-      # Nightly finance export. It opens a transaction so that every figure in
-      # one report comes from the same snapshot, reads its totals, and then
-      # writes the CSV — which is slow, and happens with the transaction still
-      # open because the COMMIT is at the end of the script.
+      # Nightly finance export: read the week's totals, write the CSV.
       set -euo pipefail
       export PGPASSWORD=devopslings
 
@@ -82,14 +79,16 @@ tasks:
       why-selects-hang: ?
       MD
 
-      setsid bash /work/app/reporting-export.sh >/work/app/reporting-export.log 2>&1 </dev/null &
+      # Wrapped so the orphan always exits 0: it is reparented to the postmaster,
+      # which crash-restarts the server when an unknown child exits non-0/1.
+      setsid bash -c "bash /work/app/reporting-export.sh >/work/app/reporting-export.log 2>&1; exit 0" </dev/null >/dev/null 2>&1 &
       for _ in $(seq 1 30); do
         s=$(psql -c "SELECT state FROM pg_stat_activity WHERE application_name = 'reporting-export'" || true)
         [ "$s" = "idle in transaction" ] && break
         sleep 1
       done
 
-      setsid bash /work/app/migrate.sh >/work/app/migrate.log 2>&1 </dev/null &
+      setsid bash -c "bash /work/app/migrate.sh >/work/app/migrate.log 2>&1; exit 0" </dev/null >/dev/null 2>&1 &
       for _ in $(seq 1 30); do
         w=$(psql -c "SELECT wait_event_type FROM pg_stat_activity WHERE application_name = 'migration-0042'" || true)
         [ "$w" = "Lock" ] && break
@@ -226,12 +225,14 @@ tasks:
       }
       trap cleanup EXIT
 
-      {
-        echo "BEGIN;"
-        echo "SELECT 1 FROM orders WHERE id = 1;"
-        sleep 120
-      } | setsid psql -qtAX -v ON_ERROR_STOP=1 -U postgres -d shop -h 127.0.0.1 \
-            -c "SET application_name = 'grader-blocker'" -f - >/dev/null 2>&1 &
+      cat > /tmp/grader-blocker.sh <<'B'
+      { echo "BEGIN;"; echo "SELECT 1 FROM orders WHERE id = 1;"; sleep 120; } |
+        psql -qtAX -v ON_ERROR_STOP=1 -U postgres -d shop -h 127.0.0.1 \
+          -c "SET application_name = 'grader-blocker'" -f -
+      B
+      # Wrapped so the orphan always exits 0: it is reparented to the postmaster,
+      # which crash-restarts the server when an unknown child exits non-0/1.
+      setsid bash -c "bash /tmp/grader-blocker.sh >/dev/null 2>&1; exit 0" </dev/null >/dev/null 2>&1 &
 
       held=no
       for _ in $(seq 1 30); do

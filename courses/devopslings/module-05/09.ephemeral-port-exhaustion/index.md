@@ -4,8 +4,7 @@ title: "the load generator runs out of ports and blames the server"
 description: |
   Two hundred requests succeed and everything after that fails to connect. The
   server is idle, its accept queue is empty, and it answers by hand instantly.
-  Nothing is refusing the connections — they are never leaving this box, because
-  it has no source port left to send them from.
+  Nothing is refusing the connections, and the server never hears about them.
 name: ephemeral-port-exhaustion
 slug: ephemeral-port-exhaustion
 createdAt: "2026-08-20"
@@ -198,9 +197,7 @@ tasks:
            connect_error: <what connect() actually said, in words>
            who_holds_time_wait: <client or server>
 
-      The second one decides everything else, so work it out rather than guess:
-      the end that closes a TCP connection first is the end that keeps the
-      socket around afterwards, and this run has one of each.
+      The second one decides everything else, so work it out rather than guess.
 
         ss -tan state time-wait dst 10.92.0.9 | wc -l
         sysctl net.ipv4.ip_local_port_range

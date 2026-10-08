@@ -88,6 +88,18 @@ tasks:
         fi
       done
 
+      for mp in /srv/backups /srv/scratch2; do
+        src=$(grep "[[:space:]]$mp[[:space:]]" /etc/fstab | grep -v '^[[:space:]]*#' | awk '{print $1; exit}')
+        case "$src" in
+          /dev/disk/by-*)
+            echo "not yet: $mp is keyed on $src"
+            echo "         that is a stable name on a real host, but the /dev/disk/by-*"
+            echo "         symlinks are made by udev, which this box does not run. Use"
+            echo "         UUID= or LABEL=, which mount resolves from the superblock itself."
+            exit 1 ;;
+        esac
+      done
+
       # Detach both, then re-attach in the opposite order. The kernel reuses the
       # lowest free loop number, so the two volumes swap device names — exactly
       # what a reboot, a new disk or a slower controller does on real hardware.

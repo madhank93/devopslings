@@ -65,19 +65,14 @@ tasks:
         $ sudo -u deploybot sudo -n -l
 
       One of them is meant to let it restart app.service. The other is meant to let
-      it run log reports with awk. Together they let deploybot become root, and it
-      takes one command to show it — no password, no exploit code:
+      it run log reports with awk. A security review marked this drop-in critical:
+      between them, these grants let deploybot become root.
 
-        $ sudo -u deploybot sudo -n /usr/bin/awk 'BEGIN{system("id")}'
-
-      deploybot has three things it must still be able to do afterwards:
-        - restart app.service with sudo, no password
-        - read /var/log/app.log
-        - NOT be able to run anything else as root
-
-      Close the hole. Note that constraining awk's arguments will not help — decide
-      what the grant should actually be. deploybot reading a log file does not need
-      root at all.
+      Show the escalation, then close it. deploybot has three things that must hold
+      afterwards:
+        - it can still restart app.service with sudo, no password
+        - it can still read /var/log/app.log
+        - it can NOT run anything else as root
 
       Then write /root/answers/sudo.md with exactly two lines:
 
@@ -87,7 +82,7 @@ tasks:
       Q
 
       # 7. End message
-      echo "scenario ready — two sudo grants, one of them a root shell"
+      echo "scenario ready — deploybot's sudo drop-in, flagged critical"
 
   verify_done:
     needs: [init_scenario]
@@ -105,9 +100,9 @@ tasks:
       if printf '%s' "$esc" | grep -q 'uid=0'; then
         echo "not yet: deploybot still becomes root with one command:"
         echo "         sudo -n awk 'BEGIN{system(\"id\")}'  ->  $esc"
-        echo "         awk runs an arbitrary program, so any NOPASSWD grant of it"
-        echo "         is a root shell. No argument restriction closes that —"
-        echo "         the grant itself is the hole."
+        echo "         sudo still runs awk as root for deploybot without a password,"
+        echo "         and awk runs any program it is handed. Whichever grant still"
+        echo "         matches awk — the awk line or a broader one — is the hole."
         exit 1
       fi
 
@@ -131,18 +126,20 @@ tasks:
         exit 1
       fi
 
-      # Nothing else may be reachable as root. Enumerate what sudo actually
-      # grants and reject any command that is a known shell-escape binary. This
-      # catches a fix that closed awk but left another door open.
-      granted=$(sudo -u deploybot sudo -n -l 2>/dev/null || true)
-      danger=$(printf '%s\n' "$granted" \
-        | grep -oE '/[^ ]*/(awk|gawk|mawk|less|more|vi|vim|view|find|tar|env|nmap|man|ftp|ed|sed|python[0-9.]*|perl|ruby|nano|pico)( |$)' \
-        | head -1 || true)
-      if [ -n "$danger" ]; then
-        echo "not yet: deploybot still has a NOPASSWD grant on a binary that can"
-        echo "         spawn a shell: ${danger}"
-        echo "         Every one of these can run an arbitrary command, so none of"
-        echo "         them is safe as a sudo grant however the arguments are pinned."
+      # Nothing else may be reachable as root. Every command sudo grants
+      # deploybot must be the pinned restart; a denylist of shell-escape
+      # binaries would miss bash, an unpinned systemctl, ALL, and the rest.
+      extra=$(sudo -u deploybot sudo -n -l 2>/dev/null \
+        | sed -n '/may run the following commands/,$p' | sed 1d \
+        | sed -E 's/^[[:space:]]*\([^)]*\)[[:space:]]*//; s/([A-Z_]+:[[:space:]]*)+//' \
+        | tr ',' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+        | grep -vxE '(/usr)?/bin/systemctl restart app(\.service)?|' || true)
+      if [ -n "$extra" ]; then
+        echo "not yet: deploybot can still run more than the pinned restart as root:"
+        printf '%s\n' "$extra" | sed 's/^/         /'
+        echo "         The only grant deploybot needs is"
+        echo "         /usr/bin/systemctl restart app.service. Anything else it can run"
+        echo "         as root is a way to run everything as root."
         exit 1
       fi
 
@@ -162,7 +159,7 @@ tasks:
         echo "         that runs a program you supply."
         exit 1
       fi
-      if ! printf '%s' "$mech" | grep -qE 'arbitrary|shell|system|command|exec|program|gtfobins'; then
+      if ! printf '%s' "$mech" | grep -qE '\b(arbitrary|shells?|system|commands?|exec[a-z]*|programs?|programming|interpreter|gtfobins)\b'; then
         echo "not yet: mechanism says '${mech:-nothing}'."
         echo "         Name what awk does that a pager or a pinned systemctl does"
         echo "         not: it runs an arbitrary command of the caller's choosing."

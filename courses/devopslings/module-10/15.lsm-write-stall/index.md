@@ -3,7 +3,7 @@ kind: lesson
 title: "writes that took a millisecond stop for seconds at a time"
 description: |
   The ingest service writes 1.2 million records into an LSM store and the
-  average write is three microseconds. Then, several times a minute,
+  median write is three microseconds. Then, several times a minute,
   everything stops for a second or more. The disk is 30% full and idle between
   the pauses. Nothing is broken — the store is doing this on purpose, and it
   will tell you why.
@@ -139,7 +139,7 @@ tasks:
       p999=$(grep -E '^Percentiles' "$log" | head -1 | sed -nE 's/.*P99\.9: ([0-9.]+).*/\1/p' || true)
 
       reasons() {
-        grep -ohE 'Stalling writes because we have [0-9]+ (level-0 files|immutable memtables)' \
+        grep -ohE '(Stalling|Stopping) writes because we have [0-9]+ (level-0 files|immutable memtables)' \
           "$db/LOG" 2>/dev/null | sed -E 's/[0-9]+ //' | sort | uniq -c | sed 's/^/    /' || true
       }
 
@@ -187,7 +187,7 @@ tasks:
       fi
       if awk -v p="$p999" 'BEGIN { exit !(p > 500) }'; then
         echo "not yet: the slowest 0.1% of writes took ${p999} microseconds, and the budget is"
-        echo "500. The average is fine and always was — the tail is the whole complaint."
+        echo "500. The median is fine and always was — the tail is the whole complaint."
         echo
         reasons
         exit 1
@@ -224,14 +224,14 @@ tasks:
         echo
         reasons
         echo
-        echo "    grep 'Stalling writes' $db/LOG | head -3"
+        echo "    grep -E '(Stalling|Stopping) writes' $db/LOG | head -3"
         exit 1
       fi
       counter=$(field the-counter | tr 'A-Z' 'a-z' | tr -d ' ')
       if ! printf '%s' "$counter" | grep -Eq '(stall|level-?0|l0)'; then
         echo "not yet: 'the-counter:' is not a counter the store publishes. Two places have"
         echo "one: the statistics block at the end of $log, and the reason on each"
-        echo "'Stalling writes' line in $db/LOG."
+        echo "'Stalling writes' or 'Stopping writes' line in $db/LOG."
         echo
         echo "    grep -iE 'stall' $log | head -5"
         exit 1

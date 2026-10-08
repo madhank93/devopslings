@@ -3,9 +3,7 @@ kind: lesson
 title: "uploads fail at exactly one megabyte, and the app never sees them"
 description: |
   Anything under a megabyte uploads fine. Anything over it gets 413, and the
-  application logs nothing at all — because the request never reached it. The
-  limit belongs to the proxy, and so does the reason the limit exists: by
-  default the whole body is spooled to disk before the upstream is contacted.
+  application logs nothing at all.
 name: 413-and-buffering
 slug: 413-and-buffering
 createdAt: "2026-08-23"

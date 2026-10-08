@@ -11,17 +11,96 @@ $ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://127.0.0.1/users
 504 3.004s
 ```
 
-A dashboard counting 5xx shows one number for these two. They have nothing in
-common except the proxy that reported them, and the fix for one is at the
-opposite end of the wire from the fix for the other.
+A dashboard counting 5xx shows one number for these two.
 
-nginx has been restarted twice. Of course it has — it is the thing whose name is
-on the error. It is also the only component in this picture that is working
-correctly.
+nginx has been restarted twice. Both still fail.
 
 Read the two numbers on the right before anything else. One failed in two
 milliseconds; one failed in three seconds and change. That difference is the
 diagnosis, and it is visible before you open a single log.
+
+## Your objective
+
+1. `http://127.0.0.1/orders` returns `orders: 1001 1002`.
+2. `http://127.0.0.1/users` returns `users: alice bob carol`. The users backend
+   takes six seconds, will keep taking six seconds, and is set back to six
+   seconds before you are graded.
+3. Write `/root/answers/gateway.md`, exactly three lines:
+
+   ```
+   orders_cause: <closed | refused | timeout>
+   users_cause:  <closed | refused | timeout>
+   users_upstream_seconds: <number>
+   ```
+
+   The last one is measured against the backend directly, not through the proxy.
+
+The backends are two separate processes, each with an admin API:
+
+```
+orders  ->  172.32.0.11:8090   admin 8091
+users   ->  172.32.0.11:8080   admin 8081
+```
+
+## What you're being graded on
+
+**Both routes return their bodies**, and `/orders` is answered by the orders
+backend — the response carries `X-Upstream: b`. Pointing the route at the other
+backend, or answering it with `return 200` from nginx, hides the outage instead
+of ending it.
+
+**`/users` took its six seconds.** A body that arrives instantly did not come
+from that backend.
+
+**A stalled orders backend is still given up on quickly.** The grader stalls
+the orders backend and checks that `/orders` still gives up in about three
+seconds, as it does now.
+
+**You can name both failures** the way the error log named them.
+
+<details>
+<summary>Hint 1 — the timings are the diagnosis</summary>
+
+```
+$ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://127.0.0.1/orders
+$ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://127.0.0.1/users
+```
+
+One fails in milliseconds and one fails after a suspiciously round number of
+seconds. A round number is a configured deadline. Find the setting whose value
+matches it.
+
+</details>
+
+<details>
+<summary>Hint 2 — ask each backend directly</summary>
+
+Take the proxy out of the picture entirely:
+
+```
+$ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://172.32.0.11:8090/orders
+$ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://172.32.0.11:8080/users
+```
+
+One of them will not answer at all. The other answers correctly, and slowly.
+Those two observations are the two different faults.
+
+</details>
+
+<details>
+<summary>Hint 3 — bring one back, wait for the other</summary>
+
+The orders backend is a process that is refusing to answer; its admin API can
+put it back:
+
+```
+$ curl -s -X POST 'http://172.32.0.11:8091/admin/mode?value=normal'
+```
+
+The users backend is not broken. `proxy_read_timeout` is per-location as well as
+per-server — put the longer one only where the slow route is.
+
+</details>
 
 ## What each code actually claims
 
@@ -105,90 +184,6 @@ location /users {
 And this is why "make the backend faster" is not the answer here either. It
 would make the symptom stop today, and the report is still a six-second report.
 This exercise puts the six seconds back before grading, for exactly that reason.
-
-## Your objective
-
-1. `http://127.0.0.1/orders` returns `orders: 1001 1002`.
-2. `http://127.0.0.1/users` returns `users: alice bob carol`. The users backend
-   takes six seconds, will keep taking six seconds, and is set back to six
-   seconds before you are graded.
-3. Write `/root/answers/gateway.md`, exactly three lines:
-
-   ```
-   orders_cause: <closed | refused | timeout>
-   users_cause:  <closed | refused | timeout>
-   users_upstream_seconds: <number>
-   ```
-
-   The last one is measured against the backend directly, not through the proxy.
-
-The backends are two separate processes, each with an admin API:
-
-```
-orders  ->  172.32.0.11:8090   admin 8091
-users   ->  172.32.0.11:8080   admin 8081
-```
-
-## What you're being graded on
-
-**Both routes return their bodies**, and `/orders` is answered by the orders
-backend — the response carries `X-Upstream: b`. Pointing the route at the other
-backend, or answering it with `return 200` from nginx, hides the outage instead
-of ending it.
-
-**`/users` took its six seconds.** A body that arrives instantly did not come
-from that backend.
-
-**The fix was aimed.** The grader stalls the orders backend and checks that
-`/orders` still gives up in about three seconds. A timeout raised at server
-level passes every other check and fails this one, because that is the change
-that turns one sick dependency into an outage.
-
-**You can name both failures** the way the error log named them.
-
-<details>
-<summary>Hint 1 — the timings are the diagnosis</summary>
-
-```
-$ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://127.0.0.1/orders
-$ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://127.0.0.1/users
-```
-
-One fails in milliseconds and one fails after a suspiciously round number of
-seconds. A round number is a configured deadline. Find the setting whose value
-matches it.
-
-</details>
-
-<details>
-<summary>Hint 2 — ask each backend directly</summary>
-
-Take the proxy out of the picture entirely:
-
-```
-$ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://172.32.0.11:8090/orders
-$ curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' http://172.32.0.11:8080/users
-```
-
-One of them will not answer at all. The other answers correctly, and slowly.
-Those two observations are the two different faults.
-
-</details>
-
-<details>
-<summary>Hint 3 — bring one back, wait for the other</summary>
-
-The orders backend is a process that is refusing to answer; its admin API can
-put it back:
-
-```
-$ curl -s -X POST 'http://172.32.0.11:8091/admin/mode?value=normal'
-```
-
-The users backend is not broken. `proxy_read_timeout` is per-location as well as
-per-server — put the longer one only where the slow route is.
-
-</details>
 
 ## What actually happened
 

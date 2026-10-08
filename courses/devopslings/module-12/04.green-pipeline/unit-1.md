@@ -43,9 +43,9 @@ The forge is at <http://localhost:3000>, user `devops`, password
 
 ## What you're being graded on
 
-That all three tests still exist, that nothing in the workflow can swallow a
-failure, that the run for your commit is green — and that its log proves three
-tests ran and three passed. A pipeline that skips the suite is green in exactly
+That all three tests still exist and still expect what they did, that nothing
+in the workflow can swallow a failure, that the run for your commit is green —
+and that its log proves three tests ran and three passed. A pipeline that skips the suite is green in exactly
 the same way as one that passes it, so the check reads the numbers rather than
 the colour.
 

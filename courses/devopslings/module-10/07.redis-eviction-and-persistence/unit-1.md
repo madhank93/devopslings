@@ -31,7 +31,8 @@ box restarts.
 
 ## What you're being graded on
 
-The grader queues 25 jobs, restarts Redis, and expects all 25 back. Then it
+The grader queues 25 jobs, kills Redis the way the OOM killer did, starts it
+again, and expects all 25 back. Then it
 clears the cache, runs `/work/app/cache-warm.sh` against the ceiling, and
 requires that Redis evicted keys, that none of them were the queue, that no
 write was refused, and that a usable cache is left standing. You also fill in

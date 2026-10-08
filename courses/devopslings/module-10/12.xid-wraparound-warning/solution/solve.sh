@@ -42,7 +42,7 @@ why-autovacuum-ran-anyway: anti-wraparound vacuums are forced once a table passe
 
 # Nobody fixed it and the age kept climbing. One line: what does Postgres
 # do when it runs out of transaction ids to give out?
-what-happens-at-the-limit: it refuses to accept any further write commands and has to be brought up in single-user mode to be vacuumed, so it is a full outage rather than a slow degradation
+what-happens-at-the-limit: it refuses every command that would assign a transaction id until a database-wide vacuum brings the age back down, so it is a write outage rather than a slow degradation
 MD
 
 echo "settlement-0091 rolled back, ledger frozen, age now $(P -c "SELECT age(relfrozenxid) FROM pg_class WHERE relname='ledger'")"

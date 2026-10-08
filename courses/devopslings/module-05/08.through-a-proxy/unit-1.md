@@ -61,31 +61,6 @@ in for the firewall that would otherwise drop the packet in silence.
 So: one caller has the proxy and is using it for everything, including traffic
 that must not go through it. The other caller does not have the proxy at all.
 
-## Why the job has a different environment from your shell
-
-```
-$ grep -i proxy /etc/environment
-http_proxy=http://10.91.0.2:3128
-HTTP_PROXY=http://10.91.0.2:3128
-
-$ systemctl show stock-sync.service -p Environment
-Environment=
-```
-
-`/etc/environment` is read by **PAM**, at login. Every interactive session on
-this box gets what is in it, which is why it feels like a system-wide setting.
-
-systemd is not a login session. It is PID 1, it starts services from units, and
-it never reads `/etc/environment` — a service's environment comes from its unit
-(`Environment=`, `EnvironmentFile=`), from `systemctl set-environment`, or from
-nothing at all. That is not an oversight: services start before anyone logs in,
-and a daemon whose behaviour depends on a file meant for humans is a daemon that
-behaves differently at boot than it does when you test it by hand.
-
-This is the single most common shape of "it works when I run it, it fails from
-cron/systemd". The environment is not a property of the box. It is a property of
-the process tree, and the two trees never touched.
-
 ## NO_PROXY is a list of names, and the matching is fussy
 
 `HTTP_PROXY` says *send everything through here*. `NO_PROXY` is the exception
@@ -98,17 +73,20 @@ Things worth knowing before you write one:
   nothing for `http://inventory.corp:8080/`. The two are the same host and only
   one of them is in the URL.
 - **Entries are suffix matches.** `corp` matches `inventory.corp`;
-  `.corp` matches `inventory.corp` and `a.b.corp`. `*` is not a wildcard in
-  `curl`, Go, or Python — a literal `*.corp` matches nothing at all. The one
+  `.corp` matches `inventory.corp` and `a.b.corp`. `*` is not a glob: in
+  `curl` and Python a literal `*.corp` matches nothing at all, and Go happens to
+  read it as `.corp`. The one
   wildcard that is widely honoured is `NO_PROXY=*`, meaning *never proxy
   anything*.
 - **The port is usually ignored, and sometimes is not.** `curl` matches the host
   and ignores the port unless you write `host:port` explicitly.
 - **`localhost` and `127.0.0.1` are not automatic** everywhere. `curl` exempts
   them by default; several libraries do not. Listing them costs nothing.
-- **Case and spelling are a minefield.** `curl` reads both `http_proxy` and
-  `HTTP_PROXY`, but for the plain-HTTP one lowercase wins by convention. Go
-  reads both. Some clients read only one. Setting both spellings is the pragmatic
+- **Case and spelling are a minefield.** `curl` reads either case for
+  most of these variables, but plain-HTTP is the exception: it reads only
+  lowercase `http_proxy`, and ignores `HTTP_PROXY` on purpose, because a CGI
+  program receives a client's `Proxy:` header under that very name. Go reads
+  both. Some clients read only one. Setting both spellings is the pragmatic
   answer, and it is what most base images do.
 
 ## Your objective
@@ -208,6 +186,31 @@ not. `--noproxy` on the command line takes the same syntax `NO_PROXY` does, so
 you can test a value before writing it into a file.
 
 </details>
+
+## Why the job has a different environment from your shell
+
+```
+$ grep -i proxy /etc/environment
+http_proxy=http://10.91.0.2:3128
+HTTP_PROXY=http://10.91.0.2:3128
+
+$ systemctl show stock-sync.service -p Environment
+Environment=
+```
+
+`/etc/environment` is read by **PAM**, at login. Every interactive session on
+this box gets what is in it, which is why it feels like a system-wide setting.
+
+systemd is not a login session. It is PID 1, it starts services from units, and
+it never reads `/etc/environment` — a service's environment comes from its unit
+(`Environment=`, `EnvironmentFile=`), from `systemctl set-environment`, or from
+nothing at all. That is not an oversight: services start before anyone logs in,
+and a daemon whose behaviour depends on a file meant for humans is a daemon that
+behaves differently at boot than it does when you test it by hand.
+
+This is the single most common shape of "it works when I run it, it fails from
+cron/systemd". The environment is not a property of the box. It is a property of
+the process tree, and the two trees never touched.
 
 ## What actually happened
 

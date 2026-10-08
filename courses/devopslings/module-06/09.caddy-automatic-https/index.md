@@ -4,8 +4,7 @@ title: "the certificate expired again, and renewing it is somebody's calendar re
 description: |
   The site is down because a certificate ran out, for the third time this year.
   There is an internal CA on this box that speaks ACME and will issue to anything
-  that asks, and the server in front of the site can ask — which turns a yearly
-  outage into a twelve-hour certificate nobody ever touches.
+  that asks. Nothing has been asking.
 name: caddy-automatic-https
 slug: caddy-automatic-https
 createdAt: "2026-08-23"
@@ -370,7 +369,7 @@ tasks:
         echo "not yet: you said cert_lifetime_hours=$life."
         case "$life" in
           2160|8760|720|90)
-            echo "         That is a public-CA sort of number, in days. Read the dates on"
+            echo "         That is a public-CA sort of lifetime. Read the dates on"
             echo "         the certificate this CA actually issued you:"
             echo "         echo | openssl s_client -connect web.internal:443 \\"
             echo "           -servername web.internal 2>/dev/null | openssl x509 -noout -dates"

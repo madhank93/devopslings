@@ -134,20 +134,59 @@ tasks:
         exit 1
       fi
 
+      # The file can say no while the running daemon still says yes: edits only
+      # take effect on reload. Ask the live daemon which methods it offers.
+      # Retried briefly: a reload re-executes sshd, and the listener blinks.
+      offered=""
+      for _ in 1 2 3 4 5 6 7 8 9 10; do
+        offered=$(ssh -n -v -o BatchMode=yes -o PreferredAuthentications=none \
+                    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                    -o ConnectTimeout=5 alice@127.0.0.1 true 2>&1 \
+                  | sed -n 's/.*Authentications that can continue: //p' | head -1 || true)
+        [ -n "$offered" ] && break
+        sleep 0.5
+      done
+      if printf '%s' "$offered" | grep -qw password; then
+        echo "not yet: sshd_config says PasswordAuthentication no, but the running"
+        echo "         daemon still offers: $offered"
+        echo "         The file is only read when sshd starts or reloads."
+        exit 1
+      fi
+
+      # Root login, tried for real with a throwaway key that is removed again,
+      # so the check leaves /root/.ssh as it found it.
+      probe=$(mktemp -d)
+      ssh-keygen -q -t ed25519 -N '' -f "$probe/k" -C grader-probe
+      install -d -m 700 /root/.ssh
+      [ -f /root/.ssh/authorized_keys ] && cp -p /root/.ssh/authorized_keys "$probe/ak"
+      cat "$probe/k.pub" >> /root/.ssh/authorized_keys
+      rootlogin=$(ssh -n -i "$probe/k" -o StrictHostKeyChecking=no \
+                    -o UserKnownHostsFile=/dev/null -o BatchMode=yes \
+                    -o ConnectTimeout=5 root@127.0.0.1 'id -un' 2>/dev/null || true)
+      if [ -f "$probe/ak" ]; then cp -p "$probe/ak" /root/.ssh/authorized_keys
+      else rm -f /root/.ssh/authorized_keys; fi
+      rm -rf "$probe"
+      if [ "$rootlogin" = root ]; then
+        echo "not yet: sshd_config says PermitRootLogin no, but the running daemon"
+        echo "         still let root in with a key. The file is only read when sshd"
+        echo "         starts or reloads."
+        exit 1
+      fi
+
       # The invariant the whole lesson turns on: after hardening, alice's key
       # still gets her in. If passwords were disabled before her key was
       # installed, this is where the lockout shows up — the login simply fails.
       # Single-quote the remote command so it runs on the far side as alice.
       # Double quotes would expand $(id -un) here, in the grader's own root
       # shell, and prove nothing about who logged in.
-      login=$(ssh -i /root/deploy_key \
+      login=$(ssh -n -i /root/deploy_key \
                 -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 -o BatchMode=yes -o ConnectTimeout=5 \
                 alice@127.0.0.1 'id -un' 2>/dev/null || true)
       if [ "$login" != "alice" ]; then
-        echo "not yet: alice cannot log in with her key, so passwords were taken"
-        echo "         away before her key worked — she is locked out."
+        echo "not yet: alice cannot log in with her key, and passwords are off —"
+        echo "         she is locked out."
         echo "         Her public key is /root/deploy_key.pub; it belongs in"
         echo "         /home/alice/.ssh/authorized_keys, owned by alice, mode 600,"
         echo "         inside a .ssh directory that is mode 700. sshd ignores a"

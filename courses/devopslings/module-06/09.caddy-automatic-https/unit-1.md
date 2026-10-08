@@ -27,6 +27,73 @@ An ACME certificate authority, on the same machine, whose root is already in
 this box's trust store. It will issue a certificate to anything that asks
 properly. Nothing has been asking.
 
+## Your objective
+
+1. `curl https://web.internal/health` returns `ok`, verifying with no `-k` and
+   no `--cacert`, with a certificate issued by the internal CA.
+2. No certificate file named in the config. Nothing on disk should ever need a
+   human to replace it again.
+3. Renewal has to work: the grader deletes the certificate the server is
+   holding, restarts it, and expects a different one to appear without anybody
+   editing anything.
+
+Then `/root/answers/acme.md`:
+
+```
+acme_directory: <url>
+cert_lifetime_hours: <number>
+```
+
+## What you're being graded on
+
+**It verifies against the trust store the box already has.** `tls internal` —
+Caddy's own built-in CA — also produces working automatic HTTPS and fails here,
+because nothing trusts that CA. Issuance and trust are separate, and this check
+is the difference.
+
+**The config names no certificate file.** While a `tls <cert> <key>` line is
+there, the file wins and nothing has changed.
+
+**A deleted certificate comes back on its own.** This is the requirement the
+whole lesson is about. Anything that got a certificate once by hand — even from
+the right CA — fails it.
+
+<details>
+<summary>Hint 1 — what is in the config that should not be</summary>
+
+The site block names two files. As long as it does, the server has been told
+what certificate to use and will never ask for one.
+
+</details>
+
+<details>
+<summary>Hint 2 — pointing Caddy at a CA that is not the public one</summary>
+
+Caddy defaults to Let's Encrypt, which this box cannot reach and which would not
+issue for `web.internal` anyway. The global option is `acme_ca`, and it takes
+the directory URL — the one that answers with a JSON object full of endpoint
+URLs.
+
+```
+{
+    acme_ca https://acme.internal:9443/acme/local/directory
+}
+```
+
+</details>
+
+<details>
+<summary>Hint 3 — watching it happen</summary>
+
+```
+$ journalctl -u caddy-site -f
+```
+
+Restart the service and read the exchange: obtaining, challenge, certificate
+obtained. If it is retrying, the message says what the CA objected to.
+
+</details>
+
 ## Certificates as a thing you install, versus a thing you obtain
 
 The config that broke looks like every TLS config written in the last twenty
@@ -111,74 +178,6 @@ failed.
 
 This is why "automatic HTTPS" is not a convenience feature. It changes what
 lifetimes are reasonable, which changes what a stolen key is worth.
-
-## Your objective
-
-1. `curl https://web.internal/health` returns `ok`, verifying with no `-k` and
-   no `--cacert`, with a certificate issued by the internal CA.
-2. No certificate file named in the config. Nothing on disk should ever need a
-   human to replace it again.
-3. Renewal has to work: the grader deletes the certificate the server is
-   holding, restarts it, and expects a different one to appear without anybody
-   editing anything.
-
-Then `/root/answers/acme.md`:
-
-```
-acme_directory: <url>
-cert_lifetime_hours: <number>
-```
-
-## What you're being graded on
-
-**It verifies against the trust store the box already has.** `tls internal` —
-Caddy's own built-in CA — also produces working automatic HTTPS and fails here,
-because nothing trusts that CA. Issuance and trust are separate, and this check
-is the difference.
-
-**The config names no certificate file.** Pointing `acme_ca` at the right place
-while leaving the `tls <cert> <key>` line in means the file still wins and
-nothing has changed.
-
-**A deleted certificate comes back on its own.** This is the requirement the
-whole lesson is about. Anything that got a certificate once by hand — even from
-the right CA — fails it.
-
-<details>
-<summary>Hint 1 — what is in the config that should not be</summary>
-
-The site block names two files. As long as it does, the server has been told
-what certificate to use and will never ask for one.
-
-</details>
-
-<details>
-<summary>Hint 2 — pointing Caddy at a CA that is not the public one</summary>
-
-Caddy defaults to Let's Encrypt, which this box cannot reach and which would not
-issue for `web.internal` anyway. The global option is `acme_ca`, and it takes
-the directory URL — the one that answers with a JSON object full of endpoint
-URLs.
-
-```
-{
-    acme_ca https://acme.internal:9443/acme/local/directory
-}
-```
-
-</details>
-
-<details>
-<summary>Hint 3 — watching it happen</summary>
-
-```
-$ journalctl -u caddy-site -f
-```
-
-Restart the service and read the exchange: obtaining, challenge, certificate
-obtained. If it is retrying, the message says what the CA objected to.
-
-</details>
 
 ## What actually happened
 

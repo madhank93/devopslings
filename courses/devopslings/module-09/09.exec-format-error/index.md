@@ -3,8 +3,8 @@ kind: lesson
 title: "exec format error on the runner, and the same image is fine on your laptop"
 description: |
   The image builds, runs locally, and dies instantly on the CI runner. Learn
-  what an image's architecture actually claims, why a multi-platform build can
-  still ship the wrong binary, and how to check before you push.
+  what an image's architecture actually claims, and how to check it before you
+  push.
 name: exec-format-error
 slug: exec-format-error
 createdAt: "2026-09-01"

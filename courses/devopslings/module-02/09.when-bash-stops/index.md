@@ -33,7 +33,7 @@ tasks:
       trap 'rm -rf "$STAGE"' EXIT
 
       find "$SRC" -name "*-$DAY.log" -print0 \
-        | xargs -0 -r -P4 gzip -9 -k -c > /dev/null
+        | xargs -0 -r -P4 gzip -9 -k
 
       find "$SRC" -name "*-$DAY.log.gz" -print0 \
         | xargs -0 -r -I{} cp -- {} "$STAGE/"
@@ -76,8 +76,7 @@ tasks:
       cat > /srv/verdict/case-3-deploy.sh <<'CASE'
       #!/bin/bash
       # Deploy a release. 55 lines. Runs as root on every app host, from CI.
-      # Deletes the previous release directory. No tests — every function
-      # shells out, so there is nothing to call without a real host.
+      # Keeps the last three releases and deletes the rest.
       set -euo pipefail
 
       RELEASE=$1

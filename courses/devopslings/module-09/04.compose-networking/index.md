@@ -133,6 +133,20 @@ tasks:
           ;;
       esac
 
+      # Any other route to the host (its LAN address, the bridge gateway, a
+      # vendor alias) reaches Redis the same wrong way: only an address that is
+      # one of this project's containers counts.
+      host=$(printf '%s' "$url" | sed -e 's|^[a-z]*://||' -e 's|^.*@||' -e 's|[:/].*$||')
+      resolved=$(docker compose -p "$proj" exec -T api python3 -c \
+        "import socket,sys; print(socket.gethostbyname(sys.argv[1]))" "$host" 2>/dev/null || true)
+      ctr_ips=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' \
+        $(docker compose -p "$proj" ps -q 2>/dev/null) 2>/dev/null | tr '\n' ' ' || true)
+      if [ -z "$resolved" ] || ! printf ' %s ' "$ctr_ips" | grep -qF " $resolved "; then
+        echo "not yet: the API reaches Redis via '$url', and '$host' resolves to '${resolved:-nothing}' inside api — not any container in this project (${ctr_ips:-none running})."
+        echo "Traffic is leaving the container network. Use the service's name on the compose network."
+        exit 1
+      fi
+
       # And it must actually be usable, not just answer a ping.
       h1=$(curl -fsS --max-time 3 http://127.0.0.1:18081/hits 2>/dev/null || true)
       h2=$(curl -fsS --max-time 3 http://127.0.0.1:18081/hits 2>/dev/null || true)

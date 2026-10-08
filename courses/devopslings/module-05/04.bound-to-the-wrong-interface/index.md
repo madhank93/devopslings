@@ -86,12 +86,13 @@ tasks:
       Make the service answer on 172.31.0.10, the box's address on the lab network,
       while still refusing on 203.0.113.1, the box's address on the outside network.
 
-      Binding to every interface is not the fix, and the check will reject it.
+      Exposing it on every address the box has is not the fix, and the check
+      will reject it.
 
       Constraints:
         - leave the nftables ruleset alone
         - do not put anything in front of the service — no socat, no port forwarding,
-          no redirect. The listening socket itself must move.
+          no redirect. The service itself has to answer.
       Q
 
       echo "scenario ready — answers on loopback, refused everywhere else"

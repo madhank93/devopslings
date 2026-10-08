@@ -27,7 +27,47 @@ true: a caching bug in the application, a stale container image, "it must be
 DNS propagation". None of those. Both observations are accurate, and they are
 accurate about **different components**.
 
-## dig is not a resolver client in the way you think
+## Your objective
+
+Make `curl http://payments.internal:8080/` return the page containing
+`payments-canonical-2026`.
+
+Then write `/root/answers/resolution.md`, one line:
+
+```
+file=<absolute path of the file that was wrong> missing=<the one word missing from it>
+```
+
+Constraints:
+
+- **Nothing added to `/etc/hosts`.**
+- **No changes to `/etc/dnsmasq.d/lab.conf`.**
+- **`getent hosts localhost` must still work when you are done.**
+
+## What you're being graded on
+
+`getent hosts payments.internal` returning `10.70.0.6`, the page served,
+`localhost` still resolving, `/etc/hosts` untouched and still consulted, and
+the answer file naming the file and the missing source.
+
+<details>
+<summary>Hint 1 — get a second opinion that is not dig</summary>
+
+```
+$ dig payments.internal +short
+$ getent hosts payments.internal
+```
+
+`getent hosts` goes through `getaddrinfo()` — the same path the application
+takes. When those two disagree, the disagreement is the entire diagnosis: the
+problem is between `getaddrinfo` and DNS, not inside DNS.
+
+Any time you are tempted to conclude "DNS is broken", run both.
+
+</details>
+
+<details>
+<summary>Hint 2 — getaddrinfo does not start with DNS</summary>
 
 `dig` is a DNS tool, and only a DNS tool. It reads `/etc/resolv.conf` for a
 server address, builds a DNS query, sends it, and prints the reply.
@@ -52,54 +92,14 @@ resolve a single name, and `dig` will report success the whole time — because
 `dig` is the one tool on the box that never asks the question the applications
 are asking.
 
-## Your objective
-
-Make `curl http://payments.internal:8080/` return the page containing
-`payments-canonical-2026`.
-
-Then write `/root/answers/resolution.md`, one line:
-
-```
-file=<absolute path of the file that was wrong> missing=<the one word missing from it>
-```
-
-Constraints:
-
-- **Nothing added to `/etc/hosts`.**
-- **No changes to `/etc/dnsmasq.d/lab.conf`.**
-- **`getent hosts localhost` must still work when you are done.**
-
-## What you're being graded on
-
-`getent hosts payments.internal` returning `10.70.0.6`, the page served,
-`localhost` still resolving, `/etc/hosts` untouched, and the answer file naming
-the file and the missing source.
-
-<details>
-<summary>Hint 1 — get a second opinion that is not dig</summary>
-
-```
-$ dig payments.internal +short
-$ getent hosts payments.internal
-```
-
-`getent hosts` goes through `getaddrinfo()` — the same path the application
-takes. When those two disagree, the disagreement is the entire diagnosis: the
-problem is between `getaddrinfo` and DNS, not inside DNS.
-
-Any time you are tempted to conclude "DNS is broken", run both.
-
-</details>
-
-<details>
-<summary>Hint 2 — read the line, count the words</summary>
+Now read the line on this box:
 
 ```
 $ grep '^hosts:' /etc/nsswitch.conf
 ```
 
-Compare what is on that line against the three sources described above. One of
-them is missing, and it is the one that would have made the resolver reachable.
+Compare it against the three sources above. One of them is missing, and it is
+the one that would have made the resolver reachable.
 
 </details>
 

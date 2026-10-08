@@ -1,11 +1,10 @@
 ---
 kind: lesson
-title: "the busy disk is fine and the quiet one is the outage"
+title: "the storage quote is for the busier disk"
 description: |
-  Two volumes, one storage quote, and a utilisation graph that points at the
-  wrong one. The volume with roughly twice the utilisation is answering faster
-  than anything can ask. The quiet-looking one takes tens of times longer per
-  request, at the same queue depth, and is where the audit writes are stuck.
+  Two volumes, one storage quote, and a utilisation graph. The audit writes
+  have been slow for a week, the vendor wants to replace the volume with the
+  higher %util, and finance wants a second opinion before signing.
 name: iostat-await-versus-util
 slug: iostat-await-versus-util
 createdAt: "2026-08-10"

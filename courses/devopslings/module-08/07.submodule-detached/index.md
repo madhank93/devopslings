@@ -212,8 +212,14 @@ tasks:
       fi
 
       out=$(cd "$work/ci" && sh test.sh 2>&1) && ok=yes || ok=no
+      # A green build is not enough: the recorded library has to contain the fix.
+      if git -C remotes/liblog.git merge-base --is-ancestor "$fix" "$recorded"; then
+        stale=no
+      else
+        stale=yes
+      fi
 
-      if [ "$ok" != yes ]; then
+      if [ "$ok" != yes ] || [ "$stale" = yes ]; then
         local_rec=$(git -C app ls-tree HEAD vendor/liblog | awk '{print $3}')
         sub_head=$(git -C app/vendor/liblog rev-parse HEAD 2>/dev/null || echo none)
 
@@ -236,6 +242,12 @@ tasks:
           echo "not yet: neither the submodule's HEAD nor the recorded commit is the"
           echo "         library's published fix $fix_s. Inside vendor/liblog:"
           echo "         git fetch origin main, then check out that commit."
+          exit 1
+        fi
+        if [ "$ok" = yes ]; then
+          echo "not yet: the fresh clone passes test.sh, but it records liblog $rec_s,"
+          echo "         which does not contain the published fix $fix_s. The build"
+          echo "         was made to pass with the old library still in place."
           exit 1
         fi
         echo "not yet: the fresh clone builds the library at $rec_s and its test"

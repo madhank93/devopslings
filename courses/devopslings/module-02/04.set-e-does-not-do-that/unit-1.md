@@ -28,9 +28,7 @@ $ echo $?
 The first step failed, said so, and the script carried on through three more
 steps and declared success.
 
-`set -e` is not broken. It is doing exactly what it is specified to do, and
-this script manages to hit all four contexts where that specification says to
-stand aside.
+`set -e` is not broken. It is doing exactly what it is specified to do.
 
 ## Your objective
 

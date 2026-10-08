@@ -42,9 +42,9 @@ this; fixing one and not the other still fails.
 
 ## What you're being graded on
 
-Keepalive enabled in `/etc/pool.conf`, `tcp_keepalive_time` under the middlebox's
-timeout *in the pool-client namespace*, the middlebox left exactly as it was, and
-the 25-second probe returning `pooled-ok-2026`.
+The application's half and the kernel's half each read back — the kernel's in
+the namespace the client actually runs in — the box in the middle left exactly
+as it was, and the 25-second probe returning `pooled-ok-2026`.
 
 <details>
 <summary>Hint 1 — find out when it dies, not that it dies</summary>

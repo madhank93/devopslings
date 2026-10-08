@@ -195,7 +195,7 @@ syntax; it is:
 4. **Know one footgun per tool.** For `sort` it is `sort f > f`. For `uniq` it
    is that it only sees adjacent lines. For `awk` it is that `$9` depends on a
    log format that can change under you — which is exactly why the answer to
-   "should we keep parsing logs like this forever?" is no, and why Module 13
+   "should we keep parsing logs like this forever?" is no, and why Module 19
    exists.
 
 </details>

@@ -4,8 +4,7 @@ title: "the certificate is fine and the handshake still fails"
 description: |
   ledger-sync cannot complete a TLS handshake against a service on the same box.
   `curl` to the same URL from your shell works. The certificate is valid, the
-  chain is intact, the hostname matches — and the client rejects it anyway,
-  because the client and the box do not agree on what day it is.
+  chain is intact, the hostname matches — and the client rejects it anyway.
 name: clock-skew
 slug: clock-skew
 createdAt: "2026-08-04"
@@ -201,20 +200,6 @@ tasks:
         exit 1
       fi
 
-      # The client must still verify. If create_default_context or the cafile is
-      # gone, the handshake succeeding proves nothing.
-      if ! grep -q 'create_default_context' /usr/local/bin/ledger-sync 2>/dev/null \
-         || ! grep -q '/etc/ledger/ca.crt' /usr/local/bin/ledger-sync 2>/dev/null; then
-        echo "not yet: ledger-sync no longer verifies the certificate against the CA."
-        echo "         Turning verification off makes the error disappear and makes the"
-        echo "         connection meaningless. Reset the lesson and fix the clock."
-        exit 1
-      fi
-      if grep -qi 'CERT_NONE\|check_hostname *= *False\|verify *= *False' /usr/local/bin/ledger-sync 2>/dev/null; then
-        echo "not yet: ledger-sync has had certificate verification disabled."
-        exit 1
-      fi
-
       rm -f /srv/ledger/last-sync
       systemctl reset-failed ledger-sync.service >/dev/null 2>&1 || true
       if ! systemctl start ledger-sync.service >/dev/null 2>&1; then
@@ -241,6 +226,69 @@ tasks:
         echo "         something else made the error go away."
         exit 1
       fi
+
+      # The client must still verify, tested by behaviour rather than by reading
+      # the script: two impostors take over ledger.internal:8443 and the unit, as
+      # configured, must refuse both. The real ledger-api is restored after.
+      imp=/run/devopslings-impostor
+      rm -rf "$imp"; install -d "$imp"
+      # Right name, untrusted issuer: rejected only if the chain is verified.
+      openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj '/CN=ledger.internal' \
+        -addext 'subjectAltName=DNS:ledger.internal' \
+        -keyout "$imp/selfsigned.key" -out "$imp/selfsigned.crt" >/dev/null 2>&1
+      # Trusted issuer, wrong name: rejected only if the hostname is checked.
+      openssl req -newkey rsa:2048 -nodes -subj '/CN=elsewhere.internal' \
+        -keyout "$imp/wrongname.key" -out "$imp/wrongname.csr" >/dev/null 2>&1
+      printf 'subjectAltName = DNS:elsewhere.internal\n' > "$imp/san.cnf"
+      openssl x509 -req -in "$imp/wrongname.csr" -CA /etc/ledger/ca.crt -CAkey /etc/ledger/ca.key \
+        -CAcreateserial -CAserial "$imp/ca.srl" -days 30 -extfile "$imp/san.cnf" \
+        -out "$imp/wrongname.crt" >/dev/null 2>&1
+
+      systemctl stop ledger-api.service >/dev/null 2>&1 || true
+      accepted=""
+      for kind in selfsigned wrongname; do
+        python3 - "$imp/$kind.crt" "$imp/$kind.key" <<'PY' >/dev/null 2>&1 &
+      import http.server, ssl, sys
+      class H(http.server.BaseHTTPRequestHandler):
+          def do_GET(self):
+              self.send_response(200); self.end_headers(); self.wfile.write(b"impostor\n")
+          def log_message(self, *a): pass
+      ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+      ctx.load_cert_chain(sys.argv[1], sys.argv[2])
+      srv = http.server.HTTPServer(("127.0.0.1", 8443), H)
+      srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+      srv.serve_forever()
+      PY
+        pid=$!
+        for _ in $(seq 1 20); do
+          (exec 3<>/dev/tcp/127.0.0.1/8443) 2>/dev/null && break
+          sleep 0.25
+        done
+        rm -f /srv/ledger/last-sync
+        systemctl reset-failed ledger-sync.service >/dev/null 2>&1 || true
+        if systemctl start ledger-sync.service >/dev/null 2>&1 || [ -s /srv/ledger/last-sync ]; then
+          accepted="$accepted $kind"
+        fi
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+      done
+      systemctl start ledger-api.service >/dev/null 2>&1 || true
+      rm -rf "$imp"
+      systemctl reset-failed ledger-sync.service >/dev/null 2>&1 || true
+      systemctl start ledger-sync.service >/dev/null 2>&1 || true
+
+      case "$accepted" in
+        *selfsigned*)
+          echo "not yet: ledger-sync accepted a self-signed certificate for ledger.internal"
+          echo "         that /etc/ledger/ca.crt never signed, so it no longer verifies the"
+          echo "         chain. Restore verification: the failure was the clock, not the check."
+          exit 1 ;;
+        *wrongname*)
+          echo "not yet: ledger-sync accepted a certificate issued to elsewhere.internal"
+          echo "         when it asked for ledger.internal, so hostname checking is off."
+          echo "         Restore it: the failure was the clock, not the check."
+          exit 1 ;;
+      esac
 
       echo "PASS — cause identified as $want; ledger-sync verifies the certificate and"
       echo "       its clock is within ${drift}s of the box."

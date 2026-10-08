@@ -47,8 +47,8 @@ recomputes all of it from the same two files you read.
 <summary>Hint 1 — the volume holds a window, not a day</summary>
 
 The average daily ingest is about 4.4 GB, and 90 × 4.4 is 396 GB. That is the
-number most people write down, and it is the size at which the volume is full
-exactly half the time.
+number most people write down, and more than half of this year's ninety-day
+windows held more than that.
 
 The volume does not fill up on an average day. It fills up during whichever
 ninety consecutive days were the heaviest, so that is the window to measure:

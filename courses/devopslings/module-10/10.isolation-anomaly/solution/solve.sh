@@ -37,7 +37,7 @@ cat > /work/answers/isolation.md <<'MD'
 # Eight refunds, one deduction
 
 # The isolation level the adjuster was running under while the
-# deductions were going missing. It is Postgres's default; name it.
+# deductions were going missing.
 isolation-level: read committed
 
 # What you changed so that two adjusters cannot both act on the same

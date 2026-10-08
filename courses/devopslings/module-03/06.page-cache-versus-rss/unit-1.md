@@ -1,5 +1,5 @@
 ---
-title: "the service that is leaking 200 MB, except for the part that is not"
+title: "200 MB and climbing, and the fix on the table is a nightly restart"
 ---
 
 ## The situation
@@ -40,9 +40,9 @@ rather than treating an unreadable counter as "no growth".
 
 ```
 $ cat $cg/memory.stat | head -6
-anon 12582912
+anon 26214400
 file 188743680
-kernel 3close
+kernel 4521984
 slab 1638400
 ...
 ```
@@ -96,13 +96,13 @@ $ while :; do awk '/^anon /{print $2/1048576 "M"}' $cg/memory.stat; sleep 5; don
 <details>
 <summary>Hint 3 — the small number that is the real problem</summary>
 
-`anon` is 12M and climbing steadily — about 256 KiB per cycle. Small, boring, and
+`anon` is 25M and climbing steadily — about 1 MiB per cycle. Small, boring, and
 it never comes back.
 
 ```python
 leaked = []
 ...
-    leaked.append(bytearray(256 * 1024))
+    leaked.append(bytearray(b"\x01") * (1024 * 1024))
 ```
 
 A buffer appended to a list that nothing ever reads or empties. The list keeps a
@@ -126,13 +126,14 @@ $ echo file > /root/answers/reclaimable
 ```python
     # Nothing retains this now, so the allocator reuses the same memory each
     # cycle.
-    scratch = bytearray(256 * 1024)
+    scratch = bytearray(b"\x01") * (1024 * 1024)
     del scratch
 ```
 
 ```
 $ systemctl restart catalog-api
-$ # anon holds flat across rounds; file climbs back to ~180M and stops
+$ # anon holds flat across rounds. The cached catalogue stays in RAM, still
+$ # charged to the cgroup that first read it — cache is billed once, not per reader
 ```
 
 ### Why this is a lesson at all
@@ -150,8 +151,8 @@ Three things worth keeping:
    train people to ignore it. Alert on `anon`, on working set, or on pressure
    (`memory.pressure`) — not on a total that includes cache.
 
-2. **A leak is a slope, not a value.** 12M of `anon` means nothing on its own.
-   12M growing to 24M over the same amount of work again is the whole
+2. **A leak is a slope, not a value.** 25M of `anon` means nothing on its own.
+   25M growing to 50M over the same amount of work again is the whole
    diagnosis. This is the fourth time this module and the last have used the
    same technique — descriptors in `too-many-open-files`, inodes in
    `inodes-not-bytes`, journal bytes in `journal-eats-the-disk`, anon here.

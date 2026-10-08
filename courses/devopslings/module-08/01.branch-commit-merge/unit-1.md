@@ -20,6 +20,68 @@ $ git merge add-healthcheck
 Run exactly that here and the history comes out wrong — not broken, not lossy,
 just silent about something it could have recorded for free.
 
+## Your objectives
+
+The steps are in `/root/questions.txt`. In short:
+
+- create `add-healthcheck`, and on it commit `healthcheck.sh` (subject
+  `feat: add healthcheck script`), then a README line mentioning it (subject
+  `docs: document the healthcheck`)
+- land the branch on `main` so that `main`'s history records that a branch was
+  merged
+
+## What you're being graded on
+
+- `main` is checked out, and its tip has `healthcheck.sh` requesting `/health`
+  and a README that mentions it
+- `main`'s tip is a merge commit, with both branch commits on its second parent
+  rather than in a straight line
+
+`merge.md`, exactly three lines:
+
+```
+parents: <how many parent commits main's tip has now>
+fast_forward: <what a fast-forward would have left in the history instead>
+records: <one line: what the merge commit records that a fast-forward does not>
+```
+
+<details>
+<summary>Hint 1 — the branch and the two commits</summary>
+
+```
+$ git checkout -b add-healthcheck
+```
+
+Then create `healthcheck.sh`, `git add` it and commit with the exact subject
+`feat: add healthcheck script`. Then append a line to `README.md`, and commit
+that separately as `docs: document the healthcheck`.
+
+</details>
+<details>
+<summary>Hint 2 — the merge has to be recorded</summary>
+
+Back on `main`, a plain `git merge` prints `Fast-forward` and creates no commit.
+The flag that forces the merge commit is `--no-ff`.
+
+```
+$ git checkout main
+$ git merge --no-ff -m 'merge: add-healthcheck into main' add-healthcheck
+```
+
+</details>
+<details>
+<summary>Hint 3 — count the parents</summary>
+
+```
+$ git rev-list --parents -n 1 HEAD
+```
+
+Three hashes on the line means two parents, which means the tip is a merge
+commit. One parent means you fast-forwarded — reset `main` back to the first
+commit and merge again.
+
+</details>
+
 ## Branch and commit
 
 A branch is a name pointing at a commit. Creating one costs nothing and copies
@@ -125,43 +187,6 @@ choice being made for you, silently, based on whether `main` happened to move
 while you worked. If `main` *had* moved, that same `git merge` would have built
 a merge commit without being asked. Knowing which one you are getting, and why,
 is the difference between a history you wrote and one that happened to you.
-
-<details>
-<summary>Hint 1 — the branch and the two commits</summary>
-
-```
-$ git checkout -b add-healthcheck
-```
-
-Then create `healthcheck.sh`, `git add` it and commit with the exact subject
-`feat: add healthcheck script`. Then append a line to `README.md`, and commit
-that separately as `docs: document the healthcheck`.
-
-</details>
-<details>
-<summary>Hint 2 — the merge has to be recorded</summary>
-
-Back on `main`, a plain `git merge` prints `Fast-forward` and creates no commit.
-The flag that forces the merge commit is `--no-ff`.
-
-```
-$ git checkout main
-$ git merge --no-ff -m 'merge: add-healthcheck into main' add-healthcheck
-```
-
-</details>
-<details>
-<summary>Hint 3 — count the parents</summary>
-
-```
-$ git rev-list --parents -n 1 HEAD
-```
-
-Three hashes on the line means two parents, which means the tip is a merge
-commit. One parent means you fast-forwarded — reset `main` back to the first
-commit and merge again.
-
-</details>
 
 ## Checking yourself
 

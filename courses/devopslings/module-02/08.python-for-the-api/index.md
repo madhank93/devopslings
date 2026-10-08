@@ -1,6 +1,6 @@
 ---
 kind: lesson
-title: "the report that has been missing 40% of the records all year"
+title: "the report that has been missing most of the records all year"
 description: |
   fetch-records pulls the billing export and writes it to a file. The file has
   50 rows. There are 437 records. Nothing errors, nothing retries, and the API
@@ -35,6 +35,8 @@ tasks:
           "last_request": 0.0, # for rate-limit accounting
           "violations": 0,     # requests that ignored Retry-After
           "retry_after_until": 0.0,
+          "retry_floor": {},   # page -> earliest polite retry after a 503
+          "hammered": 0,       # retries of a 503'd page sent with no backoff
       }
 
       # A fixed schedule of failures, keyed on (page, attempt-number). Every
@@ -64,7 +66,8 @@ tasks:
               q = urllib.parse.parse_qs(u.query)
 
               if u.path == "/stats":
-                  return self._send(200, {"violations": STATE["violations"]})
+                  return self._send(200, {"violations": STATE["violations"],
+                                          "hammered": STATE["hammered"]})
 
               if u.path != "/records":
                   return self._send(404, {"error": "not found"})
@@ -81,11 +84,15 @@ tasks:
               if page < 1 or page > PAGES:
                   return self._send(404, {"error": f"no such page: {page}"})
 
+              if now < STATE["retry_floor"].get(page, 0.0):
+                  STATE["hammered"] += 1
+
               STATE["hits"][page] = STATE["hits"].get(page, 0) + 1
               attempt = STATE["hits"][page]
 
               code = FAILURES.get((page, attempt))
               if code == 503:
+                  STATE["retry_floor"][page] = now + 0.2
                   return self._send(503, {"error": "upstream busy, try again"})
               if code == 429:
                   STATE["retry_after_until"] = now + 2.0
@@ -154,7 +161,7 @@ tasks:
         - the API paginates. The response tells you how to continue.
         - some requests fail with 503. They succeed if you try again; one page
           fails twice, so a single blind retry is not enough. Back off between
-          attempts.
+          attempts: the server counts retries that arrive within 0.2s of a 503.
         - one request returns 429 with a Retry-After header. Honour it. The
           server counts requests that arrive before that deadline, and the check
           requires that count to be zero.
@@ -245,5 +252,16 @@ tasks:
         exit 1
       fi
 
-      echo "PASS — all $want_total records, each once, in order, with 0 rate-limit violations."
+      hammered=$(curl -sf http://127.0.0.1:8099/stats | sed -n 's/.*"hammered": *\([0-9]*\).*/\1/p')
+      if [ "${hammered:-1}" -ne 0 ]; then
+        echo "not yet: the server saw $hammered retry(s) of a page within 0.2s of the 503"
+        echo "         it had just returned for that page."
+        echo "         A 503 says the server is struggling; a retry that arrives"
+        echo "         immediately adds to the load it is struggling with. Wait between"
+        echo "         attempts, and wait longer each time."
+        exit 1
+      fi
+
+      echo "PASS — all $want_total records, each once, in order, with 0 rate-limit violations"
+      echo "       and no un-backed-off retries."
 ---

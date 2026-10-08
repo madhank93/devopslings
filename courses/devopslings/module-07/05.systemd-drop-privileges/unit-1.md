@@ -14,8 +14,7 @@ root
 ```
 
 There is exactly one reason it is root: it listens on port 80, and ports below
-1024 are privileged — the kernel only lets a process bind them if it is root or
-holds the `CAP_NET_BIND_SERVICE` capability. So the portal binds its port once,
+1024 are privileged and root can bind them. So the portal binds its port once,
 at startup, and then keeps root's full authority for the entire time it is
 parsing requests from the internet. The bind takes a millisecond; the exposure
 lasts as long as the process does.
@@ -23,6 +22,68 @@ lasts as long as the process does.
 That trade is backwards. A program that touches untrusted input should have the
 least privilege that still lets it do its job — and its job needs precisely one
 privileged operation, done once.
+
+## Your objectives
+
+Harden `/etc/systemd/system/webportal.service` so that it:
+
+- runs as `www-data`, not root
+- cannot regain privilege
+- can never hold a capability beyond the one binding port 80 needs
+- still serves `portal up` on port 80
+
+## What you're being graded on
+
+The grader reads the running process, not the unit file:
+
+- `http://127.0.0.1/` returns `portal up`
+- the main process is not root
+- the kernel reports `NoNewPrivs` set for it
+- it holds the bind capability, and its bounding set holds nothing else
+
+`/root/answers/hardening.md`, exactly three lines:
+
+```
+run_as: <the user the service runs as>
+no_new_privileges: <yes or no>
+bind_capability: <the capability that lets a non-root process bind port 80>
+```
+
+<details>
+<summary>Hint 1 — the naive drop and why it fails</summary>
+
+Adding `User=www-data` alone makes the service fail with `Permission denied` on
+the bind. A non-root process cannot open port 80 unless it is granted the
+capability for it. You need the user drop *and* the capability.
+
+</details>
+
+<details>
+<summary>Hint 2 — the two capability directives</summary>
+
+```
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+```
+
+`AmbientCapabilities` grants it; `CapabilityBoundingSet` ensures the service can
+never hold more than that one. Add `NoNewPrivileges=yes` so privilege can never
+be regained.
+
+</details>
+
+<details>
+<summary>Hint 3 — reload the unit definition, then restart</summary>
+
+Changing a unit file needs `systemctl daemon-reload` before the change is seen,
+then `systemctl restart webportal`. Confirm with:
+
+```
+$ curl -s http://127.0.0.1/          # portal up
+$ ps -o user= -p $(systemctl show -p MainPID --value webportal)   # www-data
+```
+
+</details>
 
 ## Why the one-line fix breaks it
 
@@ -101,42 +162,6 @@ CapBnd:      0000000000000400
 it (so the bind works), the bounding set is capped to it (so nothing else is
 reachable), and `NoNewPrivs: 1` confirms the door is shut. A hardened service is
 not what the unit file says; it is what these three lines say.
-
-<details>
-<summary>Hint 1 — the naive drop and why it fails</summary>
-
-Adding `User=www-data` alone makes the service fail with `Permission denied` on
-the bind. A non-root process cannot open port 80 unless it is granted the
-capability for it. You need the user drop *and* the capability.
-
-</details>
-
-<details>
-<summary>Hint 2 — the two capability directives</summary>
-
-```
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
-```
-
-`AmbientCapabilities` grants it; `CapabilityBoundingSet` ensures the service can
-never hold more than that one. Add `NoNewPrivileges=yes` so privilege can never
-be regained.
-
-</details>
-
-<details>
-<summary>Hint 3 — reload the unit definition, then restart</summary>
-
-Changing a unit file needs `systemctl daemon-reload` before the change is seen,
-then `systemctl restart webportal`. Confirm with:
-
-```
-$ curl -s http://127.0.0.1/          # portal up
-$ ps -o user= -p $(systemctl show -p MainPID --value webportal)   # www-data
-```
-
-</details>
 
 ## Checking yourself
 

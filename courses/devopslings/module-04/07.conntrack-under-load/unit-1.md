@@ -4,14 +4,15 @@ title: "the connection tracker is filling up and nothing is connecting"
 
 ## The situation
 
-The box refuses new connections during the afternoon peak. It is not short of
-CPU, memory, file descriptors or worker threads. `dmesg` has this:
+New connections to this box time out during the afternoon peak. It is not
+short of CPU, memory, file descriptors or worker threads. `dmesg` has this:
 
 ```
 nf_conntrack: table full, dropping packet
 ```
 
-And the table is genuinely full — of a service that opens no connections at all.
+The only thing on the box with any volume is the metrics shipper, which sends
+UDP to a collector and opens no connections at all. One burst of it:
 
 ```
 $ cat /proc/sys/net/netfilter/nf_conntrack_count
@@ -22,10 +23,8 @@ $ cat /proc/sys/net/netfilter/nf_conntrack_count
 3247
 ```
 
-The metrics shipper sends fire-and-forget UDP: one packet per metric, a fresh
-source port each time, no reply expected and none sent. Two thousand packets that
-were over the instant they were sent leave two thousand entries behind, each held
-for five minutes.
+Two thousand metrics, two thousand more entries in the table the kernel needs
+free to accept a connection.
 
 ## Your objective
 
@@ -36,7 +35,8 @@ the collector — the traffic is wanted.
 ## What you're being graded on
 
 Both services still running, a fresh 2000-packet burst creating under 200
-entries, and the collector still receiving around 2000 of them.
+entries, the collector still receiving around 2000 of them, and every other
+flow in and out of the box still tracked.
 
 <details>
 <summary>Hint 1 — look at what is in there</summary>
@@ -103,8 +103,8 @@ At a modest 200 metrics/second and a 300-second timeout, the steady state is
 And the failure mode is brutal: once the table is full, the kernel drops the
 packets that would have created new entries. That includes the SYN of every
 genuine inbound connection. **A box doing nothing stops accepting work**, and the
-symptom — connection refused, at random, under load — points at everything except
-the metrics agent.
+symptom — connections timing out at random, under load — points at everything
+except the metrics agent.
 
 ## The fix
 
@@ -135,7 +135,9 @@ packets it *forwards* pass `prerouting`, and a metrics agent may well do both.
 ## The two answers that are not the answer
 
 **Lower `nf_conntrack_udp_timeout`.** Real, and worth doing — 300 seconds for
-unreplied UDP is indefensible. But it shrinks the damage rather than stopping it:
+unreplied UDP is indefensible — and pushed low enough it gets past this check,
+because the entries are gone before the count is read. But it shrinks the damage
+rather than stopping it:
 every packet still allocates an entry, still takes the lock, still costs the
 insert. It buys headroom, not a fix.
 

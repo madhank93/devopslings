@@ -49,7 +49,7 @@ came from is a requirement, not the bug.
 ## What you're being graded on
 
 That `staging` and `production` resolve to the same manifest digest after a run
-finishes. Then the grader pushes a commit changing a constant in
+finishes, and that the workflow builds the image once. Then the grader pushes a commit changing a constant in
 `src/server.js` and requires that both tags move together to a *new* digest,
 built under a new `build.id`. It force-pushes the repository back afterwards.
 

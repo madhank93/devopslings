@@ -1,13 +1,23 @@
 ---
-title: "the archive script that ate the quarterly report"
+title: "the archive script that cannot read a filename"
 ---
 
 ## The situation
 
-`archive-inbox` has run every night for a year. Yesterday somebody saved a file
-called `quarterly report.csv`, and this morning the archive contains a file
-named `quarterly` and a file named `report.csv`, neither of which is the
-report.
+`archive-inbox` has run every night for a year. Last night's cron mail:
+
+```
+mv: cannot stat '/srv/inbox/orders.csv': No such file or directory
+mv: cannot stat '/srv/inbox/quarterly': No such file or directory
+mv: cannot stat '/srv/inbox/report.csv': No such file or directory
+mv: cannot stat '/srv/inbox/two': No such file or directory
+mv: cannot stat '/srv/inbox/lines.txt': No such file or directory
+```
+
+`quarterly`, `report.csv`, `two` and `lines.txt` have never existed.
+`orders.csv` did, and was already in the archive by the time `mv` asked for it.
+One file is still sitting in the inbox, and `quarterly report.csv` did reach the archive — but not because the
+script handled it.
 
 ```
 $ cat /usr/local/bin/archive-inbox
@@ -16,7 +26,7 @@ for f in $(ls /srv/inbox); do
 done
 ```
 
-There are five files in `/srv/inbox` and four of them are a problem:
+The five files it was given:
 
 ```
 $ ls -1b /srv/inbox
@@ -48,10 +58,14 @@ sees it:
 1. **Word splitting** on `$IFS` — space, tab, newline. `quarterly report.csv`
    becomes two words.
 2. **Pathname expansion** — any word containing `*`, `?` or `[` is expanded as a
-   glob. The file literally named `*.csv` becomes every `.csv` in the directory.
+   glob against the current directory. The file literally named `*.csv` becomes
+   every `.csv` wherever the loop happens to be running.
 
-So a five-file directory can yield eight words, some of which name files that
-were never there and some of which name the same file twice.
+So five filenames become seven words, some of which name files that were never
+there. And the unquoted `$f` in `mv /srv/inbox/$f` goes through both steps
+again: the word `*.csv` becomes the glob `/srv/inbox/*.csv`, which moves every
+csv in the inbox in one go — the quarterly report included, by luck — and
+leaves the later `mv` of `orders.csv` with nothing to move.
 
 Watch it happen:
 

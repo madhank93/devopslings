@@ -5,8 +5,7 @@ description: |
   Downloads from the artifact store are fine. Health checks are fine. Uploading
   a 1 MB build artifact to the same host, on the same connection, hangs until
   the client gives up. Nothing is down, nothing is slow, and no log line on
-  either end says anything is wrong — because the packet that would have
-  explained it was thrown away by a router in the middle.
+  either end says anything is wrong.
 name: mtu-blackhole
 slug: mtu-blackhole
 createdAt: "2026-08-11"

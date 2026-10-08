@@ -106,6 +106,20 @@ tasks:
         echo "not yet: 'app' can no longer DELETE from orders."
         exit 1
       fi
+      if ! app_psql <<'SQL' >/dev/null 2>&1
+      \set ON_ERROR_STOP 1
+      SELECT count(*) FROM customers WHERE id = 42;
+      INSERT INTO customers (email, country, created_at) VALUES ('grader-probe@example.invalid', 'GB', now());
+      UPDATE customers SET country = 'DE' WHERE email = 'grader-probe@example.invalid';
+      DELETE FROM customers WHERE email = 'grader-probe@example.invalid';
+      SQL
+      then
+        su_psql -c "DELETE FROM customers WHERE email = 'grader-probe@example.invalid'" >/dev/null 2>&1 || true
+        echo "not yet: 'app' can read and write orders but not customers — one of SELECT,"
+        echo "INSERT, UPDATE or DELETE on customers (or its id sequence) failed. The service"
+        echo "writes both tables."
+        exit 1
+      fi
 
       # 2. And the thing it must not be able to do.
       #
@@ -154,6 +168,15 @@ tasks:
           exit 1
           ;;
       esac
+
+      owned=$(su_psql -c "SELECT string_agg(relname, ', ') FROM pg_class
+                           WHERE relowner = 'app'::regrole AND relnamespace = 'public'::regnamespace")
+      if [ -n "$owned" ]; then
+        echo "not yet: 'app' still owns: $owned"
+        echo "An owner can drop what it owns whatever has been revoked, so anything left"
+        echo "belonging to 'app' is still one bad statement away from gone."
+        exit 1
+      fi
 
       # 3. And it must not be able to help itself to more.
       if app_psql -c 'CREATE TABLE grader_probe_tbl (id int)' >/dev/null 2>&1; then

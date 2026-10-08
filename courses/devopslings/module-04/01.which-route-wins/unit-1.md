@@ -12,7 +12,7 @@ $ curl http://10.50.1.5:8080/
 partner-net-2026
 
 $ curl http://10.50.7.5:8080/
-curl: (28) Connection timed out after 5001 milliseconds
+curl: (7) Failed to connect to 10.50.7.5 port 8080 after 3054 ms: Could not connect to server
 ```
 
 Both addresses are the same host on the far side. The same web server serves
@@ -45,7 +45,7 @@ The far side serves a page containing `partner-net-2026`.
 ## What you're being graded on
 
 The default route and the `/16` still present, `ip route get 10.50.7.5` no
-longer resolving through the dead gateway, and both `10.50.7.5` and `10.50.1.5`
+longer resolving through the path it uses now, and both `10.50.7.5` and `10.50.1.5`
 serving the page.
 
 <details>
@@ -117,8 +117,10 @@ worked, and the change was closed.
 
 The `/24` was never removed. It kept winning for one twenty-fifth of the partner
 network, and pointed at an address that no longer answers ARP — so packets to
-those addresses were handed to a nexthop that does not exist and went nowhere.
-No error, no log line, no `EHOSTUNREACH`. The kernel had a route. It used it.
+those addresses were queued for a nexthop that does not exist. After three
+unanswered ARP requests the kernel gave up and told the caller `No route to
+host` — a misleading message, because there *was* a route, and the kernel used
+it. No log line anywhere.
 
 This is the ordinary shape of the failure: a correct route added alongside a
 stale one, and the stale one is more specific.

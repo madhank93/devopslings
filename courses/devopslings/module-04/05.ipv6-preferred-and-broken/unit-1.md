@@ -29,7 +29,7 @@ real  0m0.004s
 ```
 
 Resolution is instant. The service is instant. The five seconds are spent
-between those two facts, and during them nothing appears on the wire.
+between those two facts, and not one byte of the request is sent during them.
 
 ## Your objective
 
@@ -81,12 +81,14 @@ $ ip -6 route get fd00:dead:beef::99
 fd00:dead:beef::99 dev eth0 src fd00:51ee:9000::10
 ```
 
-There is a route, so the kernel accepts the packet and sends it. Nothing answers.
-The client waits out its own timeout before trying the next address.
+There is a route, so the kernel accepts the packet and sends it — capture on
+`eth0` and the SYNs are there. Nothing answers them, and nothing says no. The
+client waits out its own timeout before trying the next address.
 
-With no route at all, the connect would fail instantly with `ENETUNREACH` and
-the client would move to the v4 address in microseconds. The stale route is what
-converts a wrong answer into a five-second one.
+A connect only fails fast when something refuses: no route at all
+(`ENETUNREACH`), or a router or host sending back an unreachable or a reset.
+Silence costs the full timeout, and a wrong address in a range that swallows
+packets is silence.
 
 </details>
 
@@ -168,9 +170,9 @@ layer.
 **Resolve to a list, then try each address by hand.** `getent ahosts` and then a
 direct connect to each entry localises this class of fault in two commands.
 
-**Hanging beats failing only for the person who wrote the timeout.** A missing
-route fails fast and fails over. A stale route succeeds at routing and fails at
-arriving, which is the expensive kind.
+**Hanging beats failing only for the person who wrote the timeout.** A path
+that refuses fails fast and fails over. A path that swallows packets succeeds at
+routing and fails at arriving, which is the expensive kind.
 
 **Test with the client you actually run.** Curl's Happy Eyeballs hides this; the
 library in your application probably does not implement it.

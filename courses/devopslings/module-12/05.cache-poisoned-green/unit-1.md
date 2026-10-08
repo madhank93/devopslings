@@ -23,8 +23,7 @@ Last week a dependency upgrade went through CI green and took checkout down in
 production. The upgrade was fine. The review was fine. The pipeline reported on
 something that was not the code being merged.
 
-Nothing here is exotic. Read the two steps again and ask what the second one
-does on a day when the first one succeeds.
+Nothing here is exotic.
 
 ## Your objectives
 
@@ -40,9 +39,12 @@ tell you it is fine.
 
 That the workflow still uses `actions/cache`, so "delete the cache step" is not
 the answer. That the tip of `main` is green on the dependency its lockfile
-names. And then the measurement: the grader pushes a commit that upgrades
-`pricing-rules` to 2.0.0 and nothing else, and requires the pipeline to report
-that as a failure. It force-pushes the repository back afterwards.
+names. And then two measurements. The grader pushes a commit that adds a
+markdown file and nothing else, and requires its job log to show the cache
+restored and no fresh install — a key that misses on every commit is honest
+and useless. Then it pushes a commit that upgrades `pricing-rules` to 2.0.0 and
+nothing else, and requires the pipeline to report that as a failure. It
+force-pushes the repository back afterwards.
 
 <details>
 <summary>Hint 1 — reproduce it before you fix it</summary>

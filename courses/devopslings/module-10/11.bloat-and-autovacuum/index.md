@@ -46,11 +46,9 @@ tasks:
 
       cat > /work/app/stock-report.sh <<'SH'
       #!/usr/bin/env bash
-      # The weekly stock report. It takes a repeatable-read snapshot so its
-      # figures are consistent across a dozen queries, pulls the first of
-      # them, and then hands off to a spreadsheet step that has been broken
-      # since Tuesday — so the transaction is never closed and the snapshot is
-      # never released.
+      # The weekly stock report: a dozen queries under one repeatable-read
+      # snapshot, so the figures agree with each other, then the spreadsheet
+      # step.
       set -euo pipefail
       export PGPASSWORD=devopslings
       {
@@ -80,7 +78,9 @@ tasks:
       # The report that never finished. setsid on the whole script, not on
       # psql alone: the transaction lives as long as the pipe feeding it, and
       # a pipe whose writer is reaped closes immediately.
-      setsid bash /work/app/stock-report.sh </dev/null >/dev/null 2>&1 &
+      # Wrapped so the orphan always exits 0: it is reparented to the postmaster,
+      # which crash-restarts the server when an unknown child exits non-0/1.
+      setsid bash -c "bash /work/app/stock-report.sh >/dev/null 2>&1; exit 0" </dev/null >/dev/null 2>&1 &
       held=no
       for _ in $(seq 1 30); do
         s=$(P -c "SELECT state FROM pg_stat_activity WHERE application_name = 'stock-report'" || true)

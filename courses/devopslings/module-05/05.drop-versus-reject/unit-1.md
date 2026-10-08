@@ -8,11 +8,11 @@ The orders service calls two dependencies. Both calls started failing at the
 same moment, and they fail in completely different ways:
 
 ```
-$ time curl http://10.80.0.5:9001/      # inventory
+$ time curl -m 6 http://10.80.0.5:9001/      # inventory
 curl: (28) Connection timed out after 6001 milliseconds
 real    0m6.035s
 
-$ time curl http://10.80.0.6:9002/      # shipping
+$ time curl -m 6 http://10.80.0.6:9002/      # shipping
 curl: (7) Failed to connect to 10.80.0.6 port 9002: Connection refused
 real    0m0.015s
 ```
@@ -25,30 +25,6 @@ prove it from inside their own network, where they answer instantly.
 
 So there are two tickets, and they will be routed to two different teams, and
 both of them are the same firewall on this box.
-
-## The two signatures
-
-A packet arriving at a rule has three possible fates, and two of them are
-failures that look nothing alike from the client:
-
-| Verdict | What goes back | What the client sees |
-|---|---|---|
-| `accept` | the packet proceeds | it works |
-| `drop` | **nothing at all** | silence, until the client's own timeout fires |
-| `reject` | an RST or an ICMP error | an immediate, explicit refusal |
-
-That is the whole mechanism. `drop` is silence; `reject` is an answer.
-
-The consequence is that **the time-to-failure tells you which verdict you are
-looking at, before you read a single rule**:
-
-- **Slow failure, ending on a round number** — 5s, 30s, 6001ms. That number is
-  your own timeout, not anything the network chose. Nobody replied. Something
-  dropped it.
-- **Instant failure** — faster than a round trip could possibly be. Somebody
-  replied, and the reply was a refusal.
-
-Learn to read the clock and you have halved the problem before you start.
 
 ## Your objective
 
@@ -120,6 +96,30 @@ That is worth noticing on its own: a firewall on the *client* produces failures
 that look exactly like a broken server.
 
 </details>
+
+## The two signatures
+
+A packet arriving at a rule has three possible fates, and two of them are
+failures that look nothing alike from the client:
+
+| Verdict | What goes back | What the client sees |
+|---|---|---|
+| `accept` | the packet proceeds | it works |
+| `drop` | **nothing at all** | silence, until the client's own timeout fires |
+| `reject` | an RST or an ICMP error | an immediate, explicit refusal |
+
+That is the whole mechanism. `drop` is silence; `reject` is an answer.
+
+The consequence is that **the time-to-failure tells you which verdict you are
+looking at, before you read a single rule**:
+
+- **Slow failure, ending on a round number** — 5s, 30s, 6001ms. That number is
+  your own timeout, not anything the network chose. Nobody replied. Something
+  dropped it.
+- **Instant failure** — faster than a round trip could possibly be. Somebody
+  replied, and the reply was a refusal.
+
+Learn to read the clock and you have halved the problem before you start.
 
 ## Why the difference exists
 

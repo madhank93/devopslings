@@ -34,68 +34,6 @@ The store logs nothing for the failed upload, because from its point of view
 nothing arrived. Nobody has touched a firewall on either end, and that is true —
 there is no rule anywhere that blocks port 8080.
 
-## What is actually broken
-
-Every host on this path is configured correctly for the link it can see:
-
-```
-                        ---- 1400 --->
-box ---- 1500 ---- r1                   r2 ---- 1500 ---- far
-                        <--- 1500 ----
-```
-
-This box sits on a 1500-byte link, so it offers a 1460-byte MSS. The store sits
-on a 1500-byte link, so it offers a 1460-byte MSS. They agree. Neither of them
-has any way to know about the 1400-byte link in the middle, and they are not
-supposed to.
-
-The router that *does* know is supposed to say so. When `r1` gets a 1500-byte
-packet with the don't-fragment bit set and can only forward 1400, it is required
-to drop the packet and send back an ICMP `destination-unreachable /
-fragmentation-needed` carrying the MTU it *can* forward. The sender lowers its
-estimate for that destination and retransmits smaller. That exchange is **path
-MTU discovery**, and it is the only thing holding the arrangement together.
-
-Take that one message away and you get a black hole:
-
-| | |
-|---|---|
-| The connection opens | handshake packets are tiny |
-| Small requests work | they fit in one small segment |
-| Health checks pass | also tiny |
-| `ping` works | 84 bytes |
-| `traceroute` works | tiny probes |
-| Anything that fills a segment | **vanishes, forever, silently** |
-
-No refusal. No reset. No timeout on connect. No log line. The sender keeps
-retransmitting a packet that cannot fit, at the size that cannot fit, until the
-application above it gives up.
-
-## Why downloads work and uploads do not
-
-This sounds impossible on one TCP connection, and it is not. **The tunnel's two
-ends disagree about their MTU** — 1400 leaving the near end, 1500 leaving the
-far end. Somebody sized one end for the encapsulation overhead and left the
-other at the default, which is one of the most common tunnel bugs there is.
-
-So there is exactly one narrow direction on this path. Traffic from the store
-towards you is never squeezed by anything and arrives whole. Traffic from you
-towards the store hits a wall at the first router, and the message that would
-have told you so is dropped.
-
-Read the asymmetry as evidence. It rules out reachability, it rules out the
-service, it rules out anything port-based — and it points at one link, in one
-direction. "Which way is broken?" is a question worth asking early, and almost
-nobody asks it.
-
-There is a second-order effect here worth knowing, because it is how this class
-of fault hides from you: if the return direction *were* also squeezed, the store
-would be told the path MTU by the router squeezing it, and it would then start
-advertising a 1360-byte MSS on every new connection. That caps what your box
-sends, and your upload would begin working — by accident, for a reason nobody
-could name, after the first large download. MTU faults that come and go are
-usually this.
-
 ## Your objective
 
 Make the upload complete. It must report the full 1048576 bytes:
@@ -119,12 +57,12 @@ fragmentation forbidden — the number you measure to get the first one.
 The link between `10.90.0.2` and `10.90.1.2` is a tunnel run by another team.
 **Its MTU must still be what it is now when you are finished.** Widening it makes
 the symptom disappear and is not available to you: the encapsulation overhead
-that made it 1400 is real, and a real tunnel would start dropping again.
+that sized it is real, and a real tunnel would start dropping again.
 
 ## What you're being graded on
 
 The upload completing, the small request and the 1 MB download still working, the
-traffic still going via `10.90.0.2`, the tunnel still 1400 bytes wide, and both
+traffic still going via `10.90.0.2`, the tunnel's MTU unchanged, and both
 numbers in the answer file correct.
 
 <details>
@@ -222,6 +160,68 @@ rule you find on the internet looks symmetric and why copying it onto an
 endpoint quietly does half of nothing.
 
 </details>
+
+## What is actually broken
+
+Every host on this path is configured correctly for the link it can see:
+
+```
+                        ---- 1400 --->
+box ---- 1500 ---- r1                   r2 ---- 1500 ---- far
+                        <--- 1500 ----
+```
+
+This box sits on a 1500-byte link, so it offers a 1460-byte MSS. The store sits
+on a 1500-byte link, so it offers a 1460-byte MSS. They agree. Neither of them
+has any way to know about the 1400-byte link in the middle, and they are not
+supposed to.
+
+The router that *does* know is supposed to say so. When `r1` gets a 1500-byte
+packet with the don't-fragment bit set and can only forward 1400, it is required
+to drop the packet and send back an ICMP `destination-unreachable /
+fragmentation-needed` carrying the MTU it *can* forward. The sender lowers its
+estimate for that destination and retransmits smaller. That exchange is **path
+MTU discovery**, and it is the only thing holding the arrangement together.
+
+Take that one message away and you get a black hole:
+
+| | |
+|---|---|
+| The connection opens | handshake packets are tiny |
+| Small requests work | they fit in one small segment |
+| Health checks pass | also tiny |
+| `ping` works | 84 bytes |
+| `traceroute` works | tiny probes |
+| Anything that fills a segment | **vanishes, forever, silently** |
+
+No refusal. No reset. No timeout on connect. No log line. The sender keeps
+retransmitting a packet that cannot fit, at the size that cannot fit, until the
+application above it gives up.
+
+## Why downloads work and uploads do not
+
+This sounds impossible on one TCP connection, and it is not. **The tunnel's two
+ends disagree about their MTU** — 1400 leaving the near end, 1500 leaving the
+far end. Somebody sized one end for the encapsulation overhead and left the
+other at the default, which is one of the most common tunnel bugs there is.
+
+So there is exactly one narrow direction on this path. Traffic from the store
+towards you is never squeezed by anything and arrives whole. Traffic from you
+towards the store hits a wall at the first router, and the message that would
+have told you so is dropped.
+
+Read the asymmetry as evidence. It rules out reachability, it rules out the
+service, it rules out anything port-based — and it points at one link, in one
+direction. "Which way is broken?" is a question worth asking early, and almost
+nobody asks it.
+
+There is a second-order effect here worth knowing, because it is how this class
+of fault hides from you: if the return direction *were* also squeezed, the store
+would be told the path MTU by the router squeezing it, and it would then start
+advertising a 1360-byte MSS on every new connection. That caps what your box
+sends, and your upload would begin working — by accident, for a reason nobody
+could name, after the first large download. MTU faults that come and go are
+usually this.
 
 ## Why anyone blocks this ICMP
 

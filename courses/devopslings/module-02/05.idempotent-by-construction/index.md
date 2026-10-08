@@ -77,6 +77,7 @@ tasks:
 
       The check runs it once from clean, then twice more, then simulates an
       interrupted run and runs it again — and compares the end state each time.
+      Anything already queued in /srv/nodeagent must survive a re-run.
       Q
 
       echo "scenario ready — bootstrap-node works once on a fresh host and not twice"
@@ -126,16 +127,25 @@ tasks:
 
       # The end state has to be the specified one, not merely stable.
       conf_lines=$(wc -l < /etc/nodeagent/agent.conf 2>/dev/null || echo 0)
-      prof_lines=$(grep -c . /etc/profile.d/nodeagent.sh 2>/dev/null || echo 0)
+      prof_lines=$(grep -c . /etc/profile.d/nodeagent.sh 2>/dev/null) || true
+      prof_lines=${prof_lines:-0}
       if [ "$conf_lines" -ne 2 ]; then
         echo "not yet: after one run /etc/nodeagent/agent.conf has $conf_lines lines, expected 2"
         sed 's/^/           /' /etc/nodeagent/agent.conf 2>/dev/null | head -6
+        exit 1
+      fi
+      if [ "$prof_lines" -ne 1 ]; then
+        echo "not yet: after one run /etc/profile.d/nodeagent.sh has $prof_lines lines, expected 1"
         exit 1
       fi
       if ! getent passwd nodeagent >/dev/null; then
         echo "not yet: after one run there is no nodeagent user"
         exit 1
       fi
+
+      # /srv/nodeagent is the agent's queue_dir. Re-running must converge the
+      # host, not wipe and rebuild it, so work queued there has to survive.
+      echo "queued before rerun" > /srv/nodeagent/verify-queued.msg
 
       # Runs 2 and 3 — must succeed and change nothing.
       for n in 2 3; do
@@ -144,6 +154,12 @@ tasks:
           sed 's/^/         /' /tmp/bootstrap.out | tail -5
           echo "         the second run is the one that matters: creating something that"
           echo "         already exists has to be a no-op, not an error."
+          exit 1
+        fi
+        if [ ! -e /srv/nodeagent/verify-queued.msg ]; then
+          echo "not yet: run $n exited 0, but a file placed in /srv/nodeagent before it"
+          echo "         was gone afterwards. /srv/nodeagent is the agent's queue_dir;"
+          echo "         re-running on a live host must not delete what is queued there."
           exit 1
         fi
         now=$(snapshot)

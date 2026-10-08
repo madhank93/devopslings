@@ -100,32 +100,24 @@ tasks:
         CHANGED  /srv/app/current/asset2.js
         ... (fifteen more) ...
 
-      Sixteen changes. Fifteen are today's release rewriting the application assets —
-      entirely expected, and they will happen again tomorrow. One is not: someone
-      appended `appdeploy ALL=(ALL) NOPASSWD: ALL` to /etc/sudoers.d/appdeploy, a
-      full root grant. It is buried in the release noise, and on a busy box nobody
-      reads sixteen lines every deploy — so nobody sees it.
+      Sixteen changes, the same as after every release, and on a box that deploys ten
+      times a day nobody reads past the first few lines.
 
-      An integrity baseline is only useful if a real change stands out. Watching a
-      directory that is supposed to change on every release guarantees it never will.
-      Fix the monitor so its report shows the unexpected change and not the deploy:
-      stop watching the directory whose whole job is to change, and leave the stable
-      system paths under watch.
+      Make the report worth reading: after a deploy it should show what changed that
+      a deploy does not account for, and nothing else. The grader rolls out one more
+      release and tampers with a watched system file to find out.
 
-        /etc/fim/watch.list   the paths hashed into the baseline
-        fim-check             re-run it to see the report
-
-      Do not re-take the baseline over the current state — that would bake today's
-      intrusion in as the new "known good". The fix is what you watch, not when you
-      snapshot.
+        /etc/fim/watch.list              the paths hashed into the baseline
+        /var/lib/fim/baseline.sha256     taken before today's release
+        fim-check                        re-run it to see the report
 
       Then write /root/answers/fim.md with exactly two lines:
 
         tampered_file: <the file the monitor should have made obvious>
-        stopped_watching: <the directory you removed from the watch list>
+        stopped_watching: <what you removed from the watch list>
       Q
 
-      echo "scenario ready — fim-check drowns one intrusion in fifteen expected deploy changes"
+      echo "scenario ready — fim-check reports sixteen changes after today's release"
 
   verify_done:
     needs: [init_scenario]
@@ -143,34 +135,66 @@ tasks:
         exit 1
       fi
 
-      report=$(/usr/local/bin/fim-check 2>/dev/null || true)
+      base=/var/lib/fim/baseline.sha256
+      helper=/usr/local/bin/app-helper
+      clean_sha=$(printf '%s\n' 'appdeploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart app.service' | sha256sum | cut -d' ' -f1)
 
-      # The report must no longer be full of the deploy directory. Watching a
-      # path that changes every release is the flaw; the report should be signal.
-      if printf '%s\n' "$report" | grep -q "$deploydir"; then
-        n=$(printf '%s\n' "$report" | grep -c "$deploydir")
-        echo "not yet: fim-check still reports $n change(s) under $deploydir."
-        echo "         That directory is rewritten on every deploy, so watching it"
-        echo "         guarantees noise. Remove it from /etc/fim/watch.list — its"
-        echo "         integrity is the release pipeline's job, not the host FIM's."
+      # The baseline must still be the one taken before the release; one taken
+      # afterwards records the intrusion as known-good.
+      base_sha=$(awk -v f="$tampered" '$2==f{print $1}' "$base" 2>/dev/null || true)
+      if [ "$base_sha" != "$clean_sha" ]; then
+        now_sha=$(sha256sum "$tampered" 2>/dev/null | cut -d' ' -f1)
+        echo "not yet: $base no longer holds the pre-release hash of"
+        echo "         $tampered (entry: ${base_sha:-missing})."
+        if [ -n "$base_sha" ] && [ "$base_sha" = "$now_sha" ]; then
+          echo "         It matches the file as it is now, NOPASSWD: ALL line included:"
+          echo "         a re-taken baseline records the intrusion as known-good. Re-run"
+          echo "         the scenario to get the original back; the fix is what you"
+          echo "         watch, not when you snapshot."
+        fi
         exit 1
       fi
 
-      # And it must still catch the intrusion. If the report is empty the monitor
-      # was blinded — either the watch list was emptied or the baseline was
-      # re-taken over the tampered state.
-      if ! printf '%s\n' "$report" | grep -q "$tampered"; then
-        echo "not yet: fim-check no longer flags $tampered, which still holds the"
-        echo "         injected 'NOPASSWD: ALL' line."
-        if ! grep -q "$tampered" /etc/fim/watch.list 2>/dev/null; then
-          echo "         You stopped watching it — but that file is exactly the kind"
-          echo "         of stable system path a baseline is for. Only the deploy"
-          echo "         directory should have come off the list."
-        else
-          echo "         If you re-took the baseline, you recorded the intrusion as"
-          echo "         known-good. Restore a baseline from before the tampering;"
-          echo "         the fix is what you watch, not when you snapshot."
+      # Rehearse the next release plus a tamper with a watched binary, then put
+      # both back. The reset runs first too, in case an earlier run was cut off.
+      reset_probe() {
+        for i in $(seq 1 15); do echo "asset $i build-101" > /srv/app/current/asset$i.js; done
+        rm -f /srv/app/current/asset16.js
+        if grep -q '^# fim-probe' "$helper" 2>/dev/null; then
+          kept=$(grep -v '^# fim-probe' "$helper")
+          printf '%s\n' "$kept" > "$helper"
         fi
+      }
+      reset_probe
+      trap reset_probe EXIT
+      for i in $(seq 1 15); do echo "asset $i build-102" > /srv/app/current/asset$i.js; done
+      echo "asset 16 build-102" > /srv/app/current/asset16.js
+      echo '# fim-probe' >> "$helper"
+      report=$(/usr/local/bin/fim-check 2>/dev/null || true)
+      reset_probe
+      trap - EXIT
+
+      # A release must not show up in the report at all.
+      if printf '%s\n' "$report" | grep -q "$deploydir"; then
+        n=$(printf '%s\n' "$report" | grep -c "$deploydir")
+        echo "not yet: the grader rolled out another release and fim-check reported"
+        echo "         $n change(s) under $deploydir. That directory is rewritten on"
+        echo "         every deploy, so watching it guarantees noise. Its integrity is"
+        echo "         the release pipeline's job, not the host FIM's."
+        exit 1
+      fi
+
+      # A change to stable system state must.
+      if ! printf '%s\n' "$report" | grep -q "$helper"; then
+        echo "not yet: the grader appended a line to $helper and fim-check did"
+        echo "         not report it. That binary is stable system state — exactly what"
+        echo "         the monitor is for. Keep it on the watch list."
+        exit 1
+      fi
+      if grep -q 'NOPASSWD: ALL' "$tampered" && ! printf '%s\n' "$report" | grep -q "$tampered"; then
+        echo "not yet: $tampered still holds the injected 'NOPASSWD: ALL' line and"
+        echo "         fim-check does not report it. It is a stable system path; only"
+        echo "         the deploy directory should have come off the watch list."
         exit 1
       fi
 
@@ -195,6 +219,6 @@ tasks:
         exit 1
       fi
 
-      echo "PASS — the deploy churn is out of the report and the sudoers tamper is"
-      echo "       the one thing fim-check now shows. A baseline that survives a"
+      echo "PASS — a release no longer shows up in fim-check, and a change to"
+      echo "       stable system state still does. A baseline that survives a"
       echo "       release is one that never watched what a release changes."

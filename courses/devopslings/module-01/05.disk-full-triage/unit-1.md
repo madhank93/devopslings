@@ -33,9 +33,9 @@ works for about two seconds.
 
 ## What you're being graded on
 
-The check looks at four things: that the space came back, that nothing is still
-holding it, that you addressed the cause rather than the process, and that
-`app.log` and `access.log` are still there.
+The check waits a few seconds, then looks at three things: that the space
+came back, that it is still back, and that `app.log` and `access.log` are
+still there.
 
 <details>
 <summary>Hint 1 — df and du measure different things</summary>

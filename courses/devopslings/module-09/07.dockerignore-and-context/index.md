@@ -2,10 +2,10 @@
 kind: lesson
 title: "the build spends most of its time before the first instruction runs"
 description: |
-  Every build uploads the working directory to the daemon before it reads the
-  Dockerfile. This one uploads a hundred megabytes of things the image does not
-  need. Learn what the build context is, what .dockerignore does to it, and why
-  narrowing your COPY lines changes nothing.
+  Every build ships part of the working directory to the builder. This one
+  ships a hundred megabytes of things the image does not need. Learn what the
+  build context is, what bounds it, and why tidying the Dockerfile is not
+  that bound.
 name: dockerignore-and-context
 slug: dockerignore-and-context
 createdAt: "2026-09-01"
@@ -99,8 +99,8 @@ tasks:
         echo "The biggest things still being sent:"
         docker run --rm "$probe" sh -c 'du -sk /ctx/* /ctx/.[!.]* 2>/dev/null | sort -rn | head -5' \
           | awk '{printf "    %s KB  %s\n", $1, $2}' || true
-        echo "Every one of them is uploaded before the first instruction runs, whether"
-        echo "or not a COPY asks for it."
+        echo "Every one of them is in the context, where any COPY or builder can reach"
+        echo "it, however narrow this Dockerfile's COPY lines are."
         exit 1
       fi
 

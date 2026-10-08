@@ -22,9 +22,10 @@ tasks:
       set -e
 
       # ---- clean slate -------------------------------------------------
-      systemctl stop nginx.service 2>/dev/null || true
+      systemctl stop haproxy.service nginx.service 2>/dev/null || true
       rm -rf /srv/www /root/answers/perms.md
-      rm -f /etc/nginx/sites-enabled/example /etc/nginx/sites-available/example
+      rm -f /etc/nginx/sites-enabled/* /etc/nginx/sites-available/example
+      rm -f /etc/nginx/conf.d/*.conf
       install -d /root/answers
 
       # ---- the site ----------------------------------------------------
@@ -185,6 +186,13 @@ tasks:
       if pgrep -u root nginx >/dev/null 2>&1 && ! pgrep -u www-data nginx >/dev/null 2>&1; then
         echo "not yet: no nginx worker is running as www-data."
         echo "         The master runs as root and the workers must not."
+        exit 1
+      fi
+
+      if id -nG www-data 2>/dev/null | grep -qw root; then
+        echo "not yet: www-data is now in the root group."
+        echo "         That opens this directory through its group bits, and every other"
+        echo "         root-group file on the box with it. The bit missing was for others."
         exit 1
       fi
 

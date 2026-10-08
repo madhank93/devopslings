@@ -84,8 +84,8 @@ tasks:
       # the two transactions?
       what-postgres-did: ?
 
-      # Both jobs walk the same six rows. Name the two columns they sort by —
-      # they are not the same column, and that is the bug.
+      # Both jobs walk the same six rows. Name the column each one sorts
+      # them by.
       the-two-orders: ?
 
       # One line: why does catching the error and retrying the transaction not

@@ -12,7 +12,7 @@ cat /work/app/ingest.sh
 /work/app/ingest.sh
 ```
 
-The average write takes about three microseconds. Several times during the run
+The median write takes about three microseconds. Several times during the run
 everything stops for a second or more, and the periodic lines in
 `/work/ingest.log` show the rate collapsing and recovering.
 
@@ -45,11 +45,12 @@ to have drained, not just stopped being refused. Leave `--statistics` and
 An LSM store that pauses writes writes down the reason:
 
 ```
-grep 'Stalling writes' /work/store/LOG | head -5
+grep -E '(Stalling|Stopping) writes' /work/store/LOG | sort | uniq -c | sort -rn | head -5
 ```
 
 ```
-Stalling writes because we have 4 level-0 files rate 12582912
+     61 Stopping writes because we have 4 level-0 files
+      9 Stalling writes because we have 3 level-0 files rate 8388608
 ```
 
 And the total, in the statistics block at the end of the run:
@@ -161,9 +162,9 @@ has to check. When compaction falls behind, the store's choice is unbounded
 read latency or paused writes, and it picks paused writes. Understanding it as
 back-pressure rather than as slowness is what stops you from buying hardware.
 
-**The average was never the problem.** Three microseconds mean and 4 ms at
-P99.9: the mean cannot see a pause that hits one write in a thousand, and the
-pause is what the service felt. Any latency SLO on an LSM store belongs on a
+**The median was never the problem.** Three and a half microseconds at P50
+and nearly 4 ms at P99.9: a median cannot see a pause that hits one write in a
+thousand, and the pause is what the service felt. Any latency SLO on an LSM store belongs on a
 tail percentile — and on a store whose failure mode is a multi-second stop, P99
 is not far enough out.
 

@@ -123,16 +123,17 @@ fact behind `WHERE date_trunc('day', ts) = ...` and `WHERE substr(code,1,3) =
 
 **The cast is often invisible in the query text.** `reference::bigint` is
 explicit here so it can be pointed at. In real code it usually is not: compare
-a `text` column to an integer parameter, or a `bigint` column to a value your
-driver sends as `numeric`, and Postgres inserts the cast for you. The query
+a `bigint` column to a value your driver sends as `numeric`, or an `integer`
+column to a `double precision` parameter, and Postgres inserts the cast for
+you — on the column. The query
 looks like it filters on the column. The `Filter:` line in `EXPLAIN` is where
 you find out it does not.
 
-**Which side gets cast decides whether you have a problem.** Postgres will
-happily cast the *literal* to the column's type when it can, and then the index
-applies and nothing is wrong. It casts the *column* when the literal cannot be
-converted without losing the comparison's meaning — and casting the column is
-what disables the index. So the question is never "is there a cast" but "which
+**Which side gets cast decides whether you have a problem.** A quoted literal
+takes on the column's type, and then the index applies and nothing is wrong. A
+typed value the column's type can only be widened to — `bigint` to `numeric` —
+gets the *column* cast instead, and casting the column is what disables the
+index. So the question is never "is there a cast" but "which
 operand did it land on".
 
 **Expression indexes are not free.** Each one is a second copy of the data to

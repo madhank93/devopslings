@@ -18,15 +18,23 @@ tasks:
     init: true
     timeout_seconds: 900
     run: |
+      # A protection rule left by another lesson (any name, any pattern) would
+      # refuse the seed force-push, so every rule on the repository goes first.
+      for rule in $(curl -fsS -u devops:devopslings \
+                      "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections" 2>/dev/null \
+                    | tr ',' '\n' | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p' \
+                    | sed 's/%/%25/g; s/ /%20/g; s/\*/%2A/g; s/?/%3F/g; s/\[/%5B/g; s/]/%5D/g; s|/|%2F|g' || true); do
+        curl -fsS -u devops:devopslings -X DELETE \
+          "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections/${rule}" >/dev/null 2>&1 || true
+      done
+
       api="http://127.0.0.1:3000/api/v1"
       auth="-u devops:devopslings"
       reg="http://127.0.0.1:5000"
       repo="devops/checkout"
       accept='application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
 
-      # A branch protection rule left by an earlier lesson refuses the seed
-      # force-push, and a stale :live tag would show the wrong environment.
-      curl -fsS $auth -X DELETE "${api}/repos/${repo}/branch_protections/main" >/dev/null 2>&1 || true
+      # A stale :live tag would show the wrong environment.
       tags=$(curl -fsS "${reg}/v2/checkout/tags/list" 2>/dev/null \
                | tr ',[]' '\n\n\n' | sed -n 's/.*"\([^"]*\)".*/\1/p' \
                | grep -v '^tags$\|^name$\|^checkout$' || true)

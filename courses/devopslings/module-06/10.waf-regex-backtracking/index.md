@@ -64,6 +64,8 @@ tasks:
       cat > /root/waf-corpus/block <<'CORPUS'
       /api?x=1;a=b
       /q?p=';a=1
+      /q?p=null=1
+      /q?p=true+a=1
       CORPUS
       cat > /root/waf-corpus/allow <<'CORPUS'
       /health
@@ -313,7 +315,7 @@ tasks:
         fail=1
         echo "not yet: you said failure_mode=$mode."
         echo "         The rule was not slow because the input was long. It was"
-        echo "         slow because the engine had an exponential number of ways"
+        echo "         slow because the engine had an enormous number of ways"
         echo "         to split that input between two adjacent .* and tried them."
         echo "         There is a name for that."
       fi

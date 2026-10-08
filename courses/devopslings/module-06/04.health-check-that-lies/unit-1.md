@@ -19,8 +19,84 @@ app,b,UP
 ```
 
 2/2 healthy, on every dashboard, for as long as this has been happening. The
-check is running, it is passing, and it is telling the truth about the question
-it was asked.
+check is running, and it is passing.
+
+## Your objective
+
+1. A node whose dependency has just broken is out of rotation **within 15
+   seconds**. A node whose dependency is healthy is in rotation and is **not**
+   ejected while it is healthy. Both are tested by breaking and repairing a
+   backend while you are graded.
+
+2. Write `/root/answers/healthcheck.md`:
+
+   ```
+   check_path: <path the load balancer now asks for>
+   health_proves: <liveness | readiness>
+   ```
+
+The load balancer config is yours. The backends are not: you cannot change what
+they serve, and the dependency is not coming back on your schedule.
+
+## What you're being graded on
+
+**Both healthy nodes serve.** Twelve requests have to come back clean and touch
+both backends. A check nothing can pass — or a backend quietly deleted from the
+pool — takes the outage from half the traffic to all of it on the day the
+*other* node is the sick one.
+
+**A sick node leaves inside the deadline.** The grader breaks backend b and
+watches; it has to be out of rotation within fifteen seconds.
+
+**A recovered node comes back.** Ejection is not a one-way door. Within thirty
+seconds of its dependency returning it should be taking traffic again.
+
+**The path you name is a path that knows.** Whatever you put in `check_path` is
+requested against a backend with the dependency broken and again with it
+healthy. It has to answer differently. That check accepts any endpoint that
+genuinely reflects the dependency.
+
+<details>
+<summary>Hint 1 — ask the sick backend three questions</summary>
+
+```
+$ curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/health
+$ curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/ready
+$ curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/orders
+```
+
+Two of those three agree with each other and disagree with the one the load
+balancer is asking.
+
+</details>
+
+<details>
+<summary>Hint 2 — watch the pool while you change things</summary>
+
+```
+$ watch -n1 'echo "show stat" | socat stdio /run/haproxy/admin.sock | cut -d, -f1,2,18,19'
+```
+
+Column 18 is status, 19 is the check result. Break the dependency with
+
+```
+$ curl -s -X POST 'http://172.32.0.11:8091/admin/deps?value=broken'
+```
+
+and see whether anything moves — and how long it takes.
+
+</details>
+
+<details>
+<summary>Hint 3 — both dials</summary>
+
+`option httpchk GET <path>` chooses the question. `inter`, `fall` and `rise` on
+the `default-server` line choose how quickly the answer is acted on: out after
+`fall` failures, back after `rise` successes, one per `inter`.
+
+Fifteen seconds is the deadline. `inter 10s fall 3` is thirty.
+
+</details>
 
 ## What the check actually asked
 
@@ -96,89 +172,11 @@ place to be for a check this cheap. The right answer depends on how expensive
 the check is and how bursty the service is; the wrong answer is leaving it at
 whatever the example config had.
 
-## Your objective
-
-1. A node whose dependency has just broken is out of rotation **within 15
-   seconds**. A node whose dependency is healthy is in rotation and is **not**
-   ejected while it is healthy. Both are tested by breaking and repairing a
-   backend while you are graded.
-
-2. Write `/root/answers/healthcheck.md`:
-
-   ```
-   check_path: <path the load balancer now asks for>
-   health_proves: <liveness | readiness>
-   ```
-
-The load balancer config is yours. The backends are not: you cannot change what
-they serve, and the dependency is not coming back on your schedule.
-
-## What you're being graded on
-
-**Both healthy nodes serve.** Twelve requests have to come back clean and touch
-both backends. A check nothing can pass — or a backend quietly deleted from the
-pool — takes the outage from half the traffic to all of it on the day the
-*other* node is the sick one.
-
-**A sick node leaves inside the deadline.** The grader breaks backend b and
-watches; `inter` × `fall` has to fit in fifteen seconds.
-
-**A recovered node comes back.** Ejection is not a one-way door. `rise`
-intervals later it should be taking traffic again.
-
-**The path you name is a path that knows.** Whatever you put in `check_path` is
-requested against a backend with the dependency broken and again with it
-healthy. It has to answer differently. That check accepts any endpoint that
-genuinely reflects the dependency — `/ready` is the one that exists here, but a
-real work route would pass too.
-
-<details>
-<summary>Hint 1 — ask the sick backend three questions</summary>
-
-```
-$ curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/health
-$ curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/ready
-$ curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/orders
-```
-
-Two of those three agree with each other and disagree with the one the load
-balancer is asking.
-
-</details>
-
-<details>
-<summary>Hint 2 — watch the pool while you change things</summary>
-
-```
-$ watch -n1 'echo "show stat" | socat stdio /run/haproxy/admin.sock | cut -d, -f1,2,18,19'
-```
-
-Column 18 is status, 19 is the check result. Break the dependency with
-
-```
-$ curl -s -X POST 'http://172.32.0.11:8091/admin/deps?value=broken'
-```
-
-and see whether anything moves — and how long it takes.
-
-</details>
-
-<details>
-<summary>Hint 3 — both dials</summary>
-
-`option httpchk GET <path>` chooses the question. `inter`, `fall` and `rise` on
-the `default-server` line choose how quickly the answer is acted on: out after
-`fall` failures, back after `rise` successes, one per `inter`.
-
-Fifteen seconds is the deadline. `inter 10s fall 3` is thirty.
-
-</details>
-
 ## What actually happened
 
 Backend b lost its dependency. Its process stayed up, so `GET /health` kept
-returning 200, so the check kept passing, so HAProxy kept giving it a third of
-a second's worth of traffic — all of which it answered 503.
+returning 200, so the check kept passing, so HAProxy kept giving it half the
+traffic — all of which it answered 503.
 
 Nothing was broken about HAProxy, and nothing was broken about the check
 mechanism. The check was pointed at an endpoint that could not observe the

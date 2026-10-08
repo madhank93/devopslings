@@ -1,10 +1,10 @@
 ---
 kind: lesson
-title: "the archive script that ate the quarterly report"
+title: "the archive script that cannot read a filename"
 description: |
-  archive-inbox has worked every night for a year. Last night someone saved a
-  file with a space in the name, and this morning there are two files in the
-  archive that never existed and one that is gone. Filenames are not words.
+  archive-inbox has worked every night for a year. Last night it exited 1 with
+  five errors about files that do not exist, one file never left the inbox, and
+  the quarterly report only arrived by accident. Filenames are not words.
 name: unquoted-and-broken
 slug: unquoted-and-broken
 createdAt: "2026-08-04"

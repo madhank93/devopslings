@@ -18,15 +18,19 @@ tasks:
     init: true
     timeout_seconds: 900
     run: |
+      # A protection rule left by another lesson (any name, any pattern) would
+      # refuse the seed force-push, so every rule on the repository goes first.
+      for rule in $(curl -fsS -u devops:devopslings \
+                      "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections" 2>/dev/null \
+                    | tr ',' '\n' | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p' \
+                    | sed 's/%/%25/g; s/ /%20/g; s/\*/%2A/g; s/?/%3F/g; s/\[/%5B/g; s/]/%5D/g; s|/|%2F|g' || true); do
+        curl -fsS -u devops:devopslings -X DELETE \
+          "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections/${rule}" >/dev/null 2>&1 || true
+      done
+
       api="http://127.0.0.1:3000/api/v1"
       auth="-u devops:devopslings"
       repo="devops/checkout"
-
-      # Any rule left from a previous attempt would refuse the seed push, so
-      # the branch is unprotected while the scenario is written and the rule is
-      # created afterwards.
-      curl -fsS $auth -X DELETE "${api}/repos/${repo}/branch_protections/main" >/dev/null 2>&1 || true
-      curl -fsS $auth -X DELETE "${api}/repos/${repo}/branch_protections/%2A" >/dev/null 2>&1 || true
 
       work=$(mktemp -d)
       trap 'rm -rf "$work"' EXIT
@@ -193,10 +197,25 @@ tasks:
         exit 1
       fi
 
+      # Only the rule that governs main counts: Forgejo applies the rule named
+      # exactly "main" if there is one, otherwise the first pattern matching it.
+      main_rule=$(printf '%s\n' "$rules" | grep '"rule_name":"main"' | head -1 || true)
+      if [ -z "$main_rule" ]; then
+        while IFS= read -r r; do
+          n=$(printf '%s' "$r" | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p')
+          case "main" in
+            $n) main_rule=$r; break ;;
+          esac
+        done <<EOF
+      $rules
+      EOF
+      fi
+      rules=$main_rule
+
       approvals=$(printf '%s\n' "$rules" \
         | sed -n 's/.*"required_approvals":\([0-9]*\).*/\1/p' | sort -rn | head -1 || true)
       if [ -z "$approvals" ] || [ "$approvals" -lt 1 ]; then
-        echo "not yet: no rule on this repository requires an approving review"
+        echo "not yet: the rule that applies to main does not require an approving review"
         echo "(required_approvals is ${approvals:-unset}). Closing the push path without"
         echo "keeping the review requirement just moves every change into a pull request"
         echo "that anyone can merge unread."
@@ -204,7 +223,7 @@ tasks:
       fi
 
       if ! printf '%s\n' "$rules" | grep -q '"enable_status_check":true'; then
-        echo "not yet: no rule requires a status check. Nothing stops a pull request"
+        echo "not yet: the rule on main does not require a status check. Nothing stops a pull request"
         echo "whose pipeline is red from being merged — the build is advisory until the"
         echo "branch says otherwise."
         exit 1
@@ -214,6 +233,11 @@ tasks:
       # reports are the ones on its commits, and they are not the job names.
       curl -fsS $auth "${api}/repos/${repo}/commits/${base_sha}/statuses" 2>/dev/null \
         | tr '}' '\n' | sed -n 's/.*"context":"\([^"]*\)".*/\1/p' | sort -u > "$work/real" || true
+      # A pull request head reports the (pull_request) twin of each (push)
+      # context, so requiring that one is equally valid.
+      if grep -qs 'pull_request' .forgejo/workflows/*.yml .forgejo/workflows/*.yaml; then
+        sed -n 's/ (push)$/ (pull_request)/p' "$work/real" >> "$work/real" || true
+      fi
       real=$(cat "$work/real")
       if [ -z "$real" ]; then
         echo "not yet: the tip of main carries no check results, so there is no evidence"
@@ -250,7 +274,7 @@ tasks:
         echo "not yet: none of the required contexts match a check this repository"
         echo "actually reports. Required:"
         printf '  %s\n' "$patterns"
-        echo "Reported on the tip of main:"
+        echo "Reported by this pipeline:"
         printf '  %s\n' "$real"
         echo "A required context is matched by name, and the name is not the job's —"
         echo "it is the workflow, the job and the event together. A context nothing"

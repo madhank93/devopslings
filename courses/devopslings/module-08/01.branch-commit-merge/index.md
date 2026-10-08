@@ -173,13 +173,13 @@ tasks:
         echo "         git rev-list --parents -n 1 HEAD"
         exit 1
       fi
-      if ! printf '%s' "$a_ff" | grep -qE 'linear|straight|line|no merge|without a merge|nothing|one parent|pointer|moves|no record|no trace'; then
+      if ! printf '%s' "$a_ff" | grep -qE 'linear|straight|\bline\b|no merge|without a merge|\bnothing\b|one parent|pointer|\bmoves?\b|no record|no trace'; then
         echo "not yet: fast_forward says '${a_ff:-nothing}'. Describe the history a"
         echo "         fast-forward leaves behind — its shape, and what is missing"
         echo "         from it."
         exit 1
       fi
-      if ! printf '%s' "$a_rec" | grep -qE 'branch|second parent|two parent|when|integrat|land|merge point|group|together|who|boundary'; then
+      if ! printf '%s' "$a_rec" | grep -qE 'branch|second parent|two parent|\bwhen\b|integrat|\bland|merge point|\bgroup|together|\bwho\b|boundary'; then
         echo "not yet: records says '${a_rec:-nothing}'. Name what the merge commit"
         echo "         holds that a straight line cannot: where the commits came from,"
         echo "         and when they landed."

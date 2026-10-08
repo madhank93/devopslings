@@ -2,23 +2,17 @@
 # Reference solution — used by the contract test, not by students.
 set -euo pipefail
 
-# Case 1 requires L7 termination because the application team doesn't hold
-# the private key, making L7 the mandatory requirement despite other factors
-# that might prefer L7.
-# Case 2 requires L4 because the binary protocol is unknown to the L7 balancer
-# and cannot be parsed meaningfully.
-# Case 3 requires L4 because the application must log the true client address,
-# and L7 termination would replace that address with the balancer's IP. The
-# usual answer here is an X-Forwarded-For header, and the auditors rejected it:
-# it asks the application to trust a header instead of the connection.
-# Case 4 requires L4 because the routing key for read-only routing is not
-# available at connection time, even though the protocol is well known.
-# Cases 2 and 4 share the 'protocol' token for opposite reasons — in case 2 the
-# balancer cannot parse the protocol at all, and in case 4 it parses it fine but
-# the thing it would route on has not been sent yet.
+# Case 1: the /api/ split is written in each HTTP request's path, so only a
+# balancer that parses HTTP can make it. Key custody alone would not force L7:
+# an L4 TLS listener terminates TLS without reading the HTTP inside.
+# Case 2: an in-house binary protocol; there is nothing for an L7 balancer to parse.
+# Case 3: the application must see the caller's address on the connection
+# itself, which a terminating balancer replaces with its own.
+# Case 4: the backend must hold the only key and verify the caller's
+# certificate, so the TLS session may not end at the balancer at all.
 cat > /root/answers/verdict.md <<'ANS'
-case-1: layer=l7 because=termination
+case-1: layer=l7 because=routing
 case-2: layer=l4 because=protocol
 case-3: layer=l4 because=sourceaddress
-case-4: layer=l4 because=protocol
+case-4: layer=l4 because=termination
 ANS

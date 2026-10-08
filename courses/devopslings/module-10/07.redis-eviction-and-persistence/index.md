@@ -126,9 +126,12 @@ tasks:
       }
       probes | docker compose exec -T redis redis-cli --pipe >/dev/null
 
-      # Long enough that a once-a-second AOF flush is not a coin toss.
+      # Long enough that a once-a-second AOF flush is not a coin toss. SIGKILL,
+      # as the OOM killer delivers it: a clean shutdown would write a snapshot
+      # and let save points pass for a durability they do not have.
       sleep 2
-      docker compose restart redis >/dev/null
+      docker compose kill -s SIGKILL redis >/dev/null
+      docker compose start redis >/dev/null
 
       ready=no
       for _ in $(seq 1 60); do
@@ -139,7 +142,7 @@ tasks:
         sleep 1
       done
       [ "$ready" = yes ] || { echo "redis did not come back after the restart"; exit 1; }
-      echo "25 jobs queued, redis restarted"
+      echo "25 jobs queued, redis killed and started"
 
   verify_done:
     needs: [init_scenario]
@@ -198,16 +201,17 @@ tasks:
       # --- did anything survive the restart at all ----------------------------
       alive=$(probes_alive)
       if [ "${alive:-0}" != "25" ]; then
-        echo "not yet: the grader queued 25 jobs, restarted Redis, and ${alive:-0} of the 25"
-        echo "came back. Nothing was evicted for them to be lost to — the ceiling was never"
-        echo "the problem here, the process was."
+        echo "not yet: the grader queued 25 jobs, killed Redis the way the OOM killer did,"
+        echo "started it, and ${alive:-0} of the 25 came back. Nothing was evicted for them"
+        echo "to be lost to — the ceiling was never the problem here, the process was."
         echo
         echo "The server that came back has appendonly=$(cfg appendonly) and save='$(cfg save)'."
         echo "That is what it read from /data/redis.conf at startup, which is not necessarily"
         echo "what you set on the running server: a CONFIG SET lives exactly as long as the"
         echo "process does, and there is a command that writes the running config back to the"
         echo "file. A cache can afford to come back cold. The queue is the only copy of the"
-        echo "work it is holding."
+        echo "work it is holding. And a snapshot schedule only saves every so often: a"
+        echo "killed process never writes the last one."
         exit 1
       fi
 

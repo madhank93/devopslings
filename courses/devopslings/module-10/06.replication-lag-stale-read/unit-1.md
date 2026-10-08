@@ -26,7 +26,7 @@ they stopped agreeing at all.
 
 ## What you're being graded on
 
-The grader checks the replica is replaying again, then puts a known delay
+The grader checks the replica is catching up again, then puts a known delay
 between primary and replica — first four seconds, then twelve — and runs
 `/work/app/checkout.sh` against each. Both runs must find the order, both must
 read it from the replica, and the second must take longer than the first: a

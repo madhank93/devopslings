@@ -3,9 +3,8 @@ kind: lesson
 title: "the batch job that got nine times slower on a box with memory to spare"
 description: |
   ledger-rollup used to finish in minutes. It now grinds all night on a machine
-  with gigabytes free, and top shows it using barely 200 MB. The memory it is
-  short of is not the machine's, and the pages it keeps waiting for are ones it
-  already had.
+  with gigabytes free and an idle CPU graph, and top shows it using barely
+  200 MB.
 name: swap-and-swappiness
 slug: swap-and-swappiness
 createdAt: "2026-08-10"
@@ -86,8 +85,8 @@ tasks:
       idle CPU graph. Nothing about the ledger changed.
 
         /root/answers/evidence      the counter in the unit cgroup's memory.stat
-                                    that proves the job is paging, rather than
-                                    merely being large. One of:
+                                    that separates what is wrong with this job
+                                    from a job that is merely large. One of:
 
                                       anon      anonymous memory in use
                                       file      page cache
@@ -97,16 +96,16 @@ tasks:
       Then make the job fast again, under the same input. The check watches the
       pass counter and requires the rate to recover.
 
-      Two things it will not accept:
+      Three things it will not accept:
 
         - a smaller ledger. LEDGER_MB stays at 300; the job's work is the job.
         - a swappiness change. vm.swappiness is machine-wide here — this box
           shares it, and /proc/swaps, with the host it runs on. Writing it would
           retune every other container on the machine to fix one job.
+        - no memory limit. The box is shared; the job keeps a MemoryMax.
       Q
 
-      icg="/sys/fs/cgroup$(systemctl show -p ControlGroup --value ledger-rollup.service 2>/dev/null)"
-      echo "scenario ready — ledger-rollup has completed $(cat /srv/ledger/.passes 2>/dev/null || echo 0) passes, swapping $(( $(awk '/^pswpin /{print $2}' "$icg/memory.stat" 2>/dev/null || echo 0) * 4 / 1024 ))M back in so far"
+      echo "scenario ready — ledger-rollup has completed $(cat /srv/ledger/.passes 2>/dev/null || echo 0) passes in its first 20 seconds"
 
   verify_done:
     needs: [init_scenario]
@@ -189,6 +188,14 @@ tasks:
         echo "         That knob is machine-wide — this box shares it with its host and"
         echo "         with every other container on it. Put it back and give the job"
         echo "         the memory it actually touches."
+        exit 1
+      fi
+
+      # Unlimited passes the rate check and lets one job take a shared box.
+      if [ "$(systemctl show -p MemoryMax --value ledger-rollup.service)" = "infinity" ]; then
+        echo "not yet: ledger-rollup.service has no MemoryMax any more."
+        echo "         The box is shared; without a limit this job can take all of it."
+        echo "         Keep a limit, and make it one the job's working set fits inside."
         exit 1
       fi
 

@@ -4,8 +4,7 @@ title: "docker stop takes exactly ten seconds, every time"
 description: |
   The app has a clean shutdown handler and it never runs. Every deploy waits
   ten seconds per container and then kills them. Learn what PID 1 is inside a
-  container, why the exact number ten is a clue, and what shell-form CMD really
-  does.
+  container, and why the exact number ten is a clue.
 name: pid1-signals
 slug: pid1-signals
 createdAt: "2026-07-31"

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Reference solution — used by the contract test, not by students.
 #
-# Two halves that people routinely conflate: the setting bounds what journald
-# writes from now on, and the vacuum removes what is already on disk. Doing
-# only the first leaves the disk exactly as full as it was.
+# The cap takes effect when journald restarts, which also vacuums archived files
+# down to it; the explicit vacuum trims further while keeping recent history.
 set -euo pipefail
 
 # 1. The cap, as a drop-in rather than an edit to the shipped journald.conf —
@@ -12,8 +11,7 @@ install -d /etc/systemd/journald.conf.d
 cat > /etc/systemd/journald.conf.d/size.conf <<'CONF'
 [Journal]
 SystemMaxUse=32M
-# Keep the cap from being spent entirely on one enormous file, so a vacuum has
-# something smaller than "everything" to rotate away.
+# Vacuuming removes whole archived files, so this is how much history goes at once.
 SystemMaxFileSize=8M
 CONF
 

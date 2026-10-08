@@ -1,6 +1,6 @@
 ---
 kind: lesson
-title: "p99 spikes every few seconds and the CPU graph says 40%"
+title: "p99 spikes every few seconds and the CPU graph says 20%"
 description: |
   pricing-api is slow in bursts. The box has idle cores, the process is not
   waiting on anything, and nothing in the application changed. There is a
@@ -79,6 +79,8 @@ tasks:
           blocked       it is waiting on I/O or a lock
           slowcode      the work itself became more expensive
 
+        /root/answers/evidence   the name of the kernel counter that proves it.
+
       Then make its p99 request time under 40ms, sustained.
 
       pricing-api must keep a CPU limit — removing the bound entirely is not the
@@ -118,6 +120,14 @@ tasks:
             echo "not yet: '$got' is not one of throttled, starved, blocked, slowcode"
             ;;
         esac
+        exit 1
+      fi
+
+      # The cause is reachable by elimination; the evidence is not.
+      if ! grep -Eqi '\b(nr_throttled|throttled_usec|throttled_time)\b' /root/answers/evidence 2>/dev/null; then
+        echo "not yet: /root/answers/evidence does not name the counter that shows it"
+        echo "         the cause is right. Which number, and in which file, would prove it"
+        echo "         to someone looking at a dashboard that says the CPU is idle?"
         exit 1
       fi
 

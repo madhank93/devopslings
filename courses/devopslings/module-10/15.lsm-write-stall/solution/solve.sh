@@ -32,7 +32,7 @@ what-the-write-waited-on: compaction falling behind — level-0 files were arriv
 # The counter that proves it, by the name the store gives it — from the
 # statistics block, or from the reason the store's LOG records for each
 # pause.
-the-counter: rocksdb.stall.micros in the statistics block, and every LOG pause reads "Stalling writes because we have N level-0 files"
+the-counter: rocksdb.stall.micros in the statistics block, and the LOG records each pause as "Stopping writes because we have N level-0 files" (or "Stalling" for a slowdown)
 
 # The device is idle between the pauses and the filesystem is 30% full.
 # One line: why does moving this to a faster disk not fix it?

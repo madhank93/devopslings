@@ -5,7 +5,7 @@ description: |
   Four routes through nginx, four 404s from the upstream, and the upstream is
   healthy — it answers every one of those routes when you ask it directly. The
   difference between the request that leaves the client and the request the
-  upstream reads is one character of configuration, in two different places.
+  upstream reads is the whole exercise.
 name: trailing-slash-proxy-pass
 slug: trailing-slash-proxy-pass
 createdAt: "2026-08-22"

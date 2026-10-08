@@ -30,8 +30,8 @@ behind them. Within seconds `checkout` has no free workers, and now `/health`
 does not answer either — a service that had nothing to do with pricing is down
 because of pricing.
 
-That is a cascading failure, and it is what the AWS S3 outage in 2017 and a
-long list of others have in common.
+That is a cascading failure, and it is one of the commonest shapes a large
+outage takes.
 
 ## Your objectives
 

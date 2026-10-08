@@ -60,15 +60,16 @@ Constraints:
 
 - **Leave the nftables ruleset alone.** It was never the problem.
 - **Nothing in front of the service.** No socat, no port forwarding, no
-  redirect. The listening socket itself has to move.
-- **Binding to every interface is not the fix**, and the check rejects it. This
-  box faces two networks and the service belongs on exactly one.
+  redirect. The service itself has to answer.
+- **Exposing it on every address the box has is not the fix**, and the check
+  rejects it. This box faces two networks and the service belongs on exactly
+  one.
 
 ## What you're being graded on
 
-A listener on `172.31.0.10:8080` that belongs to the orders service itself, the
-page served from it, nothing listening on `0.0.0.0` or on `203.0.113.1`, and the
-outside network still refused.
+The orders service itself — not a relay in front of it — serving the page on
+`172.31.0.10:8080`, not exposed on every address the box has, and
+`203.0.113.1:8080` still refused from the outside network.
 
 <details>
 <summary>Hint 1 — ask what is listening, and where</summary>
@@ -135,6 +136,14 @@ outward. The next interface added to the machine gets the service too, and no
 one revisits the unit file.
 
 Bind to the address you mean. `0.0.0.0` means "I have not thought about it".
+
+One limit on that table, so it is not over-read: a bind chooses which
+*destination address* answers, not which cable a packet arrived on. Linux will
+deliver a packet for `172.31.0.10` that arrives on the outside interface, if
+something out there routes it here — try it from the `outside` namespace. The
+loopback addresses are the exception, because the kernel refuses them from any
+real interface. Keeping a whole network away from a service is the firewall's
+job; the bind only stops you publishing it there yourself.
 
 ## What actually happened
 

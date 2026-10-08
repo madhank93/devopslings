@@ -129,29 +129,39 @@ tasks:
       rows_before=$(P -c "SELECT count(*) FROM payments")
       cents=$(P -c "SELECT sum(amount_cents) FROM payments")
 
-      # The shop, still open. It reads a row by primary key and gives up after a
-      # second — it names no column that the migration touches, so the only
-      # thing that can refuse it is a lock on the table.
+      # The shop, still open. Each round reads one row by primary key and
+      # writes another, and each gives up after a second. Neither names a column
+      # the migration touches: a table lock refuses the read, and a backfill
+      # that holds its row locks for longer than a batch refuses the write.
       cat > /tmp/grader-reader.sh <<'SH'
       #!/usr/bin/env bash
       export PGPASSWORD=devopslings
-      refused=0; ok=0
+      q() { psql -qtAX -U postgres -d shop -h 127.0.0.1 -c "SET lock_timeout = '1s'" -c "$1"; }
+      refused=0; ok=0; wrefused=0; wok=0
       while [ ! -f /tmp/grader-reader.stop ]; do
-        if psql -qtAX -U postgres -d shop -h 127.0.0.1 \
-             -c "SET lock_timeout = '1s'" \
-             -c "SELECT id, order_ref FROM payments WHERE id = 1234567" \
+        if q "SELECT id, order_ref FROM payments WHERE id = 1234567" \
              >/dev/null 2>>/tmp/grader-reader.err; then
           ok=$(( ok + 1 ))
         else
           refused=$(( refused + 1 ))
         fi
+        id=$(( (RANDOM * 32768 + RANDOM) % 3000000 + 1 ))
+        if q "UPDATE payments SET order_ref = order_ref WHERE id = $id" \
+             >/dev/null 2>>/tmp/grader-writer.err; then
+          wok=$(( wok + 1 ))
+        else
+          wrefused=$(( wrefused + 1 ))
+        fi
         sleep 0.2
       done
-      echo "$ok $refused" > /tmp/grader-reader.out
+      echo "$ok $refused $wok $wrefused" > /tmp/grader-reader.out
       SH
       rm -f /tmp/grader-reader.stop /tmp/grader-reader.out
       : > /tmp/grader-reader.err
-      setsid bash /tmp/grader-reader.sh </dev/null >/dev/null 2>&1 &
+      : > /tmp/grader-writer.err
+      # Wrapped so the orphan always exits 0: it is reparented to the postmaster,
+      # which crash-restarts the server when an unknown child exits non-0/1.
+      setsid bash -c "bash /tmp/grader-reader.sh; exit 0" </dev/null >/dev/null 2>&1 &
       sleep 1
 
       rc=0
@@ -159,7 +169,8 @@ tasks:
 
       touch /tmp/grader-reader.stop
       for _ in $(seq 1 20); do [ -f /tmp/grader-reader.out ] && break; sleep 1; done
-      read -r served refused < /tmp/grader-reader.out 2>/dev/null || { served=0; refused=0; }
+      read -r served refused wserved wrefused < /tmp/grader-reader.out 2>/dev/null ||
+        { served=0; refused=0; wserved=0; wrefused=0; }
 
       if [ "$rc" != "0" ]; then
         echo "not yet: $app exited $rc:"
@@ -221,6 +232,18 @@ tasks:
         echo "statement holding it that long."
         exit 1
       fi
+      if [ "${wrefused:-0}" -gt 0 ]; then
+        echo "not yet: every read was served, and ${wrefused} of the $(( wserved + wrefused )) row"
+        echo "updates that arrived while the migration ran were refused:"
+        echo
+        { grep '^ERROR' /tmp/grader-writer.err 2>/dev/null || true; } | sort -u | head -2 | sed 's/^/    /'
+        echo
+        echo "A write waits when the row it wants is locked by a transaction that has not"
+        echo "committed yet, and an UPDATE holds every row it has changed until it commits."
+        echo "Find the transaction in the migration that held rows for over a second, and"
+        echo "make each commit cover few enough rows that nobody waits that long."
+        exit 1
+      fi
 
       # --- the answers --------------------------------------------------------
       quiet=$(field what-quiet-period-buys | tr 'A-Z' 'a-z')
@@ -253,4 +276,4 @@ tasks:
       esac
 
       echo "PASS — payments.amount is numeric and adds up, amount_cents is gone, and all"
-      echo "${served} reads that arrived during the migration were served."
+      echo "${served} reads and ${wserved} writes that arrived during the migration were served."

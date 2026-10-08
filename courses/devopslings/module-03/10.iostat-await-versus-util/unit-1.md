@@ -1,5 +1,5 @@
 ---
-title: "the busy disk is fine and the quiet one is the outage"
+title: "the storage quote is for the busier disk"
 ---
 
 ## The situation

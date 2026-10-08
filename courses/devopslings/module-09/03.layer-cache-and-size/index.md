@@ -3,9 +3,8 @@ kind: lesson
 title: "Every commit rebuilds the world, and the image is 1 GB"
 description: |
   CI takes six minutes to build an image that changed by one line, and the
-  result is a gigabyte of mostly build toolchain. Fix both with the same two
-  ideas: order layers by how often they change, and don't ship what you only
-  needed to compile.
+  result is a gigabyte. Find out what the build is doing with its cache and
+  what the image is carrying, and fix both.
 name: layer-cache-and-size
 slug: layer-cache-and-size
 createdAt: "2026-07-31"
@@ -103,8 +102,14 @@ tasks:
       out=$(docker build --progress=plain -t "$img" . 2>&1 || true)
       mv .app.py.bak app.py
 
-      if printf '%s' "$out" | grep -q 'Collecting flask'; then
-        echo "not yet: changing one line of app.py re-installed the dependencies — your COPY is invalidating the layer that installs them"
+      # `pip -q` hides "Collecting", so also require every RUN that installs
+      # dependencies to have come from cache.
+      rerun=$(printf '%s\n' "$out" | awk '
+        /^#[0-9]+ \[.*\] RUN .*(pip|requirements)/ { run[$1] = 1 }
+        /^#[0-9]+ CACHED$/ { cached[$1] = 1 }
+        END { for (k in run) if (!(k in cached)) print k }')
+      if printf '%s' "$out" | grep -q 'Collecting flask' || [ -n "$rerun" ]; then
+        echo "not yet: changing one line of app.py re-ran the dependency install — something copied in above that step includes app.py"
         exit 1
       fi
 

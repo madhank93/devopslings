@@ -73,8 +73,11 @@ much more it is willing to accept right now.
 Look at the timestamps.
 
 An answer that arrives in microseconds came from a machine that had already
-decided. An answer that never arrives, while the same packet goes out at 1s, 2s,
-4s, 8s, is TCP's exponential backoff — the sender talking to itself.
+decided. An answer that never arrives, while the same packet goes out again a
+second later, and again, is TCP retransmitting — the sender talking to itself.
+(Current kernels resend the first few SYNs a flat second apart —
+`net.ipv4.tcp_syn_linear_timeouts` — and only then back off exponentially, which
+is why the gaps in this capture do not grow.)
 
 </details>
 
@@ -87,7 +90,7 @@ decided. An answer that never arrives, while the same packet goes out at 1s, 2s,
 09:27:35.237999 IP 10.90.0.1.43828 > 10.90.0.5.9301: Flags [S], seq 2529532845
 ```
 
-The same SYN, same sequence number, at widening intervals, and **not one packet
+The same SYN, same sequence number, a second apart, and **not one packet
 in the other direction**.
 
 That is a **retransmission** — the client doing its job correctly against

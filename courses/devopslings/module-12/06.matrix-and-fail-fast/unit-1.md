@@ -47,9 +47,11 @@ and collapsing three shards into one job gives up what the shards are for.
 ## What you're being graded on
 
 That `gate` is green on the current commit, whose code is fine, despite the
-integration shard's first attempt failing. Then the grader pushes a commit with
-a failing assertion in the contract shard and requires both that shard and
-`gate` to report failure. It force-pushes the repository back afterwards.
+integration shard's first attempt failing. That the gate asks whether the
+shards succeeded rather than whether they failed — a test like `!= 'failure'`
+waves through a shard that was cancelled or skipped. Then the grader pushes a commit with
+an assertion in the integration shard that fails on every attempt, and requires
+both that shard and `gate` to report failure. It force-pushes the repository back afterwards.
 
 <details>
 <summary>Hint 1 — what `needs` actually does</summary>

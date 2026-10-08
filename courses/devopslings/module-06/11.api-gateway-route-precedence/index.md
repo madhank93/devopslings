@@ -5,8 +5,7 @@ description: |
   Reporting moved to its own service last month and the route was added to the
   gateway. Requests for it still land on the v2 API. The route is longer, more
   specific, and the person who added it has already tried moving it to the top
-  of the file — which is the wrong thing to try, because this gateway does not
-  read the file top to bottom.
+  of the file.
 name: api-gateway-route-precedence
 slug: api-gateway-route-precedence
 createdAt: "2026-09-25"
@@ -174,14 +173,19 @@ tasks:
         sed 's/^/    /' /tmp/nginx-t
         exit 1
       fi
-      # Restart rather than reload: a reload leaves the old workers serving until
-      # their connections drain, and a check that measures which route a request
-      # took cannot afford to race that.
-      systemctl restart nginx.service
-      for _ in $(seq 1 20); do
-        curl -s -o /dev/null -m 2 http://127.0.0.1/api/v1/orders && break
-        sleep 0.5
-      done
+      # Graded against the running nginx, as production would be. A worker older
+      # than the config file means the edit was never loaded.
+      worker=$(pgrep -n -f '^nginx: worker process$' || true)
+      if [ -z "$worker" ]; then
+        echo "not yet: nginx is not running. systemctl status nginx says why."
+        exit 1
+      fi
+      started=$(( $(date +%s) - $(ps -o etimes= -p "$worker" | tr -d ' ') ))
+      if [ "$(stat -L -c %Y /etc/nginx/sites-available/gateway)" -gt "$started" ]; then
+        echo "not yet: /etc/nginx/sites-available/gateway changed after nginx last loaded"
+        echo "it, so what is serving is the old config. nginx -t && systemctl reload nginx"
+        exit 1
+      fi
 
       field() {
         grep -E "^$1:" "$ans" 2>/dev/null | head -1 | sed "s/^$1: *//" | tr -d '\r' || true

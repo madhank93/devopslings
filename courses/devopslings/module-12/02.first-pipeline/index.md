@@ -19,6 +19,16 @@ tasks:
     init: true
     timeout_seconds: 600
     run: |
+      # A protection rule left by another lesson (any name, any pattern) would
+      # refuse the seed force-push, so every rule on the repository goes first.
+      for rule in $(curl -fsS -u devops:devopslings \
+                      "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections" 2>/dev/null \
+                    | tr ',' '\n' | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p' \
+                    | sed 's/%/%25/g; s/ /%20/g; s/\*/%2A/g; s/?/%3F/g; s/\[/%5B/g; s/]/%5D/g; s|/|%2F|g' || true); do
+        curl -fsS -u devops:devopslings -X DELETE \
+          "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections/${rule}" >/dev/null 2>&1 || true
+      done
+
       work=$(mktemp -d)
 
       # The forge is reachable from the host on :3000, and bootstrap.sh already

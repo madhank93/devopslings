@@ -5,8 +5,7 @@ description: |
   The deploy step cannot publish to the artifact gateway: certificate verify
   failed. The leaf certificate is valid for another two years, the CA is in the
   system store, and `curl -k` sails straight through. Two separate faults are
-  hiding behind one error message — one on the server, which is not sending the
-  whole chain, and one in the client, which is not sending the name.
+  hiding behind one error message.
 name: tls-chain-and-sni
 slug: tls-chain-and-sni
 createdAt: "2026-08-19"

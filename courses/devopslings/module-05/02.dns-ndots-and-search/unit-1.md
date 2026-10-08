@@ -39,7 +39,8 @@ Constraints, all of which exist for a reason:
 
 `api.internal` resolving to `10.70.0.6` through the normal path, the page coming
 back, the `search` line and the wildcard both still in place — and the resolver
-no longer being asked for suffixed names it should never have been asked for.
+being asked only the question the application meant to ask, with nothing wasted
+on the way.
 
 That last one is the real bar. There is more than one way to get the right
 address here, and only one of them stops the wasted queries.

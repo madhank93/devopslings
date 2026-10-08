@@ -72,8 +72,9 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 
 - **write-a-unit** *(intro · shipped)* — a working script and no unit. Write one.
   *Check:* the service starts on boot, restarts on failure, comes up after its
-  dependency rather than alongside it, and logs to the journal — `Type=`,
-  `Restart=`, and `After=` versus `Requires=` all exercised.
+  dependency rather than alongside it, and logs to the journal — `Restart=` and
+  `After=` exercised; ordering graded from the journal on a slow cold start, and a
+  fast one rejects a fixed `ExecStartPre` delay.
   *Source:* own; the counterpart to systemd-unit-failure, from the other side.
 
 - **users-groups-sudoers** *(intro · shipped)* — the user is in the group and still cannot
@@ -118,13 +119,14 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 - **signals-and-detach** *(core · shipped)* — the long job dies every time the SSH session drops.
   *First guess:* `&` on the end of the command, which changes nothing.
   *Check:* the job survives a hangup delivered to the session, and the answer
-  distinguishes the process group from the session leader.
+  names the signal a vanishing terminal delivers.
   *Source:* own.
 
 - **journal-eats-the-disk** *(core · shipped)* — a healthy box runs out of space in three weeks.
   *First guess:* `rm` the journal files, which the running journald keeps open.
-  *Check:* journal size bounded under a sustained write, with the history the
-  retention policy promises still queryable.
+  *Check:* the cap in force in the running journald (disk at the cap, and still at
+  it after a burst of writes), with a checkpoint logged just before hand-over
+  still queryable — so `--vacuum-size=1K` or `rm` fails.
   *Source:* own; callback to disk-full-triage.
 
 - **blocked-on-a-pipe** *(deep · shipped)* — a job hangs forever at 0% CPU with no error.
@@ -136,8 +138,8 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 
 - **oom-killed** *(core · shipped)* — a worker vanishes nightly with no log line of its own.
   *First guess:* the app crashed; add a `try/except`.
-  *Check:* the kernel's OOM record is quoted correctly and the process survives
-  the same workload after the limit or the allocation is fixed.
+  *Check:* the killer is named, the limit in effect when it fired is recorded,
+  and the full report builds under a memory and swap limit that still exist.
   *Source:* SadServers-style (OOM triage is a staple).
 
 - **too-many-open-files** *(deep · shipped)* — `EMFILE` under load, fine when idle.
@@ -146,9 +148,11 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   fd count stays flat across a second load run.
   *Source:* own.
 
-- **inodes-not-bytes** *(core · shipped)* — writes fail with `ENOSPC`, `df -h` says 40% free.
+- **inodes-not-bytes** *(core · shipped)* — writes fail with `ENOSPC`, `df -h` says 87% free.
   *First guess:* look for a big file; there isn't one.
-  *Check:* `df -i` usage back under threshold with the payload directory intact.
+  *Check:* `df -i` usage back under threshold on the filesystem's original inode
+  count (no remount to a bigger table), with the payload directory intact and the
+  reaper pruning by age.
   *Source:* SadServers-style.
 
 - **zombies-and-the-reaping-parent** *(core · shipped)* — the process table fills with
@@ -167,7 +171,8 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 - **clock-skew** *(core · shipped)* — TLS handshakes fail for one service only.
   *First guess:* the certificate is bad; regenerate it. The certificate is
   correct, the chain verifies, the SAN matches, and `curl` from the shell works.
-  *Check:* the cause is named, verification is still enabled, and the time the
+  *Check:* the cause is named, the unit refuses a self-signed and a wrong-name
+  impostor on the same address, and the time the
   *service itself* reports is within two minutes of the box — so a handshake
   made to succeed some other way fails.
   *Source:* own. The skew is injected with `libfaketime` via `LD_PRELOAD` on the
@@ -214,7 +219,8 @@ once, and then runs at 03:00 against input you did not imagine.
   produced nothing.
   *First guess:* the last command worked, so the script worked.
   *Check:* the pipeline's real failure is surfaced and the script exits non-zero;
-  a seeded mid-pipe failure must not pass.
+  a seeded upstream-stage failure must not pass, and must leave no output file
+  behind.
   *Source:* own; `$?` is the last stage only.
 
 - **set-e-does-not-do-that** *(core · shipped)* — `set -e` is at the top and the failure
@@ -229,7 +235,8 @@ once, and then runs at 03:00 against input you did not imagine.
   and corrupts the box on the second run.
   *First guess:* add a "has this run before" flag file.
   *Check:* running it three times leaves the same end state as running it once,
-  including after an interrupted middle run.
+  including after an interrupted middle run. A re-run must not wipe the queue
+  directory.
   *Source:* own; the property module 15 makes Ansible's whole argument.
 
 - **trap-and-cleanup** *(core · shipped)* — every interrupted run leaves a 2 GB temp
@@ -245,11 +252,12 @@ once, and then runs at 03:00 against input you did not imagine.
   the fixture, including the three records with embedded spaces and quotes.
   *Source:* own; the `jq`-not-`awk` boundary.
 
-- **python-for-the-api** *(deep · shipped)* — a report script that quietly misses 40% of records.
+- **python-for-the-api** *(deep · shipped)* — a report script that quietly writes 50 of 437 records.
   *First guess:* one request, read the list, done — page one of nine.
   *Check:* all records retrieved across pagination, rate-limit headers respected
   rather than slept through, and a transient 503 retried with backoff — the
-  fixture API returns all three conditions.
+  fixture API returns all three conditions; a retry sent within 0.2 s of a 503
+  is counted by the server and fails.
   *Source:* own; where bash should have stopped.
 
 - **when-bash-stops** *(architect · shipped)* — four real scripts, one decision each.
@@ -286,8 +294,8 @@ different things each.
 
 - **mount-and-fstab** *(intro · shipped)* — a typo in `/etc/fstab` and a box that stops
   half way through boot.
-  *Check:* the filesystem mounts at boot with the right options, and the answer
-  names the field that was wrong and what `nofail` would have changed.
+  *Check:* the filesystem mounts at boot with the right options, `findmnt
+  --verify` shows no warnings, `nofail` is set and `passno` is not 1.
   *Source:* own.
 
 - **lvm-extend-under-pressure** *(core · shipped)* — 96% full, a spare disk, and a live service.
@@ -312,7 +320,7 @@ different things each.
   evidence that separates a large job from a paging one, and the pass rate
   recovers under the same input without the job being OOM-killed. Turning swap
   off fails — the job is killed instead — and so does shrinking the work or
-  touching `vm.swappiness`.
+  touching `vm.swappiness`, or removing `MemoryMax`.
   *Source:* own. **Rescoped to a cgroup.** Swap is machine-wide: a container
   shares `/proc/swaps` and `vm.swappiness` with its host, so `swapon` or a
   swappiness change inside the box would alter the whole Docker VM. The lesson
@@ -332,6 +340,7 @@ different things each.
   *First guess:* put `sysctl -w` in `rc.local`.
   *Check:* the setting holds across a restart of the sandbox, is applied by the
   documented mechanism, and the answer names which drop-in was overriding it.
+  The vendor drop-in must be left unedited.
   *Source:* own. Uses a `net.*` sysctl deliberately: network sysctls are
   per-network-namespace and therefore genuinely the container's own, while
   `vm.*` and `kernel.*` are shared with the host and must not be written from a
@@ -479,16 +488,15 @@ table, the connection tracker, the accept queue, and the packets themselves.
 
 - **netns-veth-bridge** *(core · shipped)* — build a container's network by hand.
   *First guess:* it needs Docker.
-  *Check:* two namespaces reach each other and the outside world through a bridge
-  the student created, and the answer maps each piece to what Docker does.
+  *Check:* two namespaces reach each other and the outside world through a bridge the student created, with the box forwarding and
+  masquerading for the namespaces' subnet.
   *Source:* own; the exercise that makes module 09 stop being magic.
 
 - **nat-and-hairpin** *(core · shipped)* — the published address is reachable from
   everywhere except the subnet the service itself lives on.
   *First guess:* bind to a different address.
-  *Check:* the published address connects from inside and outside with the DNAT
-  rule still in place, and the answer names why the reply was never
-  un-translated.
+  *Check:* the published address connects from inside and outside with the DNAT rule still in place, the service still in its namespace, and
+  br_netfilter still off.
   *Source:* own. The scenario turns off `net.bridge.bridge-nf-call-iptables`,
   which the Docker daemon enables host-wide: with it on, bridged replies are
   dragged through the IP hooks and conntrack un-translates them by accident, so
@@ -497,25 +505,23 @@ table, the connection tracker, the accept queue, and the packets themselves.
 - **ipv6-preferred-and-broken** *(core · shipped)* — every connection stalls for exactly
   five seconds and then works.
   *First guess:* the DNS server is slow.
-  *Check:* connections complete without the stall, with the answer identifying
-  the AAAA record that resolved against a route that did not exist — and the fix
-  is not "disable IPv6 everywhere".
+  *Check:* connections complete without the stall, with IPv6 still enabled and the AAAA record still present and answering —
+  the fix is not "disable IPv6 everywhere".
   *Source:* own.
 
 - **tcp-keepalive-versus-idle-timeout** *(core · shipped)* — a pooled connection is dead and
   both ends believe it is fine, until the next request fails.
   *First guess:* retry the request.
-  *Check:* the dead connection is detected within the stated budget, with the
-  answer distinguishing the kernel keepalive from the middlebox idle timeout that
-  actually dropped it.
+  *Check:* a 25-second idle pooled connection survives a middlebox that forgets
+  flows after 15, with keepalive enabled by the application, the keepalive timer
+  shortened in the client's own namespace, and the middlebox untouched.
   *Source:* own.
 
-- **conntrack-under-load** *(deep · shipped)* — new connections are refused while the box
-  is nearly idle.
+- **conntrack-under-load** *(deep · shipped)* — new connections are dropped while the box is nearly idle.
   *First guess:* the service is out of workers.
-  *Check:* `nf_conntrack_count` against `nf_conntrack_max` is quoted as the
-  evidence, and the same load completes after the table or the timeouts are
-  sized — raising the service's worker count does not pass.
+  *Check:* a 2000-packet burst costs under 200 conntrack entries, the collector
+  still receives it, and unrelated traffic in and out of the box is still tracked
+  — a blanket notrack does not pass.
   *Source:* own. **Rescoped to timeouts and contents.** `nf_conntrack_max` is
   exposed read-only outside the initial network namespace — a container cannot
   lower it, and cannot lower it inside a namespace it creates either, so the
@@ -528,7 +534,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 - **accept-queue-overflow** *(deep · shipped)* — clients see connection timeouts and the
   server logs nothing at all.
   *First guess:* the network is dropping packets.
-  *Check:* the overflow counter and `ss -lnt` Recv-Q are quoted, and the drops go
+  *Check:* 100 concurrent clients connect and the overflow counter stays still, and the drops go
   to zero after both the application backlog and `somaxconn` are corrected —
   fixing only one of the two still fails.
   *Source:* own.
@@ -537,13 +543,15 @@ table, the connection tracker, the accept queue, and the packets themselves.
   failures.
   *First guess:* they all "timed out".
   *Check:* the answer classifies each as retransmission, reset, or zero-window,
-  quotes the packet that proves it, and names which end was at fault.
+  quotes the packet that proves it, and names which end has to change.
   *Source:* own.
 
 - **l4-versus-l7** *(architect · shipped)* — four requirements, one load balancer choice each.
   *Check:* the answer picks a layer per scenario and cites the deciding
-  constraint — TLS termination, header routing, source-address preservation, or
-  throughput — including the case where L7 cannot help at all. Rubric-graded.
+  constraint — per-request routing, an unparseable protocol, source-address
+  preservation, or a TLS session that must not end at the balancer — including
+  two HTTPS cases that land on opposite layers, because terminating TLS alone
+  does not make a balancer L7. Rubric-graded.
   *Source:* own.
 
 - **packet-path-drill** *(deep · drill)* — the storefront's order lookups miss
@@ -756,8 +764,9 @@ table, the connection tracker, the accept queue, and the packets themselves.
   makes rather than the first.
   *Check:* index.html and its neighbour both serve, the body matches the file at
   the deployed path, and `/root/answers/perms.md` names the component and the
-  bit. Four sidesteps are rejected: `chmod 777`, workers running as root, a
-  moved docroot, and loosening the files themselves.
+  bit. Five sidesteps are rejected: `chmod 777`, workers running as root,
+  www-data added to the root group, a moved docroot, and loosening the files
+  themselves.
   *Source:* own.
 
 - **trailing-slash-proxy-pass** *(core · shipped)* — four routes through the
@@ -813,10 +822,10 @@ table, the connection tracker, the accept queue, and the packets themselves.
   *First guess:* purge the whole cache every deploy, which hides the
   invalidation bug and stampedes the origin every release.
   *Check:* two deploys, so warming then busting is what is measured rather than
-  an empty cache; alice and bob must get their own pages; and twenty identical
-  requests must reach the origin at most three times, which rejects
-  `proxy_cache off`, `proxy_no_cache`, a unique value in the key and a zero
-  validity. Fixing the config is not enough on its own — entries stored while
+  an empty cache; alice and bob must get their own pages; and twenty identical requests spread over about fifteen seconds must reach
+  the origin at most three times, which rejects `proxy_cache off`,
+  `proxy_no_cache`, a unique value in the key and a validity of a second or two
+  (with the origin's `Cache-Control` ignored so it takes effect). Fixing the config is not enough on its own — entries stored while
   `Vary` was ignored are still wrong and have to be removed.
   *Source:* own.
 
@@ -841,8 +850,10 @@ table, the connection tracker, the accept queue, and the packets themselves.
   *First guess:* raise the limit. It is counting the proxy as one client.
   *Check:* a flood is still refused, a quiet client is clean at the same moment,
   and — the half that separates the two working fixes — a client sending a
-  different `X-Forwarded-For` per request is still limited, which
-  `set_real_ip_from 0.0.0.0/0` is not. Traffic must still reach the origin.
+  different `X-Forwarded-For` per request is still limited, which `set_real_ip_from 0.0.0.0/0` with `real_ip_recursive on`
+  is not; and the same forged burst sent straight to the limiter, bypassing the
+  edge, is still limited, which trusting every sender is not. Traffic must still
+  reach the origin.
   *Source:* own.
 
 - **websocket-upgrade** *(core · shipped)* — two faults under one ticket. The
@@ -855,8 +866,8 @@ table, the connection tracker, the accept queue, and the packets themselves.
   same round number of seconds always looks like.
   *Check:* a real websocket client in the image (`wsprobe`) opens a socket
   through the proxy, echoes, sits silent for 90 seconds and echoes again; and
-  with the application stalled an ordinary request must still return inside ten
-  seconds, which rejects the server-level timeout raise.
+  with the application stalled, ordinary requests (`/health` and `/users`)
+  must still return inside ten seconds, which rejects the server-level timeout raise.
   *Source:* own.
 
 - **caddy-automatic-https** *(deep · shipped)* — certificates that renew themselves.
@@ -909,11 +920,11 @@ AppArmor, not SELinux: every sandbox is Debian, and SELinux does not enforce
 meaningfully inside a container. The mechanism transfers; the tool differs, and
 each lesson says so.
 
-- **predict-who-can-read** *(intro · shipped)* — one file, three users, and a prediction made
-  before anything is run.
-  *Check:* the answer predicts access correctly for all three from the mode,
-  owner and group alone, then confirms it — including the user who is denied by
-  a directory's execute bit rather than by the file's own mode.
+- **predict-who-can-read** *(intro · shipped)* — seven paths, two users, and a
+  prediction made before anything is run.
+  *Check:* the answer predicts access correctly for all seven cases from the mode,
+  owner and group alone — including a path denied by a directory's execute bit
+  rather than the file's own mode — and names the class that decided the owner case.
   *Source:* own; the rung below permissions-triage in module 01.
 
 - **nopasswd-shell-escape** *(core · shipped)* — a NOPASSWD entry that looks narrow.
@@ -924,37 +935,46 @@ each lesson says so.
 
 - **setuid-hunt** *(core · shipped)* — the estate has one setuid binary that should not exist.
   *First guess:* strip setuid from everything found.
-  *Check:* the planted binary is neutralised while `ping`, `sudo` and `su` still
-  work, and the answer justifies each one kept.
+  *Check:* both planted binaries are neutralised while every package-owned setuid
+  binary (sudo, su, passwd, …) keeps its bit, and the answer counts the unowned
+  ones and names the provenance query.
   *Source:* own.
 
 - **ssh-hardening** *(core · shipped)* — an inherited box with password auth and root login.
   *First guess:* change the config, restart, and hope.
-  *Check:* key-only auth from a second host, root login refused, `authorized_keys`
-  permissions correct, and the pre-existing session still alive at the end.
+  *Check:* the running daemon offers no password auth and refuses a root key
+  login, the user still gets in with her key (so `authorized_keys` permissions are
+  right), and the live config passes `sshd -t`.
   *Source:* roadmap.sh; pairs with 05's ssh-without-locking-yourself-out.
 
 - **systemd-drop-privileges** *(core · shipped)* — the unit runs as root because it once
   needed port 80.
   *First guess:* leave it; it works.
-  *Check:* the service runs as a non-root user with `NoNewPrivileges=`,
-  `ProtectSystem=` and `PrivateTmp=`, still serves on the privileged port, and a
-  seeded write outside its allowed paths is denied.
+  *Check:* the service runs as a non-root user with `NoNewPrivileges=`, holds
+  `CAP_NET_BIND_SERVICE` in its ambient set with the bounding set capped to it,
+  and still serves on the privileged port.
   *Source:* own.
 
-- **fail2ban-bans-the-lb** *(core · shipped)* — the ban rule eventually bans the
-  load balancer.
-  *First guess:* raise the threshold.
-  *Check:* the attacker is banned, the health-checking peer never is, and the
-  answer names why counting by source address failed behind a proxy.
+- **fail2ban-bans-the-lb** *(core · shipped)* — an HTTP login jail behind a load
+  balancer counts every failure against the LB's address, so it is about to ban
+  the front door.
+  *First guess:* add the LB to `ignoreip` (or raise the threshold) — the jail then
+  bans nobody, because the attacker arrives from the LB too.
+  *Check:* a real fail2ban-server runs the student's jail against fresh random
+  traffic: the brute-forcer behind the LB (with forged X-Forwarded-For prefixes)
+  and a direct client spoofing X-Forwarded-For are banned; the LB, its health
+  checks, the framed user and users with a couple of typos never are; the answer
+  names the LB address and X-Forwarded-For as where the real client lives.
   *Source:* own.
 
 - **patch-without-reboot** *(core · shipped)* — 40 pending updates and a service
   that cannot take unplanned downtime.
   *First guess:* apply everything and reboot on Friday.
-  *Check:* security updates applied unattended, the set genuinely requiring a
-  reboot is identified from the running-kernel and library evidence, and the
-  service is restarted for the ones that only need that.
+  *Check:* unattended-upgrades is configured (as parsed by `apt-config`) to run
+  daily from security origins only with automatic reboot off, the one update
+  genuinely requiring a reboot (the kernel) is named from the running-kernel
+  evidence, and the services still mapping the replaced library are restarted
+  instead.
   *Source:* own.
 
 - **apparmor-denial** *(deep)* — the service works in complain mode and fails in enforce.
@@ -972,8 +992,9 @@ each lesson says so.
 
 - **file-integrity-baseline** *(deep · shipped)* — a baseline that cries wolf every deploy.
   *First guess:* baseline everything under `/`.
-  *Check:* a legitimate deploy produces no alert, the planted binary
-  modification does, and the answer justifies what was excluded and why.
+  *Check:* a rehearsed deploy produces no alert, a rehearsed modification of a
+  watched binary does, the pre-release baseline is intact, and the answer names
+  the tampered file and what was excluded.
   *Source:* own.
 
 - **attack-surface-audit** *(core · shipped)* — an internal metrics API,
@@ -981,7 +1002,7 @@ each lesson says so.
   every interface.
   *First guess:* firewall the port and move on.
   *Check:* the metrics API answers on loopback and nowhere else, the public
-  portal is still public, and every listening port is classified in a written
+  portal is still public, and both listening ports are classified in a written
   audit — so the fix is a decision about each one, not a blanket deny.
   *Source:* own.
 
@@ -1018,20 +1039,25 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
   states what the merge commit records that a fast-forward does not.
   *Source:* roadmap.sh.
 
-- **bisect-a-regression** *(core · shipped)* — 200 commits, one broke checkout totals.
-  *First guess:* read the diff of the suspicious-looking commit.
-  *Check:* the correct commit hash, found with an automated `git bisect run`.
+- **bisect-a-regression** *(core · shipped)* — 200 commits, one broke checkout
+  totals; two stretches of history don't run at all.
+  *First guess:* read the diff of the suspicious-looking commit — or a `bisect run`
+  test that counts "doesn't run" as bad and blames an unrelated commit.
+  *Check:* the correct commit hash, and the student's own test script, replayed by
+  the grader under `git bisect run`, lands on it (untestable commits must exit 125).
   *Source:* roadmap.sh.
 
 - **rebase-or-merge** *(core · shipped)* — a conflict resolved two ways, one of which loses a fix.
   *First guess:* accept theirs and move on.
-  *Check:* the resulting tree contains both changes and the test suite passes.
+  *Check:* both commits are reachable from main, both tests survive, and the
+  grader's own calls show the cap and the bonus applied in the right order.
   *Source:* own.
 
 - **secret-in-history** *(deep · shipped)* — a token committed three weeks ago.
   *First guess:* `git rm` the file and push.
-  *Check:* the value is absent from every reachable object *and* the answer file
-  records the rotation — history rewriting alone fails the check.
+  *Check:* the value is absent from every reachable object, the leaked token is
+  revoked at a local issuer (`./gateway`) while the deploy's `.env` token still
+  authenticates and is committed nowhere — purge-only and issue-without-revoke both fail.
   *Source:* own; pairs with module 12's leaked-secret.
 
 - **reflog-recovery** *(core · shipped)* — `reset --hard` on the wrong branch.
@@ -1111,7 +1137,8 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
 
 - **dockerignore-and-context** *(core · shipped)* — 106 MB of context uploaded
   before the first instruction runs, and copied into the image after it.
-  *First guess:* narrow the COPY lines; faster network.
+  *First guess:* narrow the COPY lines (BuildKit then sends less, until the next
+  wide COPY or another builder); faster network.
   *Check:* context under 1 MB measured independently of any COPY, and the image
   still runs with both files it reads.
   *Source:* own.
@@ -1214,7 +1241,7 @@ engine (`db_bench`) for the write-stall exercise.
 - **lock-contention** *(core · shipped)* — a migration has been "running" for 40
   minutes and the whole queue is behind it.
   *First guess:* cancel and retry the migration.
-  *Check:* the column lands, nothing is left idle in transaction, and the answer
+  *Check:* the column lands, nothing is left holding the table, and the answer
   names the blocker's state, the `AccessExclusiveLock` the migration waited for,
   and why readers queue behind an ungranted request rather than beside the held
   one. Then the grader holds a read lock of its own and requires the migration
@@ -1282,9 +1309,11 @@ engine (`db_bench`) for the write-stall exercise.
   takes the whole table. (`ADD COLUMN NOT NULL DEFAULT` with a constant has been
   free since Postgres 11 — the lesson teaches that too.)
   *First guess:* run it during a quiet period.
-  *Check:* the column exists and is populated with the application serving
-  throughout, via expand → backfill in bounded batches → contract; a single
-  statement that holds an exclusive lock past the budget fails.
+  *Check:* the column exists and is populated with the application serving reads
+  and row writes throughout (each with a 1s `lock_timeout`), via expand →
+  backfill in bounded batches → contract; a single statement that holds an
+  exclusive lock past the budget, or a one-statement backfill whose row locks
+  block writers past it, fails.
   *Source:* own.
 
 - **hot-shard** *(deep · shipped)* — four shards, and one of them serves most
@@ -1421,14 +1450,16 @@ engine (`db_bench`) for the write-stall exercise.
   before it.
   *First guess:* clear the cache manually forever; or delete the cache step.
   *Check:* the cache is still there, main is green on the dependency its lockfile
-  names, and a grader-pushed commit that changes only the lockfile now goes red.
+  names, a grader-pushed commit touching no dependency restores the cache without
+  reinstalling, and one that changes only the lockfile goes red.
   *Source:* own.
 
 - **matrix-and-fail-fast** *(core · shipped)* — three shards, one red, and the
   summary job the branch requires has never been anything but green.
   *First guess:* read the summary line; or delete `if: always()`.
-  *Check:* `gate` is green on a healthy commit despite a flaky shard, and red on
-  a grader-pushed commit that genuinely breaks one.
+  *Check:* `gate` is green on a healthy commit despite a flaky shard, tests for
+  success rather than `!= 'failure'`, and is red on a grader-pushed commit that
+  genuinely breaks one.
   *Source:* own.
 
 - **promote-do-not-rebuild** *(core · shipped)* — staging and production run
@@ -1442,8 +1473,7 @@ engine (`db_bench`) for the write-stall exercise.
 - **branch-protection-bypass** *(core · shipped)* — a change reached main
   without review, and the rule requiring review was in place the whole time.
   *First guess:* add a rule; the push allowlist beside it is still open.
-  *Check:* a grader-pushed commit to main is rejected by the forge, a review is
-  still required, and a status check is required naming a context the pipeline
+  *Check:* a grader-pushed commit to main is rejected by the forge, main's rule still requires a review and a status check naming a context the pipeline
   actually reports.
   *Source:* own.
 
@@ -1934,7 +1964,8 @@ failures transfer to any provider.
 
 - **no-timeout-hangs** *(core · shipped)* — a slow dependency fills the worker pool.
   *First guess:* restart checkout.
-  *Check:* bounded wait; the page that does not need pricing keeps serving.
+  *Check:* with 8s injected between checkout and pricing, p95 stays under the 3s
+  budget and at least 95% of checkouts still answer 200 with a price.
   *Source:* own.
 
 - **retry-storm** *(core)* — the retry that turns a blip into an outage.

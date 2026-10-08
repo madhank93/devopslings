@@ -35,7 +35,7 @@ Read the limit **before** you change anything.
 
 Then make `report-builder` complete and write `/srv/reports/daily.csv`
 containing all 20,000 orders. `report-builder.service` must still have a memory
-limit — not `infinity`.
+limit — not `infinity`, and not an unbounded swap allowance either.
 
 ## What you're being graded on
 
@@ -86,15 +86,15 @@ $ dmesg | tail -20
 An OOM kill leaves an unmistakable block: the process name, its RSS, and the
 memory cgroup it belonged to.
 
-The cgroup keeps a counter too, which is the cleanest evidence of all:
+systemd keeps its own verdict too, which is the cleanest evidence of all:
 
 ```
-$ systemctl show -p MemoryMax --value report-builder.service
-$ cat /sys/fs/cgroup/system.slice/report-builder.service/memory.events
+$ systemctl show -p Result --value report-builder.service
+oom-kill
 ```
 
-`oom_kill 1` means exactly one process in this unit's cgroup was killed for
-memory. This is `find-the-evidence` from earlier in the module, applied: the
+That is systemd reading the unit's cgroup counters when it died: the kernel
+killed a process in it for exceeding the memory limit. This is `find-the-evidence` from earlier in the module, applied: the
 application's own log was never going to have it.
 
 </details>
@@ -111,7 +111,7 @@ $ systemctl show -p MemoryMax --value report-builder.service
 the second question is gone.
 
 The tempting fix is to delete `MemoryMax=` or set it to `infinity`. Consider
-what that actually does: the job still allocates hundreds of megabytes for work
+what that actually does: the job still allocates around a hundred megabytes for work
 that needs almost none, and instead of one unit dying, the kernel now picks a
 victim from the whole box at 02:00. You have not fixed the failure, you have
 widened its blast radius and made it someone else's service that dies.
@@ -119,7 +119,7 @@ widened its blast radius and made it someone else's service that dies.
 Look at what the program holds on to:
 
 ```python
-rows.append({... "pad": "x" * 4096})   # every row, retained
+rows.append({... "pad": oid * 410})   # every row, retained
 lines.append(...)                       # every row again, formatted
 out.write("\n".join(lines))             # and a third copy, joined
 ```
@@ -139,13 +139,15 @@ $ systemctl show -p MemoryMax --value report-builder.service > /root/answers/lim
 
 ```
 $ journalctl -k | grep -i -A2 'killed process'
-Memory cgroup out of memory: Killed process 812 (report-builder)
-  total-vm:284916kB, anon-rss:47232kB, file-rss:3200kB
+Memory cgroup out of memory: Killed process 812 (python3) total-vm:60544kB,
+  anon-rss:49152kB, file-rss:5544kB, shmem-rss:0kB, UID:0 pgtables:152kB oom_score_adj:0
 
-$ cat /sys/fs/cgroup/system.slice/report-builder.service/memory.events
-oom 2
-oom_kill 1
+$ systemctl show -p Result --value report-builder.service
+oom-kill
 ```
+
+The kernel names it `python3`, not `report-builder`: the script runs through
+`/usr/bin/env python3`, so the process's name is the interpreter's.
 
 And the fix — stream it:
 

@@ -26,14 +26,14 @@ blocked, and `/work/app/reporting-export.sh`, the nightly finance export.
 ## Your objectives
 
 - Get the migration through, so `orders` has its `currency` column
-- Leave no session sitting in an open transaction behind
+- Leave nothing behind that would hold up the next migration the same way
 - Make `/work/app/migrate.sh` give up quickly rather than queue indefinitely
   the next time something holds a lock — while it still runs its `ALTER`
 
 ## What you're being graded on
 
-The grader checks the column exists and that nothing is left idle in
-transaction. Then it opens a read transaction of its own against `orders`, runs
+The grader checks the column exists and that whatever held the migration up
+is no longer holding anything. Then it opens a read transaction of its own against `orders`, runs
 `/work/app/migrate.sh`, and requires it to fail within thirty seconds instead
 of waiting. You also fill in `/work/answers/lock-contention.md`.
 
@@ -148,8 +148,8 @@ timeout`, and the table is never held hostage by it.
 
 **`idle in transaction` is the state to alert on.** It is not running a query,
 so it appears in no slow-query log and in no APM trace; it holds every lock the
-transaction took and it pins the snapshot horizon, which is separately how
-tables bloat while autovacuum has nothing to clean. One alert —
+transaction took, and if it also holds a snapshot or has written, it pins the
+vacuum horizon too — which is separately how tables bloat. One alert —
 `state = 'idle in transaction' AND now() - xact_start > 1 minute` — catches
 this class of incident before anyone files a ticket, and
 `idle_in_transaction_session_timeout` enforces it without a human.

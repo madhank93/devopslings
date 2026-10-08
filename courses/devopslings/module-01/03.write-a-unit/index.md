@@ -21,7 +21,8 @@ tasks:
     run: |
       install -d /srv/stock /var/lib/devopslings
 
-      # The dependency: a warm-up that takes about four seconds and then stays
+      # The dependency: a warm-up that takes about four seconds (the check varies
+      # it, so a fixed delay cannot stand in for ordering) and then stays
       # "active (exited)". Type=oneshot with RemainAfterExit is what makes
       # After= mean something here — a Type=simple unit counts as started the
       # instant it forks, so ordering against one would not make anybody wait.
@@ -29,7 +30,7 @@ tasks:
       #!/bin/bash
       set -euo pipefail
       rm -f /run/stock-cache.ready
-      sleep 4
+      sleep "$(cat /var/lib/devopslings/stock-cache.warm-seconds 2>/dev/null || echo 4)"
       : > /run/stock-cache.ready
       echo "stock-cache: warm"
       SH
@@ -145,44 +146,75 @@ tasks:
         exit 1
       fi
 
-      # 4. Ordering, tested from cold. Without After=, the feed starts while the
-      #    cache is still warming, logs 'refusing to start' and exits 69 —
-      #    Restart= would eventually paper over it, so the check looks for the
-      #    failed attempt rather than the eventual success.
-      systemctl stop stock-feed.service  >/dev/null 2>&1 || true
-      systemctl stop stock-cache.service >/dev/null 2>&1 || true
-      rm -f /run/stock-cache.ready /srv/stock/last-tick
-      systemctl reset-failed stock-feed.service stock-cache.service >/dev/null 2>&1 || true
+      # 4. Ordering, tested from cold, twice. A slow warm-up catches a feed that
+      #    starts before the cache (Restart= would eventually paper over that, so
+      #    the check looks for the failed attempt). A fast one catches a fixed
+      #    delay long enough to cover the slow case: After= starts the feed the
+      #    moment the cache is up, a sleep keeps waiting.
+      cold_start() {
+        echo "$1" > /var/lib/devopslings/stock-cache.warm-seconds
+        systemctl stop stock-feed.service  >/dev/null 2>&1 || true
+        systemctl stop stock-cache.service >/dev/null 2>&1 || true
+        rm -f /run/stock-cache.ready /srv/stock/last-tick
+        systemctl reset-failed stock-feed.service stock-cache.service >/dev/null 2>&1 || true
+        sleep 1
+        since=$(date '+%Y-%m-%d %H:%M:%S')
+        sleep 1
+        systemctl start --no-block stock-cache.service >/dev/null 2>&1 || true
+        systemctl start --no-block stock-feed.service  >/dev/null 2>&1 || true
+        ok=""
+        for _ in $(seq 1 120); do
+          sleep 0.5
+          if systemctl is-active --quiet stock-feed.service && [ -s /srv/stock/last-tick ]; then
+            ok=yes; break
+          fi
+        done
+      }
 
-      sleep 1
-      since=$(date '+%Y-%m-%d %H:%M:%S')
-      sleep 1
+      cold_start 8
+      rm -f /var/lib/devopslings/stock-cache.warm-seconds
+      raced=$(journalctl -u stock-feed.service --no-pager -o cat --since "$since" 2>/dev/null \
+        | grep -c 'refusing to start' || true)
+      if [ "${raced:-0}" -gt 0 ]; then
+        echo "not yet: started from cold, stock-feed tried to start $raced time(s)"
+        echo "         before stock-cache was ready:"
+        echo "           stock-feed: stock-cache is not ready — refusing to start"
+        echo "         Restart= is hiding the race rather than removing it. Order the"
+        echo "         unit after stock-cache.service so the first attempt is the one"
+        echo "         that works."
+        exit 1
+      fi
 
-      systemctl start --no-block stock-cache.service >/dev/null 2>&1 || true
-      systemctl start --no-block stock-feed.service  >/dev/null 2>&1 || true
-
-      ok=""
-      for _ in $(seq 1 80); do
-        sleep 0.5
-        if systemctl is-active --quiet stock-feed.service && [ -s /srv/stock/last-tick ]; then
-          ok=yes; break
-        fi
-      done
       if [ -z "$ok" ]; then
         echo "not yet: started from cold, stock-feed never came up"
         journalctl -u stock-feed.service --no-pager -o cat --since "$since" 2>&1 | tail -5 | sed 's/^/         /'
         exit 1
       fi
 
-      raced=$(journalctl -u stock-feed.service --no-pager -o cat --since "$since" 2>/dev/null \
-        | grep -c 'refusing to start' || true)
-      if [ "${raced:-0}" -gt 0 ]; then
-        echo "not yet: stock-feed is up, but it got there by failing first —"
-        echo "         it tried to start $raced time(s) before stock-cache was ready:"
-        echo "           stock-feed: stock-cache is not ready — refusing to start"
-        echo "         Restart= is hiding the race rather than removing it. Order the"
-        echo "         unit after stock-cache.service so the first attempt is the one"
-        echo "         that works."
+      # The race check reads the journal, so output routed away from it would
+      # hide the race as well as the service's own log.
+      if ! journalctl -u stock-feed.service --no-pager -o cat --since "$since" 2>/dev/null \
+          | grep -q 'stock-feed: started'; then
+        echo "not yet: stock-feed is running, but its 'started' line never reached the"
+        echo "         journal — 'journalctl -u stock-feed' has to show what the feed says."
+        exit 1
+      fi
+
+      cold_start 1
+      rm -f /var/lib/devopslings/stock-cache.warm-seconds
+      if [ -z "$ok" ]; then
+        echo "not yet: with a one-second warm-up, stock-feed never came up"
+        journalctl -u stock-feed.service --no-pager -o cat --since "$since" 2>&1 | tail -5 | sed 's/^/         /'
+        exit 1
+      fi
+      ready=$(systemctl show -p ActiveEnterTimestampMonotonic --value stock-cache.service)
+      began=$(systemctl show -p ExecMainStartTimestampMonotonic --value stock-feed.service)
+      gap_ms=$(( (began - ready) / 1000 ))
+      if [ "$gap_ms" -gt 2000 ]; then
+        echo "not yet: stock-cache finished warming in 1s this time, and stock-feed still"
+        echo "         waited another $((gap_ms / 1000))s before starting. A fixed delay only"
+        echo "         guesses how long the cache takes; the day it takes longer, the race"
+        echo "         is back. Order the unit after stock-cache.service instead."
         exit 1
       fi
 

@@ -11,7 +11,7 @@ install -d /root/answers
 # memory in any sense that matters.
 echo file > /root/answers/reclaimable
 
-# The real leak is `anon`, and it is small: one 256 KiB buffer retained per
+# The real leak is `anon`, and it is small: one 1 MiB buffer retained per
 # cycle, growing in proportion to work done, and never reclaimable because
 # there is nothing on disk to reconstruct it from.
 #
@@ -25,12 +25,12 @@ cycles = 0
 
 while True:
     with open("/srv/catalog/catalog.dat", "rb") as f:
-        while f.read(4 * 1024 * 1024):
+        while f.read(1024 * 1024):
             pass
 
     # The buffer was never used after the cycle that made it. Nothing retains it
     # now, so the allocator reuses the same memory every time round.
-    scratch = bytearray(256 * 1024)
+    scratch = bytearray(b"\x01") * (1024 * 1024)
     del scratch
 
     cycles += 1

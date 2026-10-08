@@ -27,6 +27,62 @@ the exercise is to be right before you touch anything — because in the case
 that matters, the file you are guessing about is one you are not supposed to
 open just to find out.
 
+## Your objectives
+
+- Predict, for each of the seven cases in `/root/questions.txt`, whether that
+  user can read that path, from the permissions alone and without running the
+  reads
+- Name which permission class decided case3
+
+## What you're being graded on
+
+The grader asks the kernel each case, as that user, and compares.
+`/root/answers/access.md`, exactly eight lines:
+
+```
+case1: <yes|no>
+...
+case7: <yes|no>
+decided_by: <owner|group|other>
+```
+
+All seven predictions have to match what the kernel does, and `decided_by` has to
+name the class the kernel actually used for case3.
+
+<details>
+<summary>Hint 1 — write the class down before the answer</summary>
+
+For each case, work out which of the three classes applies *before* deciding
+yes or no: is this user the owner, a group member, or neither? Then read only
+those three bits.
+
+Most wrong answers come from reading all nine bits and looking for one that
+permits the access.
+
+</details>
+
+<details>
+<summary>Hint 2 — walk the whole path</summary>
+
+For the two cases under a subdirectory, check `x` on every component:
+
+```
+$ ls -ld / /srv /srv/app /srv/app/secrets
+```
+
+A file is reachable only if every directory above it is traversable by that
+user.
+
+</details>
+
+<details>
+<summary>Hint 3 — the symlink case is the target's question</summary>
+
+`latest-token` and `secrets/token` are the same question asked twice. The link's
+own `lrwxrwxrwx` is not consulted.
+
+</details>
+
 ## The kernel checks one class, not the best one
 
 This is the rule that makes two of the seven come out backwards.
@@ -60,7 +116,8 @@ The same rule, one step further:
 -------r--  1 dana deploy  data/report.csv
 ```
 
-Every other account on the box could read this. Its owner cannot.
+The mode grants read to "other" and to no one else — and its owner, of all
+accounts, is refused.
 
 The habit worth taking from this: when you own a file and cannot read it, stop
 looking at the group. Owning a file is not a privilege level, it is a branch in
@@ -120,40 +177,6 @@ nothing about whether a service account can read its own config. If you check a
 permission question by running the command yourself with sudo, you have
 answered a different question.
 
-<details>
-<summary>Hint 1 — write the class down before the answer</summary>
-
-For each case, work out which of the three classes applies *before* deciding
-yes or no: is this user the owner, a group member, or neither? Then read only
-those three bits.
-
-Most wrong answers come from reading all nine bits and looking for one that
-permits the access.
-
-</details>
-
-<details>
-<summary>Hint 2 — walk the whole path</summary>
-
-For the two cases under a subdirectory, check `x` on every component:
-
-```
-$ ls -ld / /srv /srv/app /srv/app/secrets
-```
-
-A file is reachable only if every directory above it is traversable by that
-user.
-
-</details>
-
-<details>
-<summary>Hint 3 — the symlink case is the target's question</summary>
-
-`latest-token` and `secrets/token` are the same question asked twice. The link's
-own `lrwxrwxrwx` is not consulted.
-
-</details>
-
 ## Checking yourself afterwards
 
 Once the predictions are written down, the way to confirm one is to ask as the
@@ -183,8 +206,8 @@ case3: no     dana owns notes.txt; owner bits are ---, and they are the only
 case4: yes    0644, every directory above it traversable
 case5: no     secrets/ is 0700 root:root, so the walk stops before the file
 case6: no     same file as case5, reached through a symlink
-case7: no     dana owns report.csv; owner bits are ---, though every other
-              account could read it
+case7: no     dana owns report.csv; owner bits are ---, though the other
+              bits are r--
 
 decided_by: owner
 ```

@@ -8,9 +8,9 @@ title: "two thousand processes you cannot kill, because they are already dead"
 
 ```
 $ ps -eo pid,ppid,stat,cmd | grep defunct | head -3
-   1841    1802 Z    [job-runner] <defunct>
-   1843    1802 Z    [job-runner] <defunct>
-   1845    1802 Z    [job-runner] <defunct>
+   1841    1802 Z    [python3] <defunct>
+   1843    1802 Z    [python3] <defunct>
+   1845    1802 Z    [python3] <defunct>
 
 $ ps -eo stat= | grep -c '^Z'
 1974
@@ -175,8 +175,9 @@ Three things, and the first is the one that saves the most time.
 
 2. **Zombies are an accounting leak, not a resource leak.** Each one costs a
    table slot and essentially no memory. That is why this is quiet for a long
-   time, and then abrupt: nothing degrades gradually, and then the box hits
-   `kernel.pid_max` and *no process anywhere can fork*. The failure lands
+   time, and then abrupt: nothing degrades gradually, and then `fork()` starts
+   failing — at the unit's `TasksMax=` under systemd, or box-wide at
+   `kernel.pid_max` when nothing caps the unit, where the failure lands
    nowhere near the service that caused it.
 
 3. **The fix is always in the parent.** You cannot fix a zombie; there is

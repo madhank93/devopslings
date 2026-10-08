@@ -27,11 +27,12 @@ right directory with the right syntax — and the value is still the default.
 | `/root/answers/override` | the full path of the file overriding it |
 
 Then make 120 the value actually in effect, and make it stay that way when the
-sysctl configuration is applied again.
+sysctl configuration is applied again. Leave the vendor file as it is — it is
+rewritten by the baseline tooling that installed it.
 
 ## What you're being graded on
 
-The overriding file named correctly, the running value at 120, the value still
+The overriding file named correctly and left unedited, the running value at 120, the value still
 at 120 after the configuration is re-applied the way a boot does, and a file on
 disk that sets it — a live `sysctl -w` does not count.
 

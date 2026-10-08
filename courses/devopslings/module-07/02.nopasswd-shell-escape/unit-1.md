@@ -13,18 +13,62 @@ User deploybot may run the following commands on box:
     (root) NOPASSWD: /usr/bin/systemctl restart app.service
 ```
 
-The second line is exactly what it looks like: restart one named service,
-nothing else. The first line looks like the smaller privilege of the two — it
-is only `awk`, a text tool, presumably for log reports.
+The drop-in was written so deploybot could do two jobs: restart `app.service`
+after a deploy, and run reports over `/var/log/app.log`. Both lines look narrow.
+The security review marked the file critical anyway, and wants it fixed today
+without taking either job away from deploybot.
 
-It is the whole machine:
+## Your objectives
+
+- Close the route from deploybot to root
+- Keep both of deploybot's jobs: restarting `app.service` with sudo and no
+  password, and reading `/var/log/app.log`
+
+## What you're being graded on
+
+The grader asks deploybot's sudo directly:
+
+- it cannot become root, and can run nothing as root beyond the pinned
+  `systemctl restart app.service`
+- that restart still works without a password
+- deploybot can still read `/var/log/app.log`
+
+`/root/answers/sudo.md`, exactly two lines:
 
 ```
-$ sudo -u deploybot sudo -n /usr/bin/awk 'BEGIN{system("id")}'
-uid=0(root) gid=0(root) groups=0(root)
+dangerous_binary: <name>
+mechanism: <one or two words for why that binary can never be a safe NOPASSWD grant>
 ```
 
-No password, no exploit, no second step. One command, and deploybot is root.
+<details>
+<summary>Hint 1 — which of the two binaries runs a program you choose</summary>
+
+`systemctl restart app.service` does one fixed thing. The other command is a
+language interpreter. Ask which one can be told to run `id`, or `bash`.
+
+</details>
+
+<details>
+<summary>Hint 2 — do not try to constrain it</summary>
+
+Pinning awk's arguments moves the hole, it does not close it. The line has to
+go. The question that unlocks the fix is: what did deploybot actually need awk
+*for*, and does that need root?
+
+</details>
+
+<details>
+<summary>Hint 3 — the log</summary>
+
+deploybot ran awk over `/var/log/app.log`. Reading a file is a file-permission
+question, not a sudo question. Make the log readable by a group deploybot is in,
+and the awk grant has no remaining purpose.
+
+```
+$ sudo -u deploybot test -r /var/log/app.log && echo readable
+```
+
+</details>
 
 ## Why awk is a root shell
 
@@ -103,36 +147,6 @@ grant. Anything that runs a program, opens a shell, writes an arbitrary file, or
 loads code is a full-privilege grant no matter how the line is dressed. And when
 a grant is too broad, look for the smaller privilege underneath it — often, as
 here, the task did not need root in the first place.
-
-<details>
-<summary>Hint 1 — which of the two binaries runs a program you choose</summary>
-
-`systemctl restart app.service` does one fixed thing. The other command is a
-language interpreter. Ask which one can be told to run `id`, or `bash`.
-
-</details>
-
-<details>
-<summary>Hint 2 — do not try to constrain it</summary>
-
-Pinning awk's arguments moves the hole, it does not close it. The line has to
-go. The question that unlocks the fix is: what did deploybot actually need awk
-*for*, and does that need root?
-
-</details>
-
-<details>
-<summary>Hint 3 — the log</summary>
-
-deploybot ran awk over `/var/log/app.log`. Reading a file is a file-permission
-question, not a sudo question. Make the log readable by a group deploybot is in,
-and the awk grant has no remaining purpose.
-
-```
-$ sudo -u deploybot test -r /var/log/app.log && echo readable
-```
-
-</details>
 
 ## Checking yourself
 

@@ -68,8 +68,7 @@ tasks:
       cat > /work/answers/replication-lag.md <<'MD'
       # The order page that cannot find the order
 
-      # What the replica is doing with the WAL it is receiving. One word, the
-      # one pg_is_wal_replay_paused() is asking about.
+      # What the replica is doing with the WAL it is receiving. One word.
       replica-replay: ?
 
       # The function on the replica that says how far replay has actually got,

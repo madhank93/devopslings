@@ -19,6 +19,16 @@ tasks:
     init: true
     timeout_seconds: 900
     run: |
+      # A protection rule left by another lesson (any name, any pattern) would
+      # refuse the seed force-push, so every rule on the repository goes first.
+      for rule in $(curl -fsS -u devops:devopslings \
+                      "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections" 2>/dev/null \
+                    | tr ',' '\n' | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p' \
+                    | sed 's/%/%25/g; s/ /%20/g; s/\*/%2A/g; s/?/%3F/g; s/\[/%5B/g; s/]/%5D/g; s|/|%2F|g' || true); do
+        curl -fsS -u devops:devopslings -X DELETE \
+          "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections/${rule}" >/dev/null 2>&1 || true
+      done
+
       reg="http://127.0.0.1:5000"
       accept='application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
 
@@ -271,6 +281,19 @@ tasks:
         echo "stamps it from the BUILT_AT build argument so an incident can be traced"
         echo "back to a build; removing the stamp makes the digests agree by erasing"
         echo "the evidence rather than by promoting one artefact."
+        exit 1
+      fi
+
+      # Two builds of one commit can still agree when every input, or the host
+      # daemon's layer cache, lines up — e.g. a per-commit stamp. That is luck,
+      # not promotion, so the build count is graded directly.
+      builds=$(cat .forgejo/workflows/*.yml .forgejo/workflows/*.yaml \
+                 .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null \
+                 | grep -v '^[[:space:]]*#' | grep -cE 'docker (buildx )?build' || true)
+      if [ "${builds:-0}" -gt 1 ]; then
+        echo "not yet: staging and production agree on this commit, but the workflow still"
+        echo "runs 'docker build' ${builds} times. Production is a second build that happened"
+        echo "to come out identical; the next change to any build input splits them again."
         exit 1
       fi
 

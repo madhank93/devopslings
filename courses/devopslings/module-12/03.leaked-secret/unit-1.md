@@ -117,7 +117,7 @@ Order matters, because the middle step is the one with an outage in it:
 3. **Revoke the old one.** Until you do, the leak is live; everything before
    this step is housekeeping.
 4. **Scrub and audit.** Rewrite the history if the repo is public
-   (`git-filter-repo` — module 04), and read the provider's access logs to find
+   (`git-filter-repo` — module 08), and read the provider's access logs to find
    out whether anyone used it while it was exposed.
 
 Step 3 is the fix. Steps 1 and 2 exist so that step 3 doesn't take production

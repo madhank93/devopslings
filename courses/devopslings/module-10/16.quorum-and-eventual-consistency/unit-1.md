@@ -15,7 +15,8 @@ to and how many a read asks.
 ```
 
 Support says profile edits sometimes do not stick: the save says it worked and
-the page comes back with the old value. On the second refresh it is correct.
+the page comes back with the old value. Refresh a few times and sometimes it
+is right.
 
 The ticket says a node needs restarting. Every node is up and answering.
 
@@ -77,7 +78,7 @@ The client already does the second half: it compares versions across the nodes
 that answered and returns the newest. It is the two numbers at the top that are
 wrong.
 
-Three combinations satisfy the inequality at N=3. Only one of them survives the
+Six combinations satisfy the inequality at N=3. Only one of them survives the
 next hint.
 
 </details>
@@ -127,8 +128,9 @@ among them at all.
 
 **Tunable consistency is a per-operation choice, not a cluster setting.** The
 same store can serve a profile edit at W=2, R=2 and a view counter at W=1, R=1,
-and both are correct for what they are. Cassandra, Riak, DynamoDB and Mongo all
-expose this; the mistake is not picking a weak level, it is picking one without
+and both are correct for what they are. Cassandra and Riak expose it as a
+per-request consistency level, and DynamoDB and MongoDB offer coarser versions
+of the same choice; the mistake is not picking a weak level, it is picking one without
 knowing which reads depend on which writes.
 
 **W=N looks like the safe choice and is the one that breaks first.** It is the

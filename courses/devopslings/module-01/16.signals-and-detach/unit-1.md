@@ -102,9 +102,9 @@ Also worth knowing: `disown -h` marks an already-running job so bash will not
 forward `SIGHUP` to it, which is what you reach for when the job is already
 running and you forgot.
 
-Redirect all three streams. A detached process whose stdout still points at a
-vanished terminal will die on `SIGPIPE`, or block, the first time it writes —
-which looks exactly like the problem you just fixed.
+Redirect all three streams. Once the terminal is gone, a write to it fails
+with `EIO` and a read returns end-of-file. A script under `set -e` stops at
+the first write, which looks exactly like the problem you just fixed.
 
 </details>
 

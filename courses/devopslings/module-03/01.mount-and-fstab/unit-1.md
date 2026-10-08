@@ -15,12 +15,12 @@ $ tail -1 /etc/fstab
 They tested it like this:
 
 ```
-$ mount /srv/archive
+$ mount /dev/loop0 /srv/archive
+$ ls /srv/archive
+.volume-id  lost+found
 ```
 
-…which worked, because `mount` given a mount point looks up the entry, takes the
-device, and figures out the filesystem type itself. It never had to agree with
-the fields that are wrong.
+…and it worked. Then they unmounted it, happy.
 
 The next thing to read that line will be `systemd` at boot, and it reads all six
 fields.
@@ -63,21 +63,31 @@ Validate the file rather than reading it:
 $ findmnt --verify
 ```
 
-It parses every line the way the boot does and names each problem. Run it before
-you reboot anything, always.
+It parses every line and compares it with what is on disk — a wrong type shows
+up as `[W]`. Note the exit status is 0 even with warnings, so read the output.
+It does not know which options a filesystem accepts, and it does not question
+the pass number, so it is necessary and not sufficient. The test that exercises
+every field is the one the boot performs:
+
+```
+$ umount /srv/archive; mount -a
+```
 
 </details>
 
 <details>
-<summary>Hint 2 — why `mount /srv/archive` proved nothing</summary>
+<summary>Hint 2 — why the manual mount proved nothing</summary>
 
-Three of the six fields are wrong and the manual test passed anyway:
+Three of the six fields are wrong and the manual test passed anyway, because
+`mount <device> <dir>` with both arguments never opens `/etc/fstab`. It probes
+the type from the superblock and uses default options. `mount /srv/archive` or
+`mount -a` would have read the line — and failed:
 
-- **`ext3`** — `mount` probes the superblock and uses the real type. At boot,
-  systemd generates a `.mount` unit from this line and the type matters.
-- **`defaluts`** — an unparsable option. This is the one that hurts: a bad
-  options field makes the mount fail, and a mount that fails at boot without
-  `nofail` drops the machine into emergency mode.
+- **`ext3`** — the volume is ext4, and the kernel refuses to mount it as ext3
+  (`couldn't mount as ext3 due to feature incompatibilities` in `dmesg`).
+- **`defaluts`** — not an option ext4 knows: `Unknown parameter 'defaluts'`.
+  This is the one that hurts: a mount that fails at boot without `nofail`
+  drops the machine into emergency mode.
 - **`1`** — reserved for the root filesystem. Two filesystems claiming pass 1 is
   a real fsck ordering bug.
 
@@ -136,10 +146,10 @@ often remotely, on a machine you now cannot reach.
 
 Three things worth keeping:
 
-1. **Validate the file, do not test the operation.** `mount /srv/archive`
-   exercises a forgiving path. `findmnt --verify` reads it the way the boot
-   does. One command, and it is the difference between finding this now and
-   finding it during a maintenance window.
+1. **Test the path the boot takes, not a convenient one.** `mount <device>
+   <dir>` skips fstab entirely. `findmnt --verify` and then `mount -a` read it
+   the way the boot does, and that is the difference between finding this now
+   and finding it during a maintenance window.
 
 2. **`nofail` on everything that is not root.** The default is "this filesystem
    is essential, stop the machine without it", which is correct for `/` and

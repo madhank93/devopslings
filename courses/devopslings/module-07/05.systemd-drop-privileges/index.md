@@ -83,6 +83,7 @@ tasks:
 
         - it runs as the www-data user, not root
         - it cannot regain privilege: NoNewPrivileges=yes
+        - it can never hold a capability beyond the one that binding port 80 needs
         - it STILL serves on port 80
 
       The last requirement is the interesting one. Port 80 is privileged — a non-root
@@ -90,11 +91,6 @@ tasks:
       service fail to start:
 
         OSError: [Errno 13] Permission denied
-
-      Dropping the user is not enough; you have to grant back the one capability that
-      binding a low port needs, and only that one. The systemd directives that do it
-      are AmbientCapabilities and CapabilityBoundingSet, and the capability is
-      CAP_NET_BIND_SERVICE.
 
       Edit /etc/systemd/system/webportal.service, then:
 
@@ -165,6 +161,16 @@ tasks:
         echo "         its ambient set (CapAmb: $amb). That capability is what lets"
         echo "         a non-root process bind port 80; grant it with"
         echo "         AmbientCapabilities=CAP_NET_BIND_SERVICE."
+        exit 1
+      fi
+
+      # Nothing beyond that one capability may ever be reachable: the bounding
+      # set is the ceiling, and by default it holds every capability.
+      bnd=$(awk '/^CapBnd:/{print $2}' "/proc/$pid/status" 2>/dev/null)
+      if [ $(( 0x${bnd:-0} & ~0x400 )) -ne 0 ]; then
+        echo "not yet: the service's bounding set is CapBnd: $bnd — capabilities"
+        echo "         beyond CAP_NET_BIND_SERVICE (0x400) are still within reach of"
+        echo "         the process. Cap it: CapabilityBoundingSet=CAP_NET_BIND_SERVICE."
         exit 1
       fi
 

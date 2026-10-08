@@ -37,6 +37,65 @@ CONFLICT (content): Merge conflict in pricing.sh
 CONFLICT (content): Merge conflict in tests.sh
 ```
 
+## Your objectives
+
+- Get `tiered-pricing` onto `main` so that `main`'s tip has both behaviours. The
+  branch has not been shared, so merge or rebase is your call
+- Keep the commit `feat: gold-tier bonus of ten points over 10000` reachable from
+  `main`: integrate it, do not retype the change
+
+## What you're being graded on
+
+- `main` is checked out and both sides' commits are in its history
+- `tests.sh` at the tip has both sides' tests
+- `pricing.sh` gives the right total for an ordinary cart, a stacked-coupon cart,
+  a gold-tier cart, and a gold-tier cart with stacked coupons
+
+A passing `sh tests.sh` is not the same thing: a resolution that drops one side
+can drop that side's test with it.
+
+`resolution.md`, exactly three lines:
+
+```
+integrated_with: <merge or rebase>
+ours_during_conflict: <which branch's version git called "ours">
+why: <one line: what taking one side whole would have dropped>
+```
+
+<details>
+<summary>Hint 1 — let the conflict happen</summary>
+
+```
+$ git checkout tiered-pricing
+$ git rebase main
+```
+
+Both files conflict. Resist `-X ours` / `-X theirs`: they resolve every
+conflicting hunk the same way, and one of those hunks is in the test suite.
+
+</details>
+<details>
+<summary>Hint 2 — resolve pricing.sh by keeping both blocks</summary>
+
+Neither side's version is right. `discount_amount()` needs the tier bonus and
+the cap, in that order — the cap has to be the last thing that touches `pct`, or
+the bonus can lift the percentage back over it.
+
+</details>
+<details>
+<summary>Hint 3 — tests.sh keeps both lines</summary>
+
+Two independent test lines that landed in the same place. Keep `check clamp` and
+`check gold_tier` both, then finish the rebase and fast-forward main:
+
+```
+$ git add pricing.sh tests.sh
+$ git rebase --continue
+$ git checkout main && git merge --ff-only tiered-pricing
+```
+
+</details>
+
 ## The resolution that hides itself
 
 A conflict is a prompt, and under time pressure the tempting answer is to make
@@ -57,13 +116,14 @@ $ sh tests.sh; echo $?
 Green. Ship it.
 
 Except the cap is gone. `-X theirs` did not merge the two versions of
-`discount_amount()`; it took one version of the file whole and threw the other
-away, and the hotfix was in the part it threw away. A stacked coupon produces a
+`discount_amount()`; it settled every conflicting hunk by taking the branch's
+side and throwing `main`'s away. Both edits sit in the same few lines, so they
+were one hunk — and the hotfix was the side it threw away. A stacked coupon produces a
 negative total again, exactly as it did before the fix.
 
 The test suite did not catch it because the test was in the same conflict as
-the code it tests. `tests.sh` conflicted too, and `-X theirs` resolved that file
-the same way — by keeping one side whole. The line
+the code it tests. `tests.sh` conflicted too, and `-X theirs` resolved that hunk
+the same way — by keeping one side of it. The line
 
 ```sh
 check clamp "$(total 200 150)" 20
@@ -151,40 +211,6 @@ get merged; private branches are yours to rebase.
 What neither choice does is decide the conflict for you. Merge and rebase differ
 in the shape of the history they leave. They do not differ in whether the hotfix
 survives — that is the resolution, and it is yours either way.
-
-<details>
-<summary>Hint 1 — let the conflict happen</summary>
-
-```
-$ git checkout tiered-pricing
-$ git rebase main
-```
-
-Both files conflict. Resist `-X ours` / `-X theirs`: they resolve every
-conflicted file the same way, and one of those files is the test suite.
-
-</details>
-<details>
-<summary>Hint 2 — resolve pricing.sh by keeping both blocks</summary>
-
-Neither side's version is right. `discount_amount()` needs the tier bonus and
-the cap, in that order — the cap has to be the last thing that touches `pct`, or
-the bonus can lift the percentage back over it.
-
-</details>
-<details>
-<summary>Hint 3 — tests.sh keeps both lines</summary>
-
-Two independent test lines that landed in the same place. Keep `check clamp` and
-`check gold_tier` both, then finish the rebase and fast-forward main:
-
-```
-$ git add pricing.sh tests.sh
-$ git rebase --continue
-$ git checkout main && git merge --ff-only tiered-pricing
-```
-
-</details>
 
 ## Checking yourself
 

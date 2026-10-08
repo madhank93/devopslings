@@ -3,7 +3,7 @@ kind: lesson
 title: "the setuid hunt, where the dangerous binary and sudo look identical"
 description: |
   Two setuid-root binaries were planted on the box, each a one-command root
-  shell. Finding them is easy; the trap is the fix. Nine setuid binaries on this
+  shell. Finding them is easy; the trap is the fix. Ten setuid binaries on this
   box are supposed to be there — sudo among them — and the blunt instrument that
   strips the planted ones strips sudo too, leaving you unable to become root at
   all. The signal that separates them is not the mode; it is package ownership.
@@ -50,31 +50,17 @@ tasks:
         $ sudo -u probe /usr/local/bin/maint -p -c id
         uid=1000(probe) ... euid=0(root)
 
-      Find every setuid-root binary that does not belong, and neutralise it. The trap
-      is that this box also has nine setuid binaries that DO belong — sudo, su,
-      passwd, mount, umount, chfn, chsh, gpasswd, newgrp — and stripping any of those
-      breaks the system. In particular, `chmod -R` or a blanket
-      `find / -perm -4000 -exec chmod u-s {} \;` will disable sudo, and then you
-      cannot become root at all.
-
-      The difference is not the mode — a planted setuid binary and sudo look
-      identical. It is provenance: every legitimate setuid binary on a Debian box is
-      owned by an installed package, and the planted ones are not.
-
-        $ find / -xdev -perm -4000 -type f 2>/dev/null
-        $ dpkg -S /usr/bin/sudo          # owned by a package
-        $ dpkg -S /usr/local/bin/maint   # no path found -> does not belong
-
-      Neutralise every unpackaged setuid binary (delete it, or strip its setuid bit),
-      and leave the nine legitimate ones exactly as they are.
+      Find every setuid-root binary that does not belong, and neutralise it (delete
+      it, or strip its setuid bit). This box also has setuid binaries that DO belong
+      — sudo among them — and those must keep working exactly as they are.
 
       Then write /root/answers/setuid.md with exactly two lines:
 
         unpackaged_setuid: <how many you found>
-        found_with: <the command that separates legitimate from planted>
+        found_with: <the command that told you which ones do not belong>
       Q
 
-      echo "scenario ready — two planted setuid roots among nine legitimate ones"
+      echo "scenario ready — two planted setuid roots among ten legitimate ones"
 
   verify_done:
     needs: [init_scenario]
@@ -104,7 +90,7 @@ tasks:
         exit 1
       fi
 
-      # The nine that must survive. Stripping any of these is the failure the
+      # The packaged ones that must survive. Stripping any of these is the failure the
       # lesson is really about: a blanket chmod that also disables sudo.
       for p in sudo su passwd mount umount chfn chsh gpasswd newgrp; do
         path=$(command -v "$p" 2>/dev/null || true)

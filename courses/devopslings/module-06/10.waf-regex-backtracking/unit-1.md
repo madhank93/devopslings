@@ -57,69 +57,6 @@ request — the shape of an injected payload:
 (?:\"|'|\]|\}|\\|\d|(?:nan|infinity|…)|\+)+[)]*;?((?:\s|-|~|!|{}|\|\||\+)*.*(?:.*=.*))
 ```
 
-## Why a regex takes six seconds
-
-A backtracking engine does not decide whether a string matches; it searches for
-a way to make it match, and gives up only when it has tried every way. Two
-constructs make "every way" enormous.
-
-**Adjacent unbounded quantifiers.** The tail here is `.*(?:.*=.*)` — `.*`
-immediately followed by another `.*`. For a 600-character input the engine must
-consider every split of those characters between the first `.*` and the second,
-because any of them might be the one that lets the `=` land where it needs to.
-That is quadratic on its own; wrapped in the rest of the rule, with a `+` over a
-character class that the tail can also match, each of those splits is retried
-against every division of the prefix. The work grows as a polynomial with a high
-degree — 300 characters is 0.4 seconds, 600 is six, 800 takes half an hour.
-
-The engine is not confused. It is doing exactly what it was asked, and what it
-was asked is exponentially more than the author imagined.
-
-**The input is not an attack.** It has no quotes, no semicolons and nothing
-injected. It is a long string of digits. The rule was never going to block it —
-it just took six seconds to say so, which is the difference between a rule that
-is wrong and a rule that is slow.
-
-This is the July 2019 Cloudflare outage almost exactly. One WAF rule containing
-`.*.*=.*` was deployed globally, CPU on every machine in every datacentre went
-to 100 percent, and the network stopped serving traffic. Nothing was
-compromised, nothing was corrupted, and the rule blocked nothing it was not
-supposed to block.
-
-## Making it fast without making it weaker
-
-The tempting fix is to delete the rule. That is not a fix; it is an outage
-traded for an exposure. A rule has a job, and this repository writes it down:
-
-```
-$ cat /root/waf-corpus/block
-/api?x=1;a=b
-/q?p=';a=1
-$ cat /root/waf-corpus/allow
-/health
-/asset.js?v=3
-```
-
-Two changes keep every one of those verdicts and remove the search.
-
-**Drop the redundant `.*`.** `(?:.*=.*)` after a `.*` says nothing that `(?:=.*)`
-does not; the leading `.*` is already there. This is the change Cloudflare
-shipped.
-
-**Make the prefix possessive.** `(?:…)+` becomes `(?:…)++`: having consumed as
-much as it can, the engine is forbidden to give any of it back. Where a
-possessive quantifier is correct it does not change what matches — it only
-removes retries that could never succeed. `(?>…)`, an atomic group, is the same
-idea with different syntax.
-
-Both together take the 600-character request from six seconds to under a
-millisecond, with the corpus verdicts unchanged.
-
-Note the trap: making the *tail* possessive — `(?:.*+=.*)` — is also fast, and
-it breaks the rule. `.*+` swallows the `=` and never returns it, so nothing
-matches and the filter blocks nothing. Fast and wrong looks exactly like fast
-and right until something tests it, which is what the corpus is for.
-
 ## The rule you have not written yet
 
 Rewriting one regex fixes one regex. The next person to add a rule can make the
@@ -203,6 +140,71 @@ a single rule may spend before the filter abandons it and answers anyway. It is
 `0`, which means no limit.
 
 </details>
+
+## Why a regex takes six seconds
+
+A backtracking engine does not decide whether a string matches; it searches for
+a way to make it match, and gives up only when it has tried every way. Two
+constructs make "every way" enormous.
+
+**Adjacent unbounded quantifiers.** The tail here is `.*(?:.*=.*)` — `.*`
+immediately followed by another `.*`. For a 600-character input the engine must
+consider every split of those characters between the first `.*` and the second,
+because any of them might be the one that lets the `=` land where it needs to.
+That is quadratic on its own; wrapped in the rest of the rule, with a `+` over a
+character class that the tail can also match, each of those splits is retried
+against every division of the prefix. The work grows as a polynomial with a high
+degree — 300 characters is 0.4 seconds, 600 is six, 800 takes half an hour.
+
+The engine is not confused. It is doing exactly what it was asked, and what it
+was asked is vastly more than the author imagined.
+
+**The input is not an attack.** It has no quotes, no semicolons and nothing
+injected. It is a long string of digits. The rule was never going to block it —
+it just took six seconds to say so, which is the difference between a rule that
+is wrong and a rule that is slow.
+
+This is the July 2019 Cloudflare outage almost exactly. One WAF rule containing
+`.*.*=.*` was deployed globally, CPU on every machine in every datacentre went
+to 100 percent, and the network stopped serving traffic. Nothing was
+compromised, nothing was corrupted, and the rule blocked nothing it was not
+supposed to block.
+
+## Making it fast without making it weaker
+
+The tempting fix is to delete the rule. That is not a fix; it is an outage
+traded for an exposure. A rule has a job, and this repository writes it down:
+
+```
+$ cat /root/waf-corpus/block
+/api?x=1;a=b
+/q?p=';a=1
+/q?p=null=1
+/q?p=true+a=1
+$ cat /root/waf-corpus/allow
+/health
+/asset.js?v=3
+```
+
+Two changes keep every one of those verdicts and remove the search.
+
+**Drop the redundant `.*`.** `(?:.*=.*)` after a `.*` says nothing that `(?:=.*)`
+does not; the leading `.*` is already there. This is the change Cloudflare
+shipped.
+
+**Make the prefix possessive.** `(?:…)+` becomes `(?:…)++`: having consumed as
+much as it can, the engine is forbidden to give any of it back. Where a
+possessive quantifier is correct it does not change what matches — it only
+removes retries that could never succeed. `(?>…)`, an atomic group, is the same
+idea with different syntax.
+
+Both together take the 600-character request from six seconds to under a
+millisecond, with the corpus verdicts unchanged.
+
+Note the trap: making the *tail* possessive — `(?:.*+=.*)` — is also fast, and
+it breaks the rule. `.*+` swallows the `=` and never returns it, so nothing
+matches and the filter blocks nothing. Fast and wrong looks exactly like fast
+and right until something tests it, which is what the corpus is for.
 
 ## What actually happened
 

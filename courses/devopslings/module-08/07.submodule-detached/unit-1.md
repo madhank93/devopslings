@@ -26,6 +26,51 @@ Two clones of the same branch, two different libraries. Nothing is cached and
 nothing is stale: the clone is building exactly what the repository says to
 build, and what it says is not what is in your directory.
 
+## Your objectives
+
+- Make a fresh recursive clone of `remotes/app.git` build the fixed library
+- Keep `vendor/liblog` a submodule; copying the library's files in would pass the
+  build and lose the link to its history
+
+## What you're being graded on
+
+The grader reads what `remotes/` records, then clones it the way CI does:
+
+- `vendor/liblog` is still a submodule in the pushed history
+- the library commit it records is on the library's published `main`, and
+  contains the fix
+- a fresh `clone --recurse-submodules` of `remotes/app.git` succeeds and its
+  `test.sh` passes
+
+<details>
+<summary>Hint 1 — compare what the clone records with what you have</summary>
+
+```
+$ git ls-tree HEAD vendor/liblog          # the commit the parent records
+$ git -C vendor/liblog rev-parse HEAD     # the commit checked out
+```
+
+Two different shas. `git status` shows the disagreement as ` M vendor/liblog`.
+
+</details>
+
+<details>
+<summary>Hint 2 — the fix is a commit in the parent</summary>
+
+`git add` on the submodule's path stages the new commit id. The library's files
+are not part of the parent's history and never were.
+
+</details>
+
+<details>
+<summary>Hint 3 — CI clones the origin</summary>
+
+The grader clones `remotes/app.git`, so the parent commit has to be pushed. If
+you had made your own commit inside `vendor/liblog`, it would have to be pushed
+to `remotes/liblog.git` first.
+
+</details>
+
 ## A submodule is a commit id, not a directory
 
 `vendor/liblog` looks like a directory. In the parent's history it is one line:
@@ -98,35 +143,6 @@ The tempting shortcut — delete the submodule and copy the library's files in �
 does make CI build the right code today. It also throws away the link to the
 library's history: the version in use is no longer a commit id anyone can look
 up, and the next upstream fix is a manual copy again.
-
-<details>
-<summary>Hint 1 — compare what the clone records with what you have</summary>
-
-```
-$ git ls-tree HEAD vendor/liblog          # the commit the parent records
-$ git -C vendor/liblog rev-parse HEAD     # the commit checked out
-```
-
-Two different shas. `git status` shows the disagreement as ` M vendor/liblog`.
-
-</details>
-
-<details>
-<summary>Hint 2 — the fix is a commit in the parent</summary>
-
-`git add` on the submodule's path stages the new commit id. The library's files
-are not part of the parent's history and never were.
-
-</details>
-
-<details>
-<summary>Hint 3 — CI clones the origin</summary>
-
-The grader clones `remotes/app.git`, so the parent commit has to be pushed. If
-you had made your own commit inside `vendor/liblog`, it would have to be pushed
-to `remotes/liblog.git` first.
-
-</details>
 
 ## Checking yourself
 

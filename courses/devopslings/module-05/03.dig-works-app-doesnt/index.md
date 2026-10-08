@@ -174,6 +174,16 @@ tasks:
         exit 1
       fi
 
+      # localhost alone does not prove files is still consulted: the resolver
+      # upstream answers it too.
+      if ! grep -Eq '^hosts:.*[[:space:]]files([[:space:]]|$)' /etc/nsswitch.conf; then
+        echo "not yet: the hosts line in /etc/nsswitch.conf no longer names files."
+        echo "         localhost still answers, from something other than /etc/hosts,"
+        echo "         and every entry in /etc/hosts — every emergency override —"
+        echo "         is now ignored."
+        exit 1
+      fi
+
       # Check that the application path can resolve the name
       # getent exits non-zero when the name does not resolve, which is exactly
       # the state this check exists to report. Without the guard, pipefail ends

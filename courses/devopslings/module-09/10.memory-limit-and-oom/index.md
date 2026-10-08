@@ -4,8 +4,8 @@ title: "the job dies at exactly the same input size, with no error"
 description: |
   Exit 137, no stack trace, no log line. It is not a leak — memory use is
   proportional to the input and the job dies at the same place every run. Learn
-  what the JVM believes about its container, and why a heap setting above the
-  limit turns a diagnosable error into a silent kill.
+  what the JVM believes about its container, and how to make an input that does
+  not fit say so.
 name: memory-limit-and-oom
 slug: memory-limit-and-oom
 createdAt: "2026-09-01"

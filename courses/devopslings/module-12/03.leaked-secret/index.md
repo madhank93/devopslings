@@ -19,6 +19,16 @@ tasks:
     init: true
     timeout_seconds: 600
     run: |
+      # A protection rule left by another lesson (any name, any pattern) would
+      # refuse the seed force-push, so every rule on the repository goes first.
+      for rule in $(curl -fsS -u devops:devopslings \
+                      "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections" 2>/dev/null \
+                    | tr ',' '\n' | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p' \
+                    | sed 's/%/%25/g; s/ /%20/g; s/\*/%2A/g; s/?/%3F/g; s/\[/%5B/g; s/]/%5D/g; s|/|%2F|g' || true); do
+        curl -fsS -u devops:devopslings -X DELETE \
+          "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections/${rule}" >/dev/null 2>&1 || true
+      done
+
       work=$(mktemp -d)
       repo="http://devops:devopslings@127.0.0.1:3000/devops/checkout.git"
       api="http://127.0.0.1:3000/api/v1"
@@ -143,8 +153,10 @@ tasks:
         echo "not yet: .forgejo/workflows/deploy.yml is gone — deleting the pipeline is not fixing the leak"
         exit 1
       fi
-      if ! printf '%s' "$wf" | grep -q 'secrets\.'; then
-        echo "not yet: the workflow does not reference secrets.* — where is DEPLOY_TOKEN coming from now?"
+      if ! printf '%s\n' "$wf" | grep -v '^[[:space:]]*#' \
+           | grep -Eqi '\$\{\{[[:space:]]*secrets\.DEPLOY_TOKEN[[:space:]]*\}\}'; then
+        echo "not yet: no line of the workflow outside a comment reads \${{ secrets.DEPLOY_TOKEN }}"
+        echo "— where is DEPLOY_TOKEN coming from now?"
         exit 1
       fi
 

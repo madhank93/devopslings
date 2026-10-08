@@ -1,11 +1,10 @@
 ---
 kind: lesson
-title: "no space left on device, and 64M free"
+title: "no space left on device, and 57M free"
 description: |
   checkout-api cannot write. ENOSPC on every attempt. `df -h` says the
-  filesystem is 0% full and there is no big file to find, because bytes were
-  never the resource that ran out. There is a cleanup job, it runs nightly, and
-  it was written to reclaim the wrong thing.
+  filesystem is 13% full and there is no big file to find. There is a cleanup
+  job, it runs nightly, and it exits 0 every time.
 name: inodes-not-bytes
 slug: inodes-not-bytes
 createdAt: "2026-08-03"
@@ -29,6 +28,7 @@ tasks:
       mkdir -p /srv/spool
       mount -t tmpfs -o size=64m,nr_inodes=2000 tmpfs /srv/spool
 
+      df --output=itotal /srv/spool | tail -1 | tr -d ' ' > /var/lib/devopslings/inodes.total
       mkdir -p /srv/spool/sessions /srv/spool/payload
 
       # The payload is the thing that must survive. `rm -rf /srv/spool/*` frees
@@ -83,7 +83,6 @@ tasks:
 
       echo "scenario ready — writes to /srv/spool are failing"
       df -h /srv/spool | tail -1
-      df -i /srv/spool | tail -1
 
   verify_done:
     needs: [init_scenario]
@@ -111,6 +110,17 @@ tasks:
         echo "         deleting everything under /srv/spool frees the inodes and destroys"
         echo "         the settlement batch. The stale sessions were the problem, not the"
         echo "         payload."
+        exit 1
+      fi
+
+      # tmpfs lets nr_inodes be raised on remount; the ext4 disk this stands in
+      # for cannot, and a bigger table only postpones the same exhaustion.
+      want_total=$(cat /var/lib/devopslings/inodes.total)
+      got_total=$(df --output=itotal /srv/spool | tail -1 | tr -d ' ')
+      if [ "$got_total" != "$want_total" ]; then
+        echo "not yet: /srv/spool now has $got_total inodes; it was made with $want_total"
+        echo "         a real ext4 filesystem fixes its inode table at mkfs time. A bigger"
+        echo "         table postpones the exhaustion; reclaim the stale sessions instead."
         exit 1
       fi
 

@@ -39,12 +39,13 @@ tasks:
       with open("/srv/reports/orders.tsv") as f:
           for line in f:
               oid, sku, qty, price = line.rstrip("\n").split("\t")
-              # Deliberately wasteful: a dict and a padded string per row, all
-              # retained until the very end.
+              # Deliberately wasteful: a dict and a ~4 KiB string per row, all
+              # retained until the very end. Built from oid so each row gets its
+              # own string rather than one shared constant.
               rows.append({
                   "id": oid, "sku": sku,
                   "qty": int(qty), "price": float(price),
-                  "pad": "x" * 4096,
+                  "pad": oid * 410,
               })
 
       lines = ["order_id,sku,qty,unit_price,total"]
@@ -68,6 +69,8 @@ tasks:
       Type=oneshot
       ExecStart=/usr/local/bin/report-builder
       MemoryMax=48M
+      # Without this, a host with swap absorbs the overflow and nothing is killed.
+      MemorySwapMax=0
       UNIT
 
       systemctl daemon-reload
@@ -77,6 +80,11 @@ tasks:
       # find it the morning after.
       systemctl start report-builder.service >/dev/null 2>&1 || true
       sleep 1
+      result=$(systemctl show -p Result --value report-builder.service 2>/dev/null || true)
+      if [ "$result" != "oom-kill" ]; then
+        echo "scenario setup failed: report-builder ended with '$result', not an OOM kill" >&2
+        exit 1
+      fi
 
       # Ground truth, recorded before anything is changed.
       limit=$(systemctl show -p MemoryMax --value report-builder.service 2>/dev/null || echo "")
@@ -111,7 +119,8 @@ tasks:
 
       Then make report-builder complete and produce /srv/reports/daily.csv.
       The report must contain every one of the 20,000 orders.
-      report-builder.service must still have a memory limit — not infinity.
+      report-builder.service must still have a memory limit — not infinity,
+      and not an unbounded swap allowance either.
       Q
 
       echo "scenario ready — report-builder.service produced no report"
@@ -161,9 +170,8 @@ tasks:
       if [ "${gotlim:-0}" != "$want_limit" ]; then
         echo "not yet: /root/answers/limit says '${gotlim:-empty}', expected $want_limit"
         echo "         that is the limit that was in effect when it was killed —"
-        echo "         'systemctl show -p MemoryMax report-builder.service', or"
-        echo "         memory.max in the unit's cgroup. If you have already raised it,"
-        echo "         reset the lesson and read it first."
+        echo "         'systemctl show -p MemoryMax report-builder.service'. If you have"
+        echo "         already changed it, reset the lesson and read it first."
         exit 1
       fi
 
@@ -175,6 +183,14 @@ tasks:
         echo "         unbounded means the next oversized run takes the whole box down"
         echo "         instead of one unit. Keep a limit; make the work fit it, or raise"
         echo "         it to a number you chose on purpose."
+        exit 1
+      fi
+
+      swap=$(systemctl show -p MemorySwapMax --value report-builder.service 2>/dev/null || echo infinity)
+      if [ "$swap" = "infinity" ] || [ -z "$swap" ]; then
+        echo "not yet: report-builder.service may now swap without bound (MemorySwapMax=$swap)"
+        echo "         the memory limit still holds, and the overflow goes to swap instead —"
+        echo "         the same unbounded run, only slower. Keep MemorySwapMax bounded."
         exit 1
       fi
 

@@ -57,103 +57,6 @@ already trusts, and the name on it has to be the name the client asked for.
 Different failures, different fixes, and here they are stacked so that fixing
 either one alone leaves the deploy step broken.
 
-## Fault one: the chain
-
-Ask the gateway what it actually sends, for each of the two sites:
-
-```
-$ echo | openssl s_client -connect 172.31.0.10:8443 -servername artifacts.corp
-Certificate chain
- 0 s:O=Corp, CN=artifacts.corp
-   i:O=Corp, CN=Corp Issuing CA 2026
-...
-Verify return code: 21 (unable to verify the first certificate)
-```
-
-```
-$ echo | openssl s_client -connect 172.31.0.10:8443 -servername internal-tools.corp
-Certificate chain
- 0 s:O=Corp, CN=internal-tools.corp
-   i:O=Corp, CN=Corp Issuing CA 2026
- 1 s:O=Corp, CN=Corp Issuing CA 2026
-   i:O=Corp, CN=Corp Root CA 2026
-...
-Verify return code: 0 (ok)
-```
-
-That is the whole diagnosis, in the numbers down the left. `s:` is the subject —
-who the certificate is for. `i:` is the issuer — who signed it. The working site
-sends **two** certificates. The broken one sends **one**.
-
-Both leaves say the same thing about themselves: *I was signed by Corp Issuing CA
-2026*. Neither of them carries the proof. The trust store on this box has one
-Corp certificate in it:
-
-```
-$ ls /usr/local/share/ca-certificates/
-corp-root.crt
-```
-
-So a client that gets only the leaf is holding a signature by *Corp Issuing CA
-2026*, a trust anchor called *Corp Root CA 2026*, and nothing to connect them
-with. It cannot verify what it cannot see. That is error 20, promoted to error 21
-because the first certificate is where the path ran out.
-
-**A server must send every certificate between its leaf and a root, and the root
-is the one it does not need to send.** Roots live in trust stores. Intermediates
-live on the server, and this is the single most common TLS misconfiguration in
-existence, because *it does not fail everywhere*. Browsers hide it: having seen
-the intermediate once from another site, they cache it and fill in the gap
-themselves. Some even fetch it from the URL in the certificate. Your Go binary,
-your Java service and your `curl` do neither. That is why "it works in Chrome"
-and "the client library is broken" arrive in the same ticket.
-
-## Fault two: the name
-
-Fix the chain and the deploy step still fails, with the other message. Ask the
-gateway what it serves when nobody tells it which site they want:
-
-```
-$ echo | openssl s_client -connect 172.31.0.10:8443 -noservername 2>/dev/null \
-  | openssl x509 -noout -subject
-subject=O=Corp, CN=internal-tools.corp
-```
-
-Two sites share one IP address and one port. The only thing that separates them
-is **SNI** — Server Name Indication, a field in the ClientHello where the client
-writes the hostname it is trying to reach, *before* any certificate is chosen. It
-exists because the server has to pick a certificate at handshake time, and the
-`Host:` header that would have said which site is wanted is inside the encryption
-that has not happened yet.
-
-If no name arrives, the listener has to serve something. What it serves is the
-default vhost — here, another team's site.
-
-Now look at what `publish` asks for:
-
-```
-curl -sS --max-time 15 --data-binary @/root/build.tar.gz \
-     https://172.31.0.10:8443/publish
-```
-
-An IP address in the URL. **A URL with an IP literal in it sends no SNI at all** —
-not the address, not anything. SNI carries hostnames, and an IP address is not
-one, so the field is simply omitted. The gateway hears nothing, serves the
-default vhost's certificate, and `curl` reports the truthful and thoroughly
-confusing thing: the certificate it was handed does not name `172.31.0.10`.
-
-The gateway logs the name it was given for every handshake, which makes this
-visible from the other side:
-
-```
-$ tail -3 /var/log/vhosts.log
-2026-08-19T15:08:53 sni=artifacts.corp
-2026-08-19T15:08:53 sni=internal-tools.corp
-2026-08-19T15:09:41 sni=-
-```
-
-`sni=-` is the deploy step. It never said what it wanted.
-
 ## Your objective
 
 Three things.
@@ -267,6 +170,103 @@ stray client that ever dials this box by address. Fix the client instead — it 
 already in `/etc/hosts`.
 
 </details>
+
+## Fault one: the chain
+
+Ask the gateway what it actually sends, for each of the two sites:
+
+```
+$ echo | openssl s_client -connect 172.31.0.10:8443 -servername artifacts.corp
+Certificate chain
+ 0 s:O=Corp, CN=artifacts.corp
+   i:O=Corp, CN=Corp Issuing CA 2026
+...
+Verify return code: 21 (unable to verify the first certificate)
+```
+
+```
+$ echo | openssl s_client -connect 172.31.0.10:8443 -servername internal-tools.corp
+Certificate chain
+ 0 s:O=Corp, CN=internal-tools.corp
+   i:O=Corp, CN=Corp Issuing CA 2026
+ 1 s:O=Corp, CN=Corp Issuing CA 2026
+   i:O=Corp, CN=Corp Root CA 2026
+...
+Verify return code: 0 (ok)
+```
+
+That is the whole diagnosis, in the numbers down the left. `s:` is the subject —
+who the certificate is for. `i:` is the issuer — who signed it. The working site
+sends **two** certificates. The broken one sends **one**.
+
+Both leaves say the same thing about themselves: *I was signed by Corp Issuing CA
+2026*. Neither of them carries the proof. The trust store on this box has one
+Corp certificate in it:
+
+```
+$ ls /usr/local/share/ca-certificates/
+corp-root.crt
+```
+
+So a client that gets only the leaf is holding a signature by *Corp Issuing CA
+2026*, a trust anchor called *Corp Root CA 2026*, and nothing to connect them
+with. It cannot verify what it cannot see. That is error 20, promoted to error 21
+because the first certificate is where the path ran out.
+
+**A server must send every certificate between its leaf and a root, and the root
+is the one it does not need to send.** Roots live in trust stores. Intermediates
+live on the server, and this is the single most common TLS misconfiguration in
+existence, because *it does not fail everywhere*. Browsers hide it: having seen
+the intermediate once from another site, they cache it and fill in the gap
+themselves. Some even fetch it from the URL in the certificate. Your Go binary,
+your Java service and your `curl` do neither. That is why "it works in Chrome"
+and "the client library is broken" arrive in the same ticket.
+
+## Fault two: the name
+
+Fix the chain and the deploy step still fails, with the other message. Ask the
+gateway what it serves when nobody tells it which site they want:
+
+```
+$ echo | openssl s_client -connect 172.31.0.10:8443 -noservername 2>/dev/null \
+  | openssl x509 -noout -subject
+subject=O=Corp, CN=internal-tools.corp
+```
+
+Two sites share one IP address and one port. The only thing that separates them
+is **SNI** — Server Name Indication, a field in the ClientHello where the client
+writes the hostname it is trying to reach, *before* any certificate is chosen. It
+exists because the server has to pick a certificate at handshake time, and the
+`Host:` header that would have said which site is wanted is inside the encryption
+that has not happened yet.
+
+If no name arrives, the listener has to serve something. What it serves is the
+default vhost — here, another team's site.
+
+Now look at what `publish` asks for:
+
+```
+curl -sS --max-time 15 --data-binary @/root/build.tar.gz \
+     https://172.31.0.10:8443/publish
+```
+
+An IP address in the URL. **A URL with an IP literal in it sends no SNI at all** —
+not the address, not anything. SNI carries hostnames, and an IP address is not
+one, so the field is simply omitted. The gateway hears nothing, serves the
+default vhost's certificate, and `curl` reports the truthful and thoroughly
+confusing thing: the certificate it was handed does not name `172.31.0.10`.
+
+The gateway logs the name it was given for every handshake, which makes this
+visible from the other side:
+
+```
+$ tail -3 /var/log/vhosts.log
+2026-08-19T15:08:53 sni=artifacts.corp
+2026-08-19T15:08:53 sni=internal-tools.corp
+2026-08-19T15:09:41 sni=-
+```
+
+`sni=-` is the deploy step. It never said what it wanted.
 
 ## Why the intermediate gets left out
 

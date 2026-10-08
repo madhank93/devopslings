@@ -30,10 +30,10 @@ is this page's own work.
 
 ## What you're being graded on
 
-The grader renders the page itself and counts how many statements that took,
-by reading `pg_stat_statements` either side of the render. One is the fix; up
-to five is allowed, so pre-loading the customers in a second query passes too.
-Zero does not — the page has to actually read the database.
+The grader renders the page itself, checks the output and the time, and counts
+how many statements the render took by reading `pg_stat_statements` either side
+of it. Up to five passes. Zero does not — the page has to actually read the
+database.
 
 <details>
 <summary>Hint 1 — the slow-query log is the wrong instrument</summary>

@@ -15,29 +15,78 @@ LISTEN  0       0.0.0.0:80           python3  (portal.service)
 LISTEN  0       0.0.0.0:9000         python3  (metrics-api.service)
 ```
 
-Two doors. Now the question that matters for each: who is supposed to be able to
-open it?
+Two doors. What sits behind them:
 
-- **Port 80** is the customer portal. It is *meant* to face the internet —
-  `0.0.0.0` is correct here, because the whole point is that anyone can reach it.
-- **Port 9000** is the internal metrics API. It reports CPU, memory and disk, and
-  it has no authentication, because whoever wrote it assumed it would only ever
-  be read from the box itself. It is also on `0.0.0.0`.
+- **Port 80** is the customer portal.
+- **Port 9000** is the internal metrics API. It reports CPU, memory and disk, has
+  no authentication, and something on the box reads it locally.
 
-Those two facts about port 9000 — no authentication, and listening on every
-interface — are fine individually and a breach together. An unauthenticated
-endpoint is acceptable when only the box can reach it. A service on every
-interface is acceptable when it authenticates. This one is neither: it answers
-system telemetry to anyone who can route to the host.
+And from another machine on the LAN:
 
 ```
 $ curl -s http://<the box's LAN address>:9000/
 metrics: cpu=3% mem=41% disk=55%
 ```
 
-That is the attack surface nobody meant to create. It was not opened by an
-attacker or a bad password; it was opened by a default bind address and an
-assumption that never got checked.
+## Your objectives
+
+- Decide who each listener is for
+- Make what each one is reachable by match that, without taking down anything
+  that is supposed to keep serving
+
+## What you're being graded on
+
+- the metrics API still answers on `127.0.0.1:9000`, and is not reachable from
+  any other address
+- the portal on port 80 is still reachable from outside
+
+`/root/answers/surface.md`, exactly four lines:
+
+```
+port_80: <public or internal>
+port_9000: <public or internal>
+overexposed_port: <the port that was reachable beyond its purpose>
+restricted_to: <the interface you bound the metrics API to>
+```
+
+<details>
+<summary>Hint 1 — enumerate and classify</summary>
+
+```
+$ ss -ltnp
+```
+
+Two listeners. One is meant to be public (the portal), one is meant to be
+internal (the metrics API). Both are on `0.0.0.0`. Only one of those is wrong.
+
+</details>
+
+<details>
+<summary>Hint 2 — restrict the internal one to loopback</summary>
+
+The metrics API reads its bind address from `/etc/metrics/bind.conf`. Change it
+from `0.0.0.0:9000` to `127.0.0.1:9000` and restart:
+
+```
+$ echo '127.0.0.1:9000' | sudo tee /etc/metrics/bind.conf
+$ sudo systemctl restart metrics-api
+```
+
+</details>
+
+<details>
+<summary>Hint 3 — leave the portal alone</summary>
+
+Port 80 is public by design. Do not restrict it — restricting the thing that is
+supposed to be reachable is its own outage. Confirm both:
+
+```
+$ ss -ltn | grep -E ':80|:9000'
+$ curl -s http://127.0.0.1/          # portal up
+$ curl -s http://127.0.0.1:9000/     # metrics, from the box only
+```
+
+</details>
 
 ## Intended exposure is the whole audit
 
@@ -80,45 +129,6 @@ This is the shape of every attack-surface reduction: the win is closing the door
 nobody meant to open while leaving the ones the system needs. Getting there is
 one boring pass over the listeners, asking of each the question the original
 author forgot to.
-
-<details>
-<summary>Hint 1 — enumerate and classify</summary>
-
-```
-$ ss -ltnp
-```
-
-Two listeners. One is meant to be public (the portal), one is meant to be
-internal (the metrics API). Both are on `0.0.0.0`. Only one of those is wrong.
-
-</details>
-
-<details>
-<summary>Hint 2 — restrict the internal one to loopback</summary>
-
-The metrics API reads its bind address from `/etc/metrics/bind.conf`. Change it
-from `0.0.0.0:9000` to `127.0.0.1:9000` and restart:
-
-```
-$ echo '127.0.0.1:9000' | sudo tee /etc/metrics/bind.conf
-$ sudo systemctl restart metrics-api
-```
-
-</details>
-
-<details>
-<summary>Hint 3 — leave the portal alone</summary>
-
-Port 80 is public by design. Do not restrict it — restricting the thing that is
-supposed to be reachable is its own outage. Confirm both:
-
-```
-$ ss -ltn | grep -E ':80|:9000'
-$ curl -s http://127.0.0.1/          # portal up
-$ curl -s http://127.0.0.1:9000/     # metrics, from the box only
-```
-
-</details>
 
 ## Checking yourself
 

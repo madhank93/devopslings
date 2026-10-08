@@ -40,58 +40,6 @@ incident.
 The rule this comes down to: **never close the door you are standing in until
 you have opened another one and walked through it.**
 
-## What sshd is actually running
-
-Here is the part that catches careful people. The obvious move is:
-
-```
-$ sed -i 's/^PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
-$ systemctl reload ssh
-```
-
-and it does nothing at all:
-
-```
-$ sshd -T | grep -i passwordauthentication
-passwordauthentication yes
-```
-
-Look at the first line of the config you just edited:
-
-```
-$ head -1 /etc/ssh/sshd_config
-Include /etc/ssh/sshd_config.d/*.conf
-
-$ grep -ri passwordauthentication /etc/ssh/
-/etc/ssh/sshd_config:PasswordAuthentication no
-/etc/ssh/sshd_config.d/50-cloud-init.conf:PasswordAuthentication yes
-```
-
-**`sshd_config` is first-match-wins.** For most keywords, the first value sshd
-reads is the one it keeps, and every later mention is ignored. Debian and Ubuntu
-put the `Include` on line one, so anything in `sshd_config.d/` is read *before*
-the whole main file — which means a drop-in silently outranks every line you can
-see in the file you opened.
-
-Most config formats are the other way round, which is exactly why this one
-surprises people, and why `50-cloud-init.conf` re-enabling password auth is a
-genuinely common production outage in reverse: the setting everyone believes is
-off has been on for months.
-
-**`sshd -T` is the source of truth.** It prints the effective configuration — the
-merged result, every default filled in, in the words sshd itself uses. Anything
-you conclude by reading a file is a guess about what sshd did with it.
-
-```
-$ sshd -T | grep -iE 'passwordauth|permitroot|pubkeyauth'
-```
-
-Related, worth knowing before you write your own drop-in: `Match` blocks apply
-until the next `Match` or end of file, and inside one the first-match rule
-applies again. And `KbdInteractiveAuthentication` is a second door — PAM's
-challenge-response path, which on many boxes also ends up asking for a password.
-Turning off `PasswordAuthentication` and leaving that on is a half-done job.
-
 ## reload, restart, and what actually ends a session
 
 ```
@@ -200,10 +148,63 @@ $ head -1 /etc/ssh/sshd_config
 ```
 
 If those first two disagree, the third explains why. Fix the file that is
-actually winning — editing it, or emptying it — rather than adding another one
-after it, because a new file will not be read first either.
+actually winning — editing it, or emptying it. A new drop-in only wins if it
+sorts ahead of that one, and then the box carries a file that still says `yes`
+for the next person to believe.
 
 </details>
+
+## What sshd is actually running
+
+Here is the part that catches careful people. The obvious move is:
+
+```
+$ sed -i 's/^PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+$ systemctl reload ssh
+```
+
+and it does nothing at all:
+
+```
+$ sshd -T | grep -i passwordauthentication
+passwordauthentication yes
+```
+
+Look at the first line of the config you just edited:
+
+```
+$ head -1 /etc/ssh/sshd_config
+Include /etc/ssh/sshd_config.d/*.conf
+
+$ grep -ri passwordauthentication /etc/ssh/
+/etc/ssh/sshd_config:PasswordAuthentication no
+/etc/ssh/sshd_config.d/50-cloud-init.conf:PasswordAuthentication yes
+```
+
+**`sshd_config` is first-match-wins.** For most keywords, the first value sshd
+reads is the one it keeps, and every later mention is ignored. Debian and Ubuntu
+put the `Include` on line one, so anything in `sshd_config.d/` is read *before*
+the whole main file — which means a drop-in silently outranks every line you can
+see in the file you opened.
+
+Most config formats are the other way round, which is exactly why this one
+surprises people, and why `50-cloud-init.conf` re-enabling password auth is a
+genuinely common production outage in reverse: the setting everyone believes is
+off has been on for months.
+
+**`sshd -T` is the source of truth.** It prints the effective configuration — the
+merged result, every default filled in, in the words sshd itself uses. Anything
+you conclude by reading a file is a guess about what sshd did with it.
+
+```
+$ sshd -T | grep -iE 'passwordauth|permitroot|pubkeyauth'
+```
+
+Related, worth knowing before you write your own drop-in: `Match` blocks apply
+until the next `Match` or end of file, and inside one the first-match rule
+applies again. And `KbdInteractiveAuthentication` is a second door — PAM's
+challenge-response path, which on many boxes also ends up asking for a password.
+Turning off `PasswordAuthentication` and leaving that on is a half-done job.
 
 ## What actually happened
 

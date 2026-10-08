@@ -269,7 +269,7 @@ tasks:
 
       SPF authorises the machine that sent the message. DKIM proves the message
       was not altered and was signed by the domain. DMARC is the policy that
-      binds either of them to the address in the From header — and it is the
+      binds them to the address in the From header — and it is the
       only one of the three the recipient's filter actually acts on.
       Q
 
@@ -291,6 +291,24 @@ tasks:
       spf=$(dig +short TXT corp.example @10.93.0.1 2>/dev/null | tr -d '"')
       dmarc=$(dig +short TXT _dmarc.corp.example @10.93.0.1 2>/dev/null | tr -d '"')
 
+      # An all-covering mechanism passes SPF for every sender just as +all
+      # does, whatever the record ends with.
+      case "$spf" in
+        *"/0 "*|*"/0")
+          echo "not yet: the SPF record authorises a /0: $spf"
+          echo "         That is every address there is, so every host on the internet"
+          echo "         may send as this domain. Name the address that actually sends"
+          echo "         the mail."
+          exit 1
+          ;;
+        *" -all"|*"+all"*|*"?all"*)
+          ;;
+        *)
+          echo "not yet: the SPF record does not end in -all: ${spf:-no record at all}"
+          echo "         Without it, a sender the record does not name is not refused."
+          exit 1
+          ;;
+      esac
       case "$spf" in
         *"+all"*|*"?all"*)
           echo "not yet: the SPF record ends in $(printf '%s' "$spf" | grep -o '[+?~-]all')."

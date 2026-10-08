@@ -130,7 +130,8 @@ then runs at 03:00 against input you did not imagine.
 - **unquoted-and-broken** *(shipped)* — an archive script correct for a year,
   because every filename it had seen happened to contain no character the shell
   treats as syntax. `$(ls)` is one string that gets word-split and glob-expanded
-  before the loop sees it; the run that ate the quarterly report exited 0.
+  before the loop sees it; the run exited 1 having lost a file, and the
+  quarterly report reached the archive only by accident.
 - **exit-codes-and-pipefail** *(shipped)* — a nightly job that exits 0 and
   writes `0 0.00`. A pipeline has as many statuses as stages and reports one,
   and `awk` succeeded at processing nothing.
@@ -141,7 +142,7 @@ then runs at 03:00 against input you did not imagine.
 
 Then: idempotency by construction, so the second run is a no-op ·
 `trap … EXIT` and the 2 GB temp directory times forty · parsing structured data
-rather than widening a regex · **a Python script that quietly misses 40% of the
+rather than widening a regex · **a Python script that quietly writes 50 of 437
 records** because pagination, rate limits and transient 503s all exist · and a
 written verdict on which of four scripts should have been a program.
 

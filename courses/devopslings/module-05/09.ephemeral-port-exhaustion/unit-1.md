@@ -25,6 +25,87 @@ rate=1.0034
 No refusals. No resets. Nothing in its journal. The accept queue is empty and
 the process is idle.
 
+## Your objective
+
+Three things.
+
+1. Make the same run complete cleanly:
+
+   ```
+   $ loadgen 400
+   ok=400 failed=0
+   ```
+
+   `/opt/load/loadgen.py` is shipped and checksummed. `/etc/loadgen.conf` is
+   yours.
+
+2. Leave the service alone. It must still answer on `10.92.0.9:8080`.
+
+3. Write `/root/answers/ports.md`, exactly two lines:
+
+   ```
+   connect_error: <what connect() actually said, in words>
+   who_holds_time_wait: <client or server>
+   ```
+
+## What you're being graded on
+
+The full run completing with no failures, the generator unedited, the rates API
+still answering, and both answers. Note that grading waits for the previous run's
+sockets to retire before it starts — after an exhausted range, this box cannot
+open a connection to anything for up to a minute, and that includes the checks.
+
+<details>
+<summary>Hint 1 — count what is holding the ports</summary>
+
+```
+$ ss -tan state time-wait dst 10.92.0.9 | wc -l
+$ ip netns exec svc ss -tan state time-wait | wc -l
+$ ss -s
+$ sysctl net.ipv4.ip_local_port_range
+```
+
+Run the first two during a failing test and immediately after it: one end of
+these connections is holding a lot of closed sockets and the other is not. Then divide
+the range size by 60 and compare it with how fast the generator opens
+connections.
+
+</details>
+
+<details>
+<summary>Hint 2 — three levers, in order of how much they fix</summary>
+
+- **Stop needing a port per request.** The generator opens a new connection for
+  every one of the 400. `/etc/loadgen.conf` has a knob for that, and it turns 400
+  ports into one.
+- **Give the box more ports.** `net.ipv4.ip_local_port_range` is 200 wide, which
+  is a strange thing for a box that generates load. The Linux default is
+  `32768 60999`.
+- **Let the kernel take TIME_WAIT sockets back.** `net.ipv4.tcp_tw_reuse=1` —
+  read the next hint before reaching for this one.
+
+</details>
+
+<details>
+<summary>Hint 3 — on tcp_tw_reuse, which is the internet's favourite answer</summary>
+
+`tcp_tw_reuse=1` lets a *new outbound* connection take over a TIME_WAIT socket
+when TCP timestamps make it safe. It is a real fix for a steady drip of
+connections. It will not rescue this run, and it is worth seeing why:
+
+the kernel only reuses a TIME_WAIT socket that is **more than one second old**,
+and this entire run finishes inside a second. Nothing in the range is old enough
+to reclaim.
+
+Two more, so you can dismiss them properly:
+
+- **`tcp_tw_recycle` does not exist.** It was removed in Linux 4.12 because it
+  broke every client behind NAT. Any advice that mentions it predates 2017.
+- **`SO_REUSEADDR` is a different thing.** It lets a *listener* bind a port that
+  is in TIME_WAIT. It does nothing for outbound connections.
+
+</details>
+
 ## The error names the culprit
 
 `Cannot assign requested address` — `EADDRNOTAVAIL`, errno 99 — is not a network
@@ -121,85 +202,6 @@ destination, not per box: 470/s to `10.92.0.9:8080` and another 470/s to
 something else. Which is exactly why this failure hits the box that talks to one
 backend hard — a load generator, a service mesh sidecar, a SNAT gateway — and
 almost never a box with diverse traffic.
-
-## Your objective
-
-Three things.
-
-1. Make the same run complete cleanly:
-
-   ```
-   $ loadgen 400
-   ok=400 failed=0
-   ```
-
-   `/opt/load/loadgen.py` is shipped and checksummed. `/etc/loadgen.conf` is
-   yours.
-
-2. Leave the service alone. It must still answer on `10.92.0.9:8080`.
-
-3. Write `/root/answers/ports.md`, exactly two lines:
-
-   ```
-   connect_error: <what connect() actually said, in words>
-   who_holds_time_wait: <client or server>
-   ```
-
-## What you're being graded on
-
-The full run completing with no failures, the generator unedited, the rates API
-still answering, and both answers. Note that grading waits for the previous run's
-sockets to retire before it starts — after an exhausted range, this box cannot
-open a connection to anything for up to a minute, and that includes the checks.
-
-<details>
-<summary>Hint 1 — count what is holding the ports</summary>
-
-```
-$ ss -tan state time-wait dst 10.92.0.9 | wc -l
-$ ss -s
-$ sysctl net.ipv4.ip_local_port_range
-```
-
-Run the first one during a failing test and immediately after it. Then divide
-the range size by 60 and compare it with how fast the generator opens
-connections.
-
-</details>
-
-<details>
-<summary>Hint 2 — three levers, in order of how much they fix</summary>
-
-- **Stop needing a port per request.** The generator opens a new connection for
-  every one of the 400. `/etc/loadgen.conf` has a knob for that, and it turns 400
-  ports into one.
-- **Give the box more ports.** `net.ipv4.ip_local_port_range` is 200 wide, which
-  is a strange thing for a box that generates load. The Linux default is
-  `32768 60999`.
-- **Let the kernel take TIME_WAIT sockets back.** `net.ipv4.tcp_tw_reuse=1` —
-  read the next hint before reaching for this one.
-
-</details>
-
-<details>
-<summary>Hint 3 — on tcp_tw_reuse, which is the internet's favourite answer</summary>
-
-`tcp_tw_reuse=1` lets a *new outbound* connection take over a TIME_WAIT socket
-when TCP timestamps make it safe. It is a real fix for a steady drip of
-connections. It will not rescue this run, and it is worth seeing why:
-
-the kernel only reuses a TIME_WAIT socket that is **more than one second old**,
-and this entire run finishes inside a second. Nothing in the range is old enough
-to reclaim.
-
-Two more, so you can dismiss them properly:
-
-- **`tcp_tw_recycle` does not exist.** It was removed in Linux 4.12 because it
-  broke every client behind NAT. Any advice that mentions it predates 2017.
-- **`SO_REUSEADDR` is a different thing.** It lets a *listener* bind a port that
-  is in TIME_WAIT. It does nothing for outbound connections.
-
-</details>
 
 ## What actually happened
 

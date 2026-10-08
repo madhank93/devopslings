@@ -16,12 +16,10 @@ From `client` — a machine on the service's own subnet, `10.88.0.6` — it does
 not:
 
 ```
-$ ip netns exec client curl -v http://203.0.113.10/
+$ ip netns exec client curl -v -m 6 http://203.0.113.10/
 *   Trying 203.0.113.10:80...
-* Recv failure: Connection reset by peer
+* Connection timed out after 6003 milliseconds
 ```
-
-Reset, not timeout. Something answered and the answer was rejected.
 
 The rule is firing. The counter proves it:
 
@@ -30,8 +28,9 @@ $ nft list table ip pubnat
     ip daddr 203.0.113.10 tcp dport 80 dnat to 10.88.0.5:8080
 ```
 
-And the service receives the request — it logs a `GET /` from `10.88.0.6` and
-returns 200. The request works. Only the reply does not.
+And the service is not idle. A capture inside its namespace shows a connection
+attempt from `10.88.0.6` arriving once a second, for as long as the client keeps
+trying — and never becoming a request.
 
 ## Your objective
 
@@ -63,6 +62,7 @@ it send back, and — this is the one — *to whom*, and *from what address*?
 $ ip netns exec svc tcpdump -i any -nn tcp port 8080
 IP 10.88.0.6.43558 > 10.88.0.5.8080: Flags [S]
 IP 10.88.0.5.8080 > 10.88.0.6.43558: Flags [S.]
+IP 10.88.0.6.43558 > 10.88.0.5.8080: Flags [R]
 ```
 
 The reply goes straight from `10.88.0.5` to `10.88.0.6`. Both are on the same
@@ -97,7 +97,11 @@ translation the box does not see is a translation the box cannot reverse.
 
 So the client, which opened a connection to `203.0.113.10:80`, gets a SYN-ACK
 from `10.88.0.5:8080`. Its kernel has no socket matching that, and does the only
-correct thing: **RST**.
+correct thing: it sends a **RST** — to the service, directly, over the bridge.
+The service drops the half-open connection. `curl`'s own socket never hears a
+thing: it is still waiting for an answer from `203.0.113.10`, retransmits its
+SYN, the box translates it again, and the same three packets repeat until the
+client gives up.
 
 Every layer behaved properly. The rule fired, the routing was right, the service
 answered. The reply simply took a shortcut past the machine holding the only
@@ -156,9 +160,10 @@ produced its own long history of surprising bugs.
 **"Reachable from everywhere except nearby" is a NAT symptom.** The shorter the
 path, the more likely it bypasses the thing doing the translating.
 
-**RST means something answered.** A timeout means nothing came back at all.
-A reset means a reply arrived at a machine that could not match it to a socket —
-almost always a wrong address, not a missing one.
+**A timeout does not mean nothing answered.** Here the service answered every
+SYN, and the client's kernel reset every answer, because it came from an address
+it had never dialled. None of that reaches the application, which sees only
+silence. Capture on the far side before concluding the far side is quiet.
 
 **Translation is a pair.** Anything that rewrites a packet must see the reply,
 and a route that lets the reply skip that machine breaks the pair. That is the

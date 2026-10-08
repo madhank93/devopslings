@@ -21,8 +21,8 @@ case-4: layer=? because=?
 `layer` is `l4` or `l7`. `because` is one of `termination`, `routing`,
 `sourceaddress`, `throughput`, `protocol`.
 
-One of the four is a case where L7 cannot do what is being asked at all, however
-it is configured. Finding that one is most of the exercise.
+Cases 1 and 4 are both HTTPS and land on opposite layers. Working out why is
+most of the exercise.
 
 ## What you're being graded on
 
@@ -43,12 +43,15 @@ Everything else follows from that sentence.
 
 | | L4 | L7 |
 |---|---|---|
-| Connections | one, forwarded | two, one either side |
-| Can route on | address, port | header, path, method, cookie |
-| Can terminate TLS | no | yes |
-| Backend sees source | the real client | the balancer |
+| Connections | one, forwarded (an L4 *proxy* opens two, but only copies bytes) | two, one either side |
+| Can route on | address, port (and SNI, without decrypting) | header, path, method, cookie |
+| Can terminate TLS | yes — decrypts and forwards the bytes without reading the HTTP inside (AWS NLB TLS listener, HAProxy `mode tcp`) | yes, and then reads the request |
+| Backend sees source | the real client, when the balancer passes packets through (NAT, DSR); an L4 proxy hides it too | the balancer |
 | Understands your protocol | does not need to | must |
 | Cost per connection | low | parse, buffer, re-encrypt |
+
+The TLS row is the one people get wrong. Where TLS ends and whether anything
+reads what is inside are separate choices. Only the second one is L7.
 
 <details>
 <summary>Hint 1 — ask what the routing key is, and when it exists</summary>
@@ -67,32 +70,34 @@ time, and is committed.
 Terminating gives you visibility and takes three things: the client's source
 address, the protocol's own end-to-end semantics, and throughput.
 
-In two of these cases one of those costs is disqualifying.
+In two of these cases one of those costs is disqualifying. For TLS, "end-to-end
+semantics" includes who holds the key and who sees the client's certificate.
 
 </details>
 
 <details>
-<summary>Hint 3 — two cases share an answer for opposite reasons</summary>
+<summary>Hint 3 — cases 1 and 4 are both HTTPS</summary>
 
-Both are `protocol`, and they are not the same problem. In one, the balancer
-cannot understand what is on the wire. In the other it understands perfectly
-and the thing it would route on has not been sent yet.
+Terminating TLS is not what makes a balancer L7; reading the request after
+decryption is. So for case 1, ask which requirement needs the request read.
+For case 4, ask whether anything but the backend may decrypt at all.
 
 </details>
 
 ## Working through them
 
-**Case 1 — the checkout front end.** Several things here want L7: routing `/api/`
-by path, adding a header. But those are preferences and could be moved elsewhere
-— into the application, into a service mesh, into DNS.
+**Case 1 — the checkout front end.** TLS must end before the application, and
+that looks like the deciding constraint. It is not: an L4 balancer with a TLS
+listener terminates TLS and forwards the decrypted bytes without reading them,
+and the application team still never holds the key.
 
-One requirement cannot move. The certificate must terminate before traffic
-reaches the application, because the application team may not hold the private
-key. Only something that terminates TLS can do that, and terminating is the
-definition of L7.
+What an L4 balancer cannot do is send `/api/` to one pool and everything else to
+another. The path is inside each HTTP request, and a single keep-alive
+connection carries requests for both pools. Choosing per request means parsing
+every request, and that is L7. The `X-Request-Id` rewrite needs the same.
 
-`layer=l7 because=termination`. Not `routing`: the path split is real, and it is
-the second reason, not the deciding one.
+`layer=l7 because=routing`. `termination` is the distractor: it is required, and
+both layers can do it.
 
 **Case 2 — telemetry ingest.** A private binary framing protocol over long-lived
 TCP. There are no requests and no headers. An L7 balancer would have nothing to
@@ -110,7 +115,8 @@ requests/second. Nothing here needs L7 in the slightest.
 
 And one thing rules it out. The application itself must log the true source
 address. An L7 balancer opens its own connection, so the backend sees the
-balancer's address — always, by construction.
+balancer's address — always, by construction. (So does an L4 *proxy*; this
+needs an L4 balancer that passes packets through, which is the usual kind.)
 
 The usual answer is `X-Forwarded-For`. The auditors explicitly rejected it, and
 their reasoning is sound: a header is a claim made by whoever wrote it, and
@@ -119,25 +125,22 @@ source address is not a claim.
 
 `layer=l4 because=sourceaddress`.
 
-**Case 4 — the read replicas.** This is the one that cannot be done.
+**Case 4 — the settlement API.** HTTPS again, and the opposite answer.
 
-The wish is to route read-only transactions to replicas and everything else to
-the primary. The balancer would have to know, at the moment it picks a backend,
-whether the traffic is read-only. It cannot: read-only-ness is a property of
-statements sent later, inside a connection that carries many transactions over
-its life.
+Before an L7 balancer can read a byte of HTTP it has to decrypt, and to decrypt
+it has to hold the service's private key. The policy forbids exactly that. It
+would also break authentication: the TLS handshake the backend sees would be the
+balancer's, so the backend would verify the balancer's certificate, not the
+caller's — and the balancer presenting one on the caller's behalf is the other
+thing the policy forbids.
 
-Even a balancer that fully understood the PostgreSQL wire protocol could not do
-this, because a connection is not a transaction. Routing per connection is the
-only thing available, and the requirement is per transaction.
+An L4 balancer forwards the connection with the handshake untouched. The backend
+holds the only key and sees the caller's certificate itself. No routing is
+needed, so nothing is lost.
 
-`layer=l4 because=protocol` — the same token as case 2, the opposite reason. In
-case 2 the protocol is opaque. Here it is entirely legible and the routing key
-does not exist yet.
-
-The real answer to case 4 lives in the application or in a connection pooler that
-understands transactions — two connection pools, one per role. Not in a load
-balancer.
+`layer=l4 because=termination`. Same token that case 1 is tempted by, opposite
+direction: case 1 needs TLS to end at the balancer and both layers can do it;
+case 4 needs TLS *not* to end there, and only L4 leaves it alone.
 
 ## Solving it
 
@@ -145,10 +148,10 @@ balancer.
 <summary>Solution</summary>
 
 ```
-case-1: layer=l7 because=termination
+case-1: layer=l7 because=routing
 case-2: layer=l4 because=protocol
 case-3: layer=l4 because=sourceaddress
-case-4: layer=l4 because=protocol
+case-4: layer=l4 because=termination
 ```
 
 </details>
@@ -177,8 +180,9 @@ Three questions decide this every time:
 1. **What is the routing key, and does it exist when the decision must be made?**
    Per-connection facts are available to L4. Per-request facts need L7. Facts
    that arrive later than the decision are available to neither.
-2. **Does anything require the connection to end at the balancer?** Key custody,
-   header rewriting, response caching. If yes, L7 — and accept the costs.
+2. **Does anything require the request to be read at the balancer?** Path or
+   header routing, header rewriting, response caching. If yes, L7 — and accept
+   the costs. Key custody alone is not this: an L4 TLS listener covers it.
 3. **Does anything require the connection to survive intact?** Source address,
    end-to-end TLS, a protocol nobody else parses. If yes, L4.
 

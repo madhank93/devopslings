@@ -14,16 +14,70 @@ $ for i in $(seq 1 3); do curl -s --interface 127.0.0.3 -o /dev/null -w '%{http_
 127.0.0.3 has sent three requests all day. It is being refused because of what
 127.0.0.2 did.
 
-The limiter is not malfunctioning. It is counting exactly what it was told to
-count, and getting the right answer to the wrong question:
+The limiter reports which address it counted each request under:
 
 ```
 $ curl -s --interface 127.0.0.3 -o /dev/null -D - http://127.0.0.1/health | grep -i x-limiter-saw
-X-Limiter-Saw: 127.0.0.1
 ```
 
-Every request it has ever seen came from 127.0.0.1 — the edge in front of it.
-One key, one bucket, and the whole internet sharing it.
+## Your objective
+
+1. **Per-client limiting.** A flooding client gets 429s; a client that has sent
+   three requests does not, at the same moment.
+2. **The limit still exists.** A flood from one address is still refused —
+   raising the rate until nothing trips is not a fix.
+3. **No self-exemption.** A client sending a different `X-Forwarded-For` on
+   every request does not get a fresh bucket each time.
+
+Then `/root/answers/realip.md`:
+
+```
+before_key: <the address every request was counted under>
+xff_trust: <leftmost | rightmost-untrusted>
+```
+
+## What you're being graded on
+
+The three requirements, behaviourally, plus two more. A client that connects to
+the limiter on `127.0.0.1:8081` directly, sending a different `X-Forwarded-For`
+on every request, is still limited. And traffic still has to reach the origin —
+a limiter that is perfectly fair and serves nothing is not a pass.
+
+<details>
+<summary>Hint 1 — ask the limiter what it sees</summary>
+
+```
+$ curl -s --interface 127.0.0.3 -o /dev/null -D - http://127.0.0.1/health | grep -i x-limiter-saw
+```
+
+If that address is the same for every client, the key is the connection's peer
+and not the client. Which server block is that response coming from, and what is
+in front of it?
+
+</details>
+
+<details>
+<summary>Hint 2 — the header is already being sent</summary>
+
+The edge already adds `X-Forwarded-For`. The limiter is not reading it. The
+`ngx_http_realip_module` directives are `set_real_ip_from`, `real_ip_header` and
+`real_ip_recursive`, and they belong in the server block doing the limiting.
+
+</details>
+
+<details>
+<summary>Hint 3 — before you finish, try to cheat</summary>
+
+```
+$ for i in $(seq 1 10); do
+    curl -s --interface 127.0.0.4 -H "X-Forwarded-For: 9.9.9.$i" -o /dev/null -w '%{http_code} ' http://127.0.0.1/health
+  done
+```
+
+If those are all 200, your limiter believes whatever a client tells it. The
+trust list should contain the proxies you run, and nothing else.
+
+</details>
 
 ## $remote_addr is the last hop, not the client
 
@@ -115,73 +169,14 @@ The one thing never to write is the tempting one:
 set_real_ip_from 0.0.0.0/0;   # "trust everything"
 ```
 
-That declares the whole internet a trusted proxy, so the leftmost — the forged —
-entry wins, and the rate limiter becomes opt-in.
+That declares the whole internet a trusted proxy. With `real_ip_recursive on`
+every entry is skipped as trusted and the leftmost — the forged — one wins. With
+it off, nginx takes the last entry: right when the request came through the
+edge, and whatever the caller wrote when it reached the limiter any other way.
 
 After the fix, `$remote_addr` *is* the client address for everything that runs
 after the real_ip module: the limiter key, the access log, `allow`/`deny`. That
 is the point of it rewriting the variable rather than exposing a new one.
-
-## Your objective
-
-1. **Per-client limiting.** A flooding client gets 429s; a client that has sent
-   three requests does not, at the same moment.
-2. **The limit still exists.** A flood from one address is still refused —
-   raising the rate until nothing trips is not a fix.
-3. **No self-exemption.** A client sending a different `X-Forwarded-For` on
-   every request does not get a fresh bucket each time.
-
-Then `/root/answers/realip.md`:
-
-```
-before_key: <the address every request was counted under>
-xff_trust: <leftmost | rightmost-untrusted>
-```
-
-## What you're being graded on
-
-The three requirements, behaviourally, plus one more: traffic still has to reach
-the origin. A limiter that is perfectly fair and serves nothing is not a pass.
-
-Requirement 3 is the one that separates the two fixes that both make the
-symptom go away. Trusting `0.0.0.0/0` produces beautiful per-client limiting
-right up until someone reads your response headers and starts forging.
-
-<details>
-<summary>Hint 1 — ask the limiter what it sees</summary>
-
-```
-$ curl -s --interface 127.0.0.3 -o /dev/null -D - http://127.0.0.1/health | grep -i x-limiter-saw
-```
-
-If that address is the same for every client, the key is the connection's peer
-and not the client. Which server block is that response coming from, and what is
-in front of it?
-
-</details>
-
-<details>
-<summary>Hint 2 — the header is already being sent</summary>
-
-The edge already adds `X-Forwarded-For`. The limiter is not reading it. The
-`ngx_http_realip_module` directives are `set_real_ip_from`, `real_ip_header` and
-`real_ip_recursive`, and they belong in the server block doing the limiting.
-
-</details>
-
-<details>
-<summary>Hint 3 — before you finish, try to cheat</summary>
-
-```
-$ for i in $(seq 1 10); do
-    curl -s --interface 127.0.0.4 -H "X-Forwarded-For: 9.9.9.$i" -o /dev/null -w '%{http_code} ' http://127.0.0.1/health
-  done
-```
-
-If those are all 200, your limiter believes whatever a client tells it. The
-trust list should contain the proxies you run, and nothing else.
-
-</details>
 
 ## What actually happened
 

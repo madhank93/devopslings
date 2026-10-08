@@ -23,21 +23,15 @@ tasks:
       groupadd -f deploy
       id -u dana >/dev/null 2>&1 || useradd --create-home --shell /bin/bash dana
 
-      # dana was added to the group after their session started, which is the
-      # entire scenario. The membership is real and their running shell has an
-      # older credential set that does not include it.
-      usermod -aG deploy dana
-
       chgrp deploy /srv/deploy
       chmod 0770 /srv/deploy
       printf 'release=2026.08.03\nchannel=stable\n' > /srv/deploy/manifest.env
       chgrp deploy /srv/deploy/manifest.env
       chmod 0660 /srv/deploy/manifest.env
 
-      # A long-running login shell for dana, started BEFORE the usermod above
-      # would have taken effect for it. This is the session that cannot read
-      # the file — it is what a student would be looking at over dana's
-      # shoulder.
+      # A long-running login shell for dana, started BEFORE the usermod below.
+      # This is the session that cannot read the file — it is what a student
+      # would be looking at over dana's shoulder.
       cat > /etc/systemd/system/dana-session.service <<'UNIT'
       [Unit]
       Description=dana's login session (simulated)
@@ -49,7 +43,14 @@ tasks:
       Restart=no
       UNIT
       systemctl daemon-reload
-      systemctl start dana-session.service >/dev/null 2>&1 || true
+      # Out of the group first, so a re-run starts the session without it too.
+      gpasswd -d dana deploy >/dev/null 2>&1 || true
+      systemctl restart dana-session.service >/dev/null 2>&1 || true
+
+      # dana is added to the group after the session started, which is the
+      # entire scenario. The membership is real and the running shell has an
+      # older credential set that does not include it.
+      usermod -aG deploy dana
 
       # deploy-status needs root to read the fleet table, and dana is supposed
       # to be able to run just that one command. Nobody has set that up.

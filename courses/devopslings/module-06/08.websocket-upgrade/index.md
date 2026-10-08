@@ -2,10 +2,9 @@
 kind: lesson
 title: "the socket will not open, and once it does it dies after sixty seconds"
 description: |
-  A WebSocket through a proxy is two problems wearing one ticket. The handshake
-  is an HTTP request that asks to stop being HTTP, and a proxy that forwards it
-  like any other request strips the part that asks. Then, once it works, an idle
-  socket looks exactly like a stalled upstream to a read timeout.
+  The live feed fails to connect through the proxy and works straight at the
+  application. On a test box where it did connect, sockets died after about a
+  minute, every time.
 name: websocket-upgrade
 slug: websocket-upgrade
 createdAt: "2026-08-23"
@@ -104,10 +103,9 @@ tasks:
          to say for ninety seconds is a normal socket, not a broken one.
 
       2. Ordinary requests must give up quickly: with the application stalled,
-         http://127.0.0.1/health must return within 10 seconds. The default is
-         60, and the deadline the websocket needs is minutes — applied to the
-         whole server, that is how one wedged backend holds every worker on the
-         box. The two routes need two deadlines.
+         a plain request such as http://127.0.0.1/health or /users must return
+         within 10 seconds. A wedged backend must not hold every worker on the
+         box for as long as a quiet socket is allowed to live.
 
       Then write /root/answers/ws.md, exactly two lines:
 
@@ -153,16 +151,21 @@ tasks:
       fi
 
       # ---- and ordinary requests still give up quickly ----------------------
+      # Two routes, so a short deadline on /health alone does not stand in for
+      # the ordinary traffic it represents.
       curl -s -X POST -m 5 'http://172.32.0.11:8081/admin/mode?value=slow&ms=30000' >/dev/null 2>&1 || true
-      probe=$(curl -s -o /dev/null -m 60 -w '%{http_code} %{time_total}' http://127.0.0.1/health 2>/dev/null || echo "000 99")
+      for route in /health /users; do
+        probe=$(curl -s -o /dev/null -m 60 -w '%{http_code} %{time_total}' "http://127.0.0.1$route" 2>/dev/null || echo "000 99")
+        ptime=$(printf '%s' "$probe" | awk '{print $2}')
+        psecs=${ptime%%.*}
+        : "${psecs:=99}"
+        [ "$psecs" -ge 12 ] && break
+      done
       restore
-      ptime=$(printf '%s' "$probe" | awk '{print $2}')
-      psecs=${ptime%%.*}
-      : "${psecs:=99}"
 
       if [ "$psecs" -ge 12 ]; then
-        echo "not yet: with the application stalled, /health took ${ptime}s, and the"
-        echo "         requirement is under ten."
+        echo "not yet: with the application stalled, $route took ${ptime}s, and the"
+        echo "         requirement is under ten for ordinary requests."
         echo "         nginx waits 60s by default, and the deadline a websocket needs is"
         echo "         longer still. A socket that is idle by design and a backend that"
         echo "         has wedged look identical to a timeout, so the two routes need"

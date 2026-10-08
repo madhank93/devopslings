@@ -2,10 +2,8 @@
 kind: lesson
 title: "one capture, three connections, three different failures"
 description: |
-  All three were reported as "it timed out". One never got a reply, one was
-  refused outright, and one was throttled to a standstill by the machine that
-  asked for the data. The packets say which is which, and they say it in the
-  first few lines.
+  All three were reported as "it timed out". They are three different
+  failures, and the packets say which is which in the first few lines.
 name: read-the-capture
 slug: read-the-capture
 createdAt: "2026-08-08"
@@ -208,7 +206,7 @@ tasks:
           echo "not yet: flow-$port — you said verdict=$gv."
           case "$port" in
             9301) echo "         Count the packets from the client and look at their flags."
-                  echo "         The same one, several times, at growing intervals, and not"
+                  echo "         The same one, several times, a second or more apart, and not"
                   echo "         a single packet back. Nobody refused it. Nobody answered." ;;
             9302) echo "         Look at what came back, and how fast. One packet, one flag,"
                   echo "         immediately. That is a host saying nothing is listening —"

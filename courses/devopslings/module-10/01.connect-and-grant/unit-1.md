@@ -34,10 +34,10 @@ production.
 
 ## What you're being graded on
 
-That `app` can still `SELECT`, `INSERT`, `UPDATE` and `DELETE`; that a
-grader-run `DROP TABLE orders` is refused with a permission error and the table
-survives; that `app` no longer owns `orders`; and that `app` cannot `CREATE
-TABLE` in `public`.
+That `app` can still `SELECT`, `INSERT`, `UPDATE` and `DELETE` on `orders` and
+`customers`; that a grader-run `DROP TABLE orders` is refused with a permission
+error and the table survives; that `app` no longer owns anything in `public`;
+and that `app` cannot `CREATE TABLE` there.
 
 <details>
 <summary>Hint 1 — revoking is not enough, and this is the part people miss</summary>

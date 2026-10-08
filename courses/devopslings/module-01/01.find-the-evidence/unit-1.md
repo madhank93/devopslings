@@ -11,7 +11,7 @@ first place anyone looked was the obvious one:
 $ ls -l /var/log/invoice-sync/
 total 4
 -rw-r--r-- 1 root root   0 Aug  3 03:00 app.log
--rw-r--r-- 1 root root 108 Aug  3 03:00 access.log
+-rw-r--r-- 1 root root 117 Aug  3 03:00 access.log
 
 $ cat /var/log/invoice-sync/app.log
 $

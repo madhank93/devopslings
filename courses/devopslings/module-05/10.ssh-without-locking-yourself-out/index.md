@@ -4,8 +4,7 @@ title: "turn off password logins on a box you are sitting inside"
 description: |
   Security wants password authentication off. The dangerous part is not the
   setting, it is the order: turn it off before key login works and the next
-  person to connect is nobody. There is also a drop-in file that quietly wins
-  over the config you are about to edit.
+  person to connect is nobody.
 name: ssh-without-locking-yourself-out
 slug: ssh-without-locking-yourself-out
 createdAt: "2026-08-21"

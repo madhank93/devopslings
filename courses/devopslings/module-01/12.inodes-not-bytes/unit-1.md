@@ -1,5 +1,5 @@
 ---
-title: "no space left on device, and 64M free"
+title: "no space left on device, and 57M free"
 ---
 
 ## The situation
@@ -11,17 +11,16 @@ the same thing:
 [error] failed to write session: open /srv/spool/sessions/sess-a91f: no space left on device
 ```
 
-So you check, and the filesystem is empty:
+So you check, and the filesystem is nearly empty:
 
 ```
 $ df -h /srv/spool
 Filesystem      Size  Used Avail Use% Mounted on
-tmpfs            64M     0   64M   0% /srv/spool
+tmpfs            64M  7.9M   57M  13% /srv/spool
 ```
 
-Zero used. 64M available. `ENOSPC` anyway. There is no large file to hunt for
-this time, and `du` will not help you, because the thing that ran out is not
-measured in bytes.
+13% used. 57M available. `ENOSPC` anyway, and there is no large file to hunt
+for this time.
 
 ## Your objectives
 
@@ -36,7 +35,9 @@ back here.
 
 ## What you're being graded on
 
-Inode usage back under 50%, the payload byte-for-byte intact, writes working —
+`/srv/spool` back under 50% on whatever actually ran out — on the filesystem
+as it was made, not remounted bigger — the payload byte-for-byte intact,
+writes working —
 and then the recurrence: the check creates 400 stale and 40 live session files,
 runs the reaper, and requires that all 400 go and all 40 stay.
 
@@ -49,12 +50,12 @@ $ df -i /srv/spool     # inodes
 ```
 
 Every file, directory, symlink and socket consumes one **inode**, regardless of
-its size. A zero-byte file costs one inode and no data blocks at all. The inode
-table is allocated when the filesystem is made and, on most filesystems, cannot
-be grown afterwards.
+its size. A zero-byte file costs one inode and no data blocks at all. On ext4 the
+inode table is sized when the filesystem is made and cannot be grown
+afterwards.
 
-So a filesystem holding two thousand empty files is completely full while being
-completely empty. `ENOSPC` is the same errno for both conditions, which is why
+So a filesystem holding two thousand tiny files is completely full while being
+nearly empty. `ENOSPC` is the same errno for both conditions, which is why
 the error message sends everyone to `df -h` and then to a dead end.
 
 ```
@@ -68,13 +69,13 @@ tmpfs            2000  2000     0  100% /srv/spool
 <details>
 <summary>Hint 2 — find where the entries went, not where the bytes went</summary>
 
-`du -sh` sorts by size and will rank a directory of two thousand empty files
-below a single 1 MB log. Count entries instead:
+`du -sh` measures size, so it ranks a directory of two thousand tiny files
+below a single 10 MB log. Count entries instead:
 
 ```
 $ for d in /srv/spool/*/; do printf '%8d  %s\n' "$(find "$d" | wc -l)" "$d"; done
-    2001  /srv/spool/sessions/
       13  /srv/spool/payload/
+    1986  /srv/spool/sessions/
 ```
 
 Then look at what they actually are:
@@ -128,7 +129,7 @@ $ find /srv/spool/sessions -type f -mtime +1 -delete
 
 $ df -i /srv/spool
 Filesystem     Inodes IUsed IFree IUse% Mounted on
-tmpfs            2000    16  1984    1% /srv/spool
+tmpfs            2000    15  1985    1% /srv/spool
 ```
 
 And the recurrence:
@@ -145,8 +146,8 @@ echo "session-reaper: done"
 ### Why this is a lesson at all
 
 `disk-full-triage` earlier in this module was a filesystem that was genuinely
-full of bytes you could not see. This is the opposite: a filesystem with no
-bytes in it at all that cannot accept another file. Both report `ENOSPC`, and
+full of bytes you could not see. This is the opposite: a filesystem with
+almost no bytes in it that cannot accept another file. Both report `ENOSPC`, and
 the reflex both trigger — look for the big file — is right in one case and a
 dead end in the other.
 
@@ -154,7 +155,7 @@ Three things worth keeping:
 
 1. **`ENOSPC` is two errors sharing one errno.** Check `df -i` alongside `df
    -h`, always, and it costs one command. The signature here is unmistakable
-   once you have seen it: 0% bytes, 100% inodes. Mail spools, session stores,
+   once you have seen it: bytes to spare, 100% inodes. Mail spools, session stores,
    cache directories and anything that writes one small file per event are the
    usual candidates.
 

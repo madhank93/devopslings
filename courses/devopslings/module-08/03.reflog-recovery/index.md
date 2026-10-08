@@ -51,6 +51,9 @@ tasks:
       git add -A
       git commit -q -m 'release: ship v2.0'
 
+      # Kept for the grader: recovery means these exact commits, not retyped ones.
+      git rev-parse HEAD > .git/devopslings-release
+
       # The accident - reset main back to base commit
       base=$(git rev-list --max-parents=0 main)
       git reset --hard "$base" >/dev/null
@@ -70,24 +73,13 @@ tasks:
       to v1.0, feature-a.txt and feature-b.txt are not on disk. `git log` shows
       nothing but the base commit.
 
-      They are not actually gone. `reset --hard` moved the branch pointer; it did not
-      delete the commits. Git keeps a log of every position HEAD has held — the
-      reflog — and the lost commits are still in it, still whole:
-
-        $ git reflog
-        <sha> HEAD@{1}: commit: release: ship v2.0
-        <sha> HEAD@{2}: commit: feat: add feature b
-        ...
-
-      Bring main back to the release commit so the work is reachable again — VERSION
-      at v2.0, both feature files restored. Point the branch back at the lost tip:
-
-        $ git reset --hard <the sha of the release commit from the reflog>
+      Get the work back onto main — VERSION at v2.0, both feature files restored — as
+      the commits that were lost, not new ones that happen to look the same.
 
       Then write recovery.md with exactly two lines:
 
         recovered_version: <what VERSION should say once the work is back>
-        found_with: <the git log of former HEAD positions you used to find the lost commit>
+        found_with: <the command that showed you where the lost commits were>
       Q
 
       echo "scenario ready — main reset --hard back to base, three commits lost from the branch"
@@ -100,6 +92,28 @@ tasks:
 
       ans=recovery.md
       want='shipped: v2.0'
+
+      # The lost commits themselves, by hash: re-committing the same files makes
+      # new commits and loses the history the reset dropped.
+      rel=$(cat .git/devopslings-release 2>/dev/null || true)
+      if [ -n "$rel" ] && ! git merge-base --is-ancestor "$rel" main 2>/dev/null; then
+        head_subj=$(git log -1 --format=%s main 2>/dev/null || true)
+        echo "not yet: main does not contain the original release commit $(printf '%s' "$rel" | cut -c1-7)"
+        echo "         (main's tip: '${head_subj:-nothing}')."
+        if git merge-base --is-ancestor "$rel" HEAD 2>/dev/null; then
+          echo "         HEAD has it, but main does not: a checkout of the old commit"
+          echo "         leaves the branch where the reset put it. Move main itself."
+        else
+          echo "         The files alone are not the recovery — the commits that were"
+          echo "         lost still exist, with their original hashes. Point main back"
+          echo "         at them."
+        fi
+        exit 1
+      fi
+      if [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo none)" != main ]; then
+        echo "not yet: check out main — the recovered work has to be on the branch."
+        exit 1
+      fi
 
       # The recovered work has to be real: committed and reachable from HEAD, not
       # a file typed back by hand. Read it from the committed tree, not the disk.

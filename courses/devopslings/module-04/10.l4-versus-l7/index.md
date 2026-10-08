@@ -21,6 +21,7 @@ tasks:
     timeout_seconds: 180
     run: |
       set -e
+      rm -rf /srv/reqs
       install -d /srv/reqs /root/answers
 
       cat > /srv/reqs/case-1-checkout.md <<'CASE'
@@ -64,17 +65,20 @@ tasks:
       request.
       CASE
 
-      cat > /srv/reqs/case-4-database.md <<'CASE'
-      # Case 4 — the read replicas
+      cat > /srv/reqs/case-4-settlement.md <<'CASE'
+      # Case 4 — the settlement API
 
-      A PostgreSQL primary with six read replicas. The team wants the balancer
-      to send read-only transactions to the replicas and everything else to the
-      primary, so that applications can point at one address and stop caring.
+      An internal HTTPS API that moves money between ledgers. Callers are
+      authenticated by client certificate: the backend itself verifies each
+      caller's certificate during the TLS handshake and authorises by the
+      identity in it.
 
-      The protocol is the PostgreSQL wire protocol over TCP, optionally with
-      TLS. Whether a transaction is read-only is not known from the connection —
-      it is a property of the statements sent inside it, and a single connection
-      carries many transactions over its lifetime.
+      Security policy: this service's TLS private key lives only on the backend
+      hosts. Nothing between the caller and the backend may hold it, and no
+      component may present a certificate on a caller's behalf.
+
+      1,500 requests/second over a few hundred long-lived connections. Any
+      backend can serve any request; no content-based routing is needed.
       CASE
 
       cat > /root/answers/verdict.md <<'ANS'
@@ -101,8 +105,8 @@ tasks:
       Write your answers in /root/answers/verdict.md, which has the four lines
       and the allowed values already.
 
-      One of these four is a case where L7 cannot do what is being asked at all,
-      no matter how it is configured. Finding that one is most of the exercise.
+      Cases 1 and 4 are both HTTPS and land on opposite layers. Working out
+      why is most of the exercise.
 
       Nothing needs to be installed or configured. This is graded on the
       decisions and the reasons.
@@ -153,8 +157,8 @@ tasks:
           fail=1
           echo "not yet: case-$n — you said $gl."
           case "$n" in
-            1) echo "         Read what has to happen to the TLS session and what decides"
-               echo "         which pool a request goes to. Both need the request itself." ;;
+            1) echo "         Read what decides which pool a request goes to, and where in"
+               echo "         the traffic that thing is written." ;;
             2) echo "         There are no requests in this protocol. Ask what an L7"
                echo "         balancer would parse, and what it would cost at 12 Gbit/s"
                echo "         across 90,000 connections it has to terminate twice." ;;
@@ -162,38 +166,38 @@ tasks:
                echo "         its own. Ask what source address the backend then sees, and"
                echo "         whether a header carrying the original is what the auditors"
                echo "         said they would accept." ;;
-            4) echo "         Look again at whether the balancer can know, at connection"
-               echo "         time, what it is being asked to route on." ;;
+            4) echo "         Ask what an L7 balancer has to do before it can read one byte"
+               echo "         of HTTP on this connection, and whether the policy lets it." ;;
           esac
         elif [ "$gt" != "$want_token" ]; then
           fail=1
           echo "not yet: case-$n — the layer is right, '$gt' is not the constraint that"
           echo "         decided it."
           case "$n" in
-            1) echo "         Several things here need L7. Only one of them is impossible"
-               echo "         to do anywhere else in the stack: the key may not reach the"
-               echo "         application, so the connection must end at the balancer." ;;
+            1) echo "         Terminating TLS does not need L7: an L4 balancer with a TLS"
+               echo "         listener decrypts and forwards the bytes without reading them."
+               echo "         What here can only be done by reading each HTTP request?" ;;
             2) echo "         It is not that L7 would be slow. It is that there is nothing"
                echo "         for it to parse — the framing is ours and no balancer knows"
                echo "         it." ;;
             3) echo "         The volume is trivial and there is no TLS and no routing."
                echo "         What is left is the one thing terminating the connection"
                echo "         destroys." ;;
-            4) echo "         The routing key does not exist at connection time. It is"
-               echo "         inside statements sent later, on a connection that carries"
-               echo "         many transactions — so no balancer can classify it." ;;
+            4) echo "         Nothing here is about volume, routing or an unknown protocol."
+               echo "         The policy decides where the TLS session may end, and it may"
+               echo "         not end at the balancer." ;;
           esac
         fi
       done <<'EXPECT'
-      1 l7 termination
+      1 l7 routing
       2 l4 protocol
       3 l4 sourceaddress
-      4 l4 protocol
+      4 l4 termination
       EXPECT
 
       if [ "$fail" -ne 0 ]; then
         exit 1
       fi
 
-      echo "PASS — four layers chosen and four constraints named, including the case"
-      echo "       where L7 cannot answer the question at all."
+      echo "PASS — four layers chosen and four constraints named, including the HTTPS"
+      echo "       service whose TLS session must not end at the balancer."

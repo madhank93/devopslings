@@ -18,13 +18,63 @@ $ wsprobe http://127.0.0.1/ws --idle 2
 handshake failed: HTTP/1.1 426 Upgrade Required
 ```
 
-`426 Upgrade Required` is the application saying *you asked me for this URL as
-ordinary HTTP*. The request reached it, and by the time it did, the part that
-made it a WebSocket handshake was gone.
-
 And there is an older report nobody solved: on a test box the feed did connect,
 and then died after about a minute, every time. It was blamed on the client's
-reconnect logic. It was not the client.
+reconnect logic.
+
+## Your objective
+
+1. `wsprobe http://127.0.0.1/ws --idle 90` succeeds.
+2. With the application stalled, ordinary requests such as
+   `http://127.0.0.1/health` return within 10 seconds.
+
+Then `/root/answers/ws.md`:
+
+```
+handshake_code: <the status the proxied handshake got before the fix>
+idle_limit_seconds: <how long an idle proxied socket survived, before you changed any timeout>
+```
+
+## What you're being graded on
+
+**The socket opens and survives ninety seconds of silence.** Both halves are
+checked by the same probe.
+
+**Ordinary requests give up inside ten seconds.** The grader stalls the
+application and times two plain requests, `/health` and `/users`.
+
+**Both numbers**, as they were before you changed anything.
+
+<details>
+<summary>Hint 1 — compare the two requests</summary>
+
+The application answers `/ws` correctly when asked directly and 426 when asked
+through the proxy. The difference is in the headers that arrived. Which headers
+does a WebSocket handshake need, and what class of header are they?
+
+</details>
+
+<details>
+<summary>Hint 2 — three directives, and the order they matter in</summary>
+
+`proxy_http_version 1.1` first: `Upgrade` does not exist in HTTP/1.0, so
+forwarding it over 1.0 achieves nothing. Then `Upgrade: $http_upgrade` and
+`Connection: "upgrade"`.
+
+</details>
+
+<details>
+<summary>Hint 3 — it opens, and then it does not last</summary>
+
+```
+$ time wsprobe http://127.0.0.1/ws --idle 90
+```
+
+Watch how long it survives, and compare that number with nginx's default
+`proxy_read_timeout`. Then put the longer one where it belongs — not on the
+whole server.
+
+</details>
 
 ## A WebSocket starts as an HTTP request that asks to stop
 
@@ -94,67 +144,6 @@ dependency then holds all of them, and one broken route becomes a down site.
 The two cases genuinely differ — for `/ws` a long silence is normal, for
 `/health` it is a fault — so they need different deadlines, which is what a
 separate `location` is for.
-
-## Your objective
-
-1. `wsprobe http://127.0.0.1/ws --idle 90` succeeds.
-2. With the application stalled, `http://127.0.0.1/health` returns within 10
-   seconds. nginx's own default is 60, and the socket needs minutes — so this
-   is not "leave it alone", it is a second, shorter deadline for the route
-   where silence means something is wrong.
-
-Then `/root/answers/ws.md`:
-
-```
-handshake_code: <the status the proxied handshake got before the fix>
-idle_limit_seconds: <how long an idle proxied socket survived, before you changed any timeout>
-```
-
-## What you're being graded on
-
-**The socket opens and survives ninety seconds of silence.** Both halves — a
-config with the upgrade headers but the default timeout passes the handshake and
-fails the idle.
-
-**Ordinary requests give up inside ten seconds.** The grader stalls the
-application and times a plain request. This is what rejects the server-level
-raise — and it also means picking a deadline for ordinary traffic rather than
-inheriting one.
-
-**Both numbers.** 426 is what the upstream said when the handshake arrived
-stripped, and 60 is nginx's default `proxy_read_timeout` — the one that was
-killing the connection while nothing in the config mentioned it.
-
-<details>
-<summary>Hint 1 — compare the two requests</summary>
-
-The application answers `/ws` correctly when asked directly and 426 when asked
-through the proxy. The difference is in the headers that arrived. Which headers
-does a WebSocket handshake need, and what class of header are they?
-
-</details>
-
-<details>
-<summary>Hint 2 — three directives, and the order they matter in</summary>
-
-`proxy_http_version 1.1` first: `Upgrade` does not exist in HTTP/1.0, so
-forwarding it over 1.0 achieves nothing. Then `Upgrade: $http_upgrade` and
-`Connection: "upgrade"`.
-
-</details>
-
-<details>
-<summary>Hint 3 — it opens, and then it does not last</summary>
-
-```
-$ time wsprobe http://127.0.0.1/ws --idle 90
-```
-
-Watch how long it survives, and compare that number with nginx's default
-`proxy_read_timeout`. Then put the longer one where it belongs — not on the
-whole server.
-
-</details>
 
 ## What actually happened
 

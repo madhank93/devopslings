@@ -3,9 +3,9 @@ kind: lesson
 title: "The disk is full but du says it isn't"
 description: |
   /var/log/app is at 91% and climbing, but `du` can only account for a few
-  kilobytes of it. Deleting files does nothing. Learn to find space that is
-  held by a process rather than by a directory entry — and why killing the
-  process is not the same as fixing it.
+  kilobytes of it. Deleting files does nothing. Learn to account for space
+  that `du` cannot see — and why the fix that works for two seconds is not a
+  fix.
 name: disk-full-triage
 slug: disk-full-triage
 createdAt: "2026-07-31"
@@ -83,6 +83,10 @@ tasks:
     needs: [init_scenario]
     timeout_seconds: 60
     run: |
+      # Outlast RestartSec: a killed-not-stopped unit is "activating" for two
+      # seconds, then takes the space again.
+      sleep 4
+
       # 1. The space is actually back.
       avail=$(df --output=avail -BM /var/log/app | tail -1 | tr -dc '0-9')
       if [ "${avail:-0}" -lt 50 ]; then

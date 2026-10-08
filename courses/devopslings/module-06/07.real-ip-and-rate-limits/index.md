@@ -2,10 +2,8 @@
 kind: lesson
 title: "one client floods the API and everyone gets rate limited"
 description: |
-  The rate limiter is working exactly as configured, which is the problem: every
-  request arrives from the proxy in front of it, so the whole internet shares one
-  bucket. Fixing that by believing X-Forwarded-For is how you get a limiter that
-  anybody can walk straight past.
+  One client floods the API and every other client starts getting 429s. The
+  obvious fix produces a limiter that anybody can walk straight past.
 name: real-ip-and-rate-limits
 slug: real-ip-and-rate-limits
 createdAt: "2026-08-23"
@@ -213,6 +211,26 @@ tasks:
         echo "         The header is written by whoever is talking to you. Believing all"
         echo "         of it turns the rate limiter into an opt-in. A proxy may only"
         echo "         believe the entries appended by proxies it trusts."
+        exit 1
+      fi
+
+      # ---- and only the edge is believed ------------------------------------
+      #
+      # Straight to the limiter, from an address that is not the edge. Trusting
+      # every sender passes the edge-side check above and fails this one.
+      sleep 2
+      codes=""
+      for i in $(seq 1 10); do
+        c=$(curl -s -m 5 -o /dev/null -w '%{http_code}' --interface 127.0.0.6 \
+              -H "X-Forwarded-For: 9.9.9.$i" http://127.0.0.1:8081/health 2>/dev/null || echo 000)
+        codes="$codes $c"
+      done
+      if ! has429; then
+        echo "not yet: a client that connected to the limiter on 127.0.0.1:8081 directly,"
+        echo "         with a different X-Forwarded-For on every request, was never limited:"
+        echo "         $codes"
+        echo "         The limiter believed the header from a connection that was not the"
+        echo "         edge. set_real_ip_from is the list of senders whose header counts."
         exit 1
       fi
 

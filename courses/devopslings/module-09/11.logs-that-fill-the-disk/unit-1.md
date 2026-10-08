@@ -9,8 +9,7 @@ roughly every Thursday the host it runs on runs out of disk and somebody clears
 space by hand.
 
 The service writes a line per request at debug level. That is a decision
-somebody made once and it is not the bug. The bug is that nothing ever removes
-those lines:
+somebody made once, and it is not the bug:
 
 ```
 $ docker compose -p devopslings-logs up -d --build
@@ -19,8 +18,8 @@ $ docker logs $(docker compose -p devopslings-logs ps -aq quote-api) | wc -c
 40688914
 ```
 
-Forty megabytes for one replay of a day's traffic. Nothing rotates it, nothing
-expires it, and the file is not in `/var/log` where you would look for it.
+Forty megabytes for one replay of a day's traffic, and nothing under
+`/var/log` accounts for it.
 
 The fix everyone tries first is to delete the file. It does not work, and the
 reason it does not work is worth knowing before you try it.
@@ -139,8 +138,8 @@ not the first.
 unbounded.** Not `/var/log`, not managed by logrotate, not counted by anything
 you would normally watch: `/var/lib/docker/containers/<id>/<id>-json.log`. It
 grows for the life of the container and is deleted when the container is
-removed, which is why "restart it and the disk frees up" is folk knowledge that
-happens to be true and teaches the wrong lesson.
+removed — not when it restarts. A service redeployed every week never shows
+this; one nobody has deployed in six weeks does.
 
 **Set the default on the daemon, not on each service.** A per-service `logging:`
 block fixes one service written by one person who knew about this. The host-wide

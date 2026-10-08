@@ -148,9 +148,11 @@ surprise vacuum at a moment you did not choose, on top of the ordinary bloat
 nobody is now clearing.
 
 **At the limit the database refuses writes.** Not slowly, not partially: it
-stops accepting commands that would consume a transaction id and tells you to
-vacuum it in single-user mode. Getting back from there means downtime measured
-in however long a full-database freeze takes on your largest table. This is the
+stops accepting commands that would consume a transaction id, and the error
+tells you to run a database-wide `VACUUM` — and to resolve old prepared
+transactions and stale replication slots first, or that vacuum cannot help.
+Getting back from there means downtime measured in however long a
+full-database freeze takes on your largest table. This is the
 one Postgres failure mode where the warning period is months and the recovery
 is not.
 

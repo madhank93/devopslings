@@ -30,13 +30,68 @@ $ find / -xdev -perm -4000 -type f
 /usr/bin/su
 /usr/bin/sudo
 /usr/bin/umount
+/usr/lib/openssh/ssh-keysign
 /usr/local/bin/maint
 /opt/tools/backup
 ```
 
-Eleven setuid-root binaries. Two are backdoors. Nine are load-bearing. The
+Twelve setuid-root binaries. Two are backdoors. Ten are load-bearing. The
 difficulty of this lesson is not the search — it is telling which is which
 without breaking the box.
+
+## Your objectives
+
+- Find every setuid-root binary that does not belong on this box, and neutralise
+  it (delete it, or strip its setuid bit)
+- Leave the setuid binaries that do belong, `sudo` among them, working exactly as
+  they are
+
+## What you're being graded on
+
+The grader lists every setuid-root binary left on the box. None may be one that
+no installed package owns, and every packaged one it checks must still be
+setuid.
+
+`/root/answers/setuid.md`, exactly two lines:
+
+```
+unpackaged_setuid: <how many you found>
+found_with: <the command that told you which ones do not belong>
+```
+
+<details>
+<summary>Hint 1 — list them first</summary>
+
+```
+$ find / -xdev -perm -4000 -type f 2>/dev/null
+```
+
+Ten of the results are supposed to be there. Two are not. The list itself does
+not tell you which; the next hint does.
+
+</details>
+
+<details>
+<summary>Hint 2 — ask the package database</summary>
+
+For each setuid binary, ask whether a package owns it:
+
+```
+$ dpkg -S /usr/bin/sudo          # sudo: /usr/bin/sudo
+$ dpkg -S /usr/local/bin/maint   # no path found
+```
+
+The ones dpkg cannot place are the ones to remove.
+
+</details>
+
+<details>
+<summary>Hint 3 — do not touch the packaged ones</summary>
+
+Remove or de-setuid only the unowned binaries. Leave every `/usr/bin` entry
+alone — stripping sudo's setuid bit is the failure this lesson is built around.
+
+</details>
 
 ## The mode does not tell you
 
@@ -65,7 +120,7 @@ go with them. You have hardened the machine into a brick.
 
 ## Provenance is the signal
 
-The thing that separates the nine from the two is not on the file. It is in the
+The thing that separates the ten from the two is not on the file. It is in the
 package database.
 
 Every setuid binary a Debian system is supposed to have arrived in a package,
@@ -99,16 +154,17 @@ unowned: /opt/tools/backup
 
 Two lines out. Those are the two to remove — and only those.
 
-## A note on the nine, and on ping
+## A note on the ten, and on ping
 
-The nine legitimate ones are setuid for reasons worth knowing, because "why does
+The ten legitimate ones are setuid for reasons worth knowing, because "why does
 this need root" is the question you will actually be asked. `passwd` writes to
 `/etc/shadow`, which only root may touch. `mount`, `su`, `sudo`, `newgrp` all
-switch to a privilege the calling user does not have. They are setuid because
+switch to a privilege the calling user does not have, and `ssh-keysign` reads
+the host's private key for host-based authentication. They are setuid because
 the task genuinely requires it, and each is a small, audited program whose whole
 job is to do that one privileged thing and drop back.
 
-`ping` is the classic tenth name in this list — it used to be setuid so it could
+`ping` is the classic extra name in this list — it used to be setuid so it could
 open a raw socket. On this box it is not, and it still works:
 
 ```
@@ -124,40 +180,6 @@ trap this closes is the opposite of the blanket strip: an admin who "knows" ping
 must be setuid and re-adds the bit is widening the attack surface for a capability
 the kernel already grants safely. Removing a setuid bit that is not needed is as
 much a part of this job as keeping the ones that are.
-
-<details>
-<summary>Hint 1 — list them first</summary>
-
-```
-$ find / -xdev -perm -4000 -type f 2>/dev/null
-```
-
-Nine of the results are supposed to be there. Two are not. The list itself does
-not tell you which; the next hint does.
-
-</details>
-
-<details>
-<summary>Hint 2 — ask the package database</summary>
-
-For each setuid binary, ask whether a package owns it:
-
-```
-$ dpkg -S /usr/bin/sudo          # sudo: /usr/bin/sudo
-$ dpkg -S /usr/local/bin/maint   # no path found
-```
-
-The ones dpkg cannot place are the ones to remove.
-
-</details>
-
-<details>
-<summary>Hint 3 — do not touch the packaged ones</summary>
-
-Remove or de-setuid only the unowned binaries. Leave every `/usr/bin` entry
-alone — stripping sudo's setuid bit is the failure this lesson is built around.
-
-</details>
 
 ## Checking yourself
 

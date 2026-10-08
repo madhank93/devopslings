@@ -24,8 +24,83 @@ $ curl -s http://172.32.0.11:8080/users
 users: alice bob carol
 ```
 
-`/users` works. `/api/users` does not exist. Nobody sent `/api/users` to the
-upstream — the client sent it to *nginx*, and nginx passed it on unchanged.
+`/users` works. `/api/users` does not exist.
+
+## Your objective
+
+1. Make all four routes work through the gateway on `127.0.0.1`:
+
+   ```
+   /api/users     -> users: alice bob carol
+   /api/orders    -> orders: 1001 1002
+   /api/version   -> upstream 1.0
+   /docs/intro    -> docs: introduction
+   ```
+
+   In the proxy configuration, still going to `172.32.0.11:8080`, with no
+   `rewrite`.
+
+2. Write `/root/answers/proxy.md`, exactly two lines:
+
+   ```
+   api_before: <path>
+   docs_before: <path>
+   ```
+
+   What the upstream received, before your fix, for `/api/users` and for
+   `/docs/intro`. They are in its record — and they stay there after you fix
+   it, so you can look at any point.
+
+## What you're being graded on
+
+**All four routes return the upstream's bodies.** Not three.
+
+**The upstream is actually being asked.** A verification request goes through
+the gateway with a random token in its query string, and that token has to turn
+up in the upstream's own record. `return 200 'users: alice bob carol';` in an
+nginx location satisfies every body check and proxies nothing — it would pass a
+naive grader, and it would keep passing after the application changed.
+
+**No `rewrite`, and both routes still point at `172.32.0.11:8080`.**
+
+**You can say what arrived.** Both paths exactly as the upstream recorded them,
+copied verbatim — every character of them.
+
+<details>
+<summary>Hint 1 — get the evidence first</summary>
+
+```
+$ curl -s http://172.32.0.11:8081/admin/received
+```
+
+Every request as the upstream received it. Compare each line with the path you
+asked nginx for. Two different things are wrong, and this shows both without
+reading any configuration.
+
+</details>
+
+<details>
+<summary>Hint 2 — the rule for /api/</summary>
+
+`proxy_pass http://host:port;` forwards the request URI unchanged.
+`proxy_pass http://host:port/;` replaces the matched location prefix with `/`.
+
+The upstream's route is `/users`, and the client asks for `/api/users`.
+
+</details>
+
+<details>
+<summary>Hint 3 — the rule for /docs</summary>
+
+What gets replaced is exactly the text the location matched. `location /docs`
+matches `/docs`, leaving `/intro` — including its leading slash — to be
+appended to `/pages/`.
+
+Make the location match the separator too, and the leftover no longer has one.
+While you are there, try `curl http://127.0.0.1/docsfoo` and see what a prefix
+location without a trailing slash also claims.
+
+</details>
 
 ## The one question worth asking at a proxy
 
@@ -134,82 +209,6 @@ place when the transformation is genuinely not a prefix swap: a regex capture,
 a conditional, a query-string rearrangement. Stripping a prefix is not that.
 
 This exercise rejects a `rewrite` for that reason.
-
-## Your objective
-
-1. Make all four routes work through the gateway on `127.0.0.1`:
-
-   ```
-   /api/users     -> users: alice bob carol
-   /api/orders    -> orders: 1001 1002
-   /api/version   -> upstream 1.0
-   /docs/intro    -> docs: introduction
-   ```
-
-   In the proxy configuration, still going to `172.32.0.11:8080`, with no
-   `rewrite`.
-
-2. Write `/root/answers/proxy.md`, exactly two lines:
-
-   ```
-   api_before: <path>
-   docs_before: <path>
-   ```
-
-   What the upstream received, before your fix, for `/api/users` and for
-   `/docs/intro`. They are in its record — and they stay there after you fix
-   it, so you can look at any point.
-
-## What you're being graded on
-
-**All four routes return the upstream's bodies.** Not three.
-
-**The upstream is actually being asked.** A verification request goes through
-the gateway with a random token in its query string, and that token has to turn
-up in the upstream's own record. `return 200 'users: alice bob carol';` in an
-nginx location satisfies every body check and proxies nothing — it would pass a
-naive grader, and it would keep passing after the application changed.
-
-**No `rewrite`, and both routes still point at `172.32.0.11:8080`.**
-
-**You can say what arrived.** `/api/users` and `/pages//intro`, copied from the
-record verbatim — the double slash included, because it is the fault.
-
-<details>
-<summary>Hint 1 — get the evidence first</summary>
-
-```
-$ curl -s http://172.32.0.11:8081/admin/received
-```
-
-Every request as the upstream received it. Compare each line with the path you
-asked nginx for. Two different things are wrong, and this shows both without
-reading any configuration.
-
-</details>
-
-<details>
-<summary>Hint 2 — the rule for /api/</summary>
-
-`proxy_pass http://host:port;` forwards the request URI unchanged.
-`proxy_pass http://host:port/;` replaces the matched location prefix with `/`.
-
-The upstream's route is `/users`, and the client asks for `/api/users`.
-
-</details>
-
-<details>
-<summary>Hint 3 — the rule for /docs</summary>
-
-What gets replaced is exactly the text the location matched. `location /docs`
-matches `/docs`, leaving `/intro` — including its leading slash — to be
-appended to `/pages/`.
-
-Make the location match the separator too, and the leftover no longer has one.
-While you are there, try `curl http://127.0.0.1/docsfoo` and see what a prefix
-location without a trailing slash also claims.
-
-</details>
 
 ## What actually happened
 

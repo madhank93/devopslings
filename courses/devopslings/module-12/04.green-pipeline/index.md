@@ -18,6 +18,16 @@ tasks:
     init: true
     timeout_seconds: 600
     run: |
+      # A protection rule left by another lesson (any name, any pattern) would
+      # refuse the seed force-push, so every rule on the repository goes first.
+      for rule in $(curl -fsS -u devops:devopslings \
+                      "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections" 2>/dev/null \
+                    | tr ',' '\n' | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p' \
+                    | sed 's/%/%25/g; s/ /%20/g; s/\*/%2A/g; s/?/%3F/g; s/\[/%5B/g; s/]/%5D/g; s|/|%2F|g' || true); do
+        curl -fsS -u devops:devopslings -X DELETE \
+          "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections/${rule}" >/dev/null 2>&1 || true
+      done
+
       work=$(mktemp -d)
       repo="http://devops:devopslings@127.0.0.1:3000/devops/checkout.git"
       api="http://127.0.0.1:3000/api/v1"
@@ -27,7 +37,7 @@ tasks:
       git config user.email devops@example.invalid
       git config user.name devops
 
-      # Clear the other module-07 lessons out of the way — they share this repo.
+      # Clear the other lessons in this module out of the way — they share this repo.
       mkdir -p src .forgejo/workflows
       rm -f src/pricing.js src/pricing.test.js src/deploy.js \
         .forgejo/workflows/test.yml .forgejo/workflows/deploy.yml
@@ -138,6 +148,14 @@ tasks:
       if [ "$tests" -lt 3 ]; then
         echo "not yet: src/cart.test.js has ${tests} tests, and the lesson shipped 3."
         echo "         Deleting the test that fails is not the same as passing it."
+        exit 1
+      fi
+
+      # The red test encodes the bug; editing its expectation to match the code
+      # makes the suite agree with the defect.
+      if ! grep -qF 'cartTotal([{ price: 9.5, qty: 3 }]), 28.5)' src/cart.test.js 2>/dev/null; then
+        echo "not yet: src/cart.test.js no longer asserts that three items at 9.5 total 28.5."
+        echo "         That test was right — the code is what charges for one item."
         exit 1
       fi
 

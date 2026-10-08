@@ -139,7 +139,18 @@ tasks:
       # Matched in the shell rather than through `grep -q`: under pipefail an
       # early-exiting grep SIGPIPEs docker history, and the pipeline reports
       # failure on the run where the secret was found.
+      # base64 is an encoding, not a hiding place: a build arg carrying the key
+      # that way is as readable as the key itself.
+      b64=$(printf '%s' "$secret" | base64)
+      b64nl=$(printf '%s\n' "$secret" | base64)
       hist=$(docker history --no-trunc "$img" 2>/dev/null || true)
+      case "$hist" in *"$b64"*|*"$b64nl"*)
+        echo "not yet: the key is in docker history base64-encoded, which anyone can decode:"
+        printf '%s\n' "$hist" | grep -e "$b64" -e "$b64nl" | head -2 | sed 's/^.*ago  *//' | cut -c1-120 | sed 's/^/    /' || true
+        echo "Encoding a build arg does not stop it being recorded."
+        exit 1
+        ;;
+      esac
       case "$hist" in *"$secret"*)
         echo "not yet: the key is in docker history, which ships with the image:"
         printf '%s\n' "$hist" | grep "$secret" | head -2 | sed 's/^.*ago  *//' | cut -c1-120 | sed 's/^/    /' || true
@@ -149,12 +160,13 @@ tasks:
         ;;
       esac
 
-      hits=$(docker save "$img" 2>/dev/null | grep -a -c "$secret" || true)
+      hits=$(docker save "$img" 2>/dev/null | grep -a -c -e "$secret" -e "$b64" -e "$b64nl" || true)
       if [ "${hits:-0}" != "0" ]; then
         echo "not yet: docker history is clean and the key is still in the image —"
         echo "$hits occurrence(s) in the saved layers."
-        echo "A layer is a snapshot of what changed. Removing the file in a later"
-        echo "layer records the deletion; it does not edit the layer that holds it."
+        echo "Some layer holds its bytes — a file written or copied in, or a context"
+        echo "that carried license.key. Deleting it in a later layer only records the"
+        echo "deletion; it does not edit the layer that holds it."
         exit 1
       fi
 

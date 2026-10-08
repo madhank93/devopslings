@@ -12,7 +12,7 @@ $ systemctl is-active order-events
 active
 
 $ journalctl --disk-usage
-Archived and active journals take up 96.4M in the file system.
+Archived and active journals take up 112.2M in the file system.
 ```
 
 That number only goes up. Nothing rotates it, nothing caps it, and the box has
@@ -35,10 +35,12 @@ filesystem is full and every service on the box starts failing at once.
 
 ## What you're being graded on
 
-All four at once: the setting in effect, the bytes actually gone from the disk,
-the history still readable, and the service still writing. Three of those are
-easy to get individually and mutually destructive if you take the shortest path
-to each.
+All at once: the setting in effect, the bytes actually gone from the disk, the
+history still readable — `order-events` logged a settlement checkpoint just
+before you took over, and the check looks for it — and the service still
+writing. Then the check writes a burst of order events bigger than any sensible
+cap and requires the journal to stay at the cap. Those are easy to get
+individually and mutually destructive if you take the shortest path to each.
 
 <details>
 <summary>Hint 1 — what the default actually is</summary>
@@ -92,30 +94,37 @@ $ systemd-analyze cat-config systemd/journald.conf | grep -i systemmaxuse
 </details>
 
 <details>
-<summary>Hint 3 — the setting does not delete anything</summary>
+<summary>Hint 3 — a cap in a file is not a cap</summary>
 
-Restart journald with the new cap and look again:
+Write the drop-in and look again, before restarting anything:
 
 ```
 $ journalctl --disk-usage
-Archived and active journals take up 96.4M in the file system.
+Archived and active journals take up 112.2M in the file system.
 ```
 
-Unchanged. `SystemMaxUse=` governs what journald does **from now on** — it will
-rotate and discard as it writes past the limit. It does not go back and reclaim
-what is already there, so on a box that is nearly full it buys you nothing
-today.
+Unchanged: journald read its configuration when it started and has not read it
+since. Restart it and journald applies the new limit straight away — it
+deletes archived journal files, oldest first, until the total is under
+`SystemMaxUse=`, and from then on it does the same at every rotation.
+
+```
+$ systemctl restart systemd-journald
+$ journalctl --disk-usage
+Archived and active journals take up 28.4M in the file system.
+```
+
+It only ever removes *archived* files; the active `system.journal` is never
+vacuumed. To trim further without waiting for a rotation, vacuum by hand:
 
 ```
 $ journalctl --vacuum-size=24M
 $ journalctl --vacuum-time=7d
 ```
 
-`--vacuum-size` removes archived journal files, oldest first, until the total is
-under the size you name.
-
-And the obvious trap: `--vacuum-size=1K` passes every size check and throws away
-the history. Vacuum to something *under* your cap, not to nothing.
+And the obvious trap: `--vacuum-size=1K` (or `rm` in `/var/log/journal`)
+passes every size check and throws away the history. Vacuum to something
+*under* your cap, not to nothing.
 
 </details>
 
@@ -132,7 +141,6 @@ CONF
 
 $ systemctl restart systemd-journald
 $ journalctl --vacuum-size=24M
-Vacuuming done, freed 72.1M of archived journals.
 
 $ journalctl --disk-usage
 Archived and active journals take up 23.8M in the file system.
@@ -142,9 +150,10 @@ order-events: processed order ORD-018842 in 47ms
 ...
 ```
 
-`SystemMaxFileSize=8M` is not required, and it is worth setting: without it a
-single journal file can consume the entire allowance, and rotation then has
-nothing smaller than "everything" to discard.
+`SystemMaxFileSize=8M` is not required — journald defaults it to an eighth of
+`SystemMaxUse=` — but writing it down makes the unit of deletion explicit:
+vacuuming removes whole archived files, so this is the granularity at which
+history disappears.
 
 ### Why this is a lesson at all
 
@@ -162,11 +171,13 @@ Three things worth keeping:
    The dashboard is green for the entire run-up, and then every service on the
    box fails simultaneously for a reason unrelated to any of them.
 
-2. **A retention setting and a reclaim are separate actions.** The cap applies
-   going forward; the vacuum handles the past. This same split appears in log
-   rotation, in cloud storage lifecycle rules (module 17), and in Prometheus
-   retention (module 18) — configure the policy, then reconcile what already
-   exists, because the policy will not do it for you.
+2. **A policy on disk is not a policy in force.** The cap did nothing until
+   journald re-read it; the restart is what reconciled the files already
+   there. Check what the running daemon reports (`journalctl -u
+   systemd-journald` prints "max …" on every start), not what the file says.
+   Other systems split this further — log rotation, cloud storage lifecycle
+   rules (module 17) and Prometheus retention (module 18) each have their own
+   rule for what already exists — so find out which one you are dealing with.
 
 3. **"Under the limit" is not the goal.** `--vacuum-size=1K` satisfies every
    size check on the box and destroys the only record of what happened last

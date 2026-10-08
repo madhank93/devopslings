@@ -41,7 +41,9 @@ interrupted runs, must reach the same end state and exit 0 every time:
 ## What you're being graded on
 
 A fingerprint of that whole end state, taken after 1, 2 and 3 runs, and again
-after resuming a deliberately half-finished run. All four must match.
+after resuming a deliberately half-finished run. All four must match. And a
+re-run converges a live host rather than rebuilding it: anything already queued
+in `/srv/nodeagent` has to still be there afterwards.
 
 <details>
 <summary>Hint 1 — what idempotent actually means here</summary>

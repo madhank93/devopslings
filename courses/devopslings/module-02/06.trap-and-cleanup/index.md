@@ -131,8 +131,12 @@ tasks:
       # 3. Interrupted, twice — once with SIGINT and once with SIGTERM.
       for sig in INT TERM; do
         rm -f /srv/build/FAIL
+        # Job control gives the run its own process group. Without it a
+        # background job starts with SIGINT ignored and the INT round tests nothing.
+        set -m
         BUILD_SECONDS=30 "$bin" >/tmp/b.log 2>&1 &
         pid=$!
+        set +m
         # Wait for the scratch directory to actually exist before interrupting.
         for _ in $(seq 1 40); do
           [ "$(count_scratch)" -gt 0 ] && break
@@ -143,7 +147,13 @@ tasks:
           echo "not yet: could not observe a scratch directory being created"
           exit 1
         fi
-        kill -"$sig" "$pid" 2>/dev/null || true
+        # Ctrl-C signals the whole foreground group; a supervisor's SIGTERM
+        # goes to the script alone.
+        if [ "$sig" = INT ]; then
+          kill -INT -- -"$pid" 2>/dev/null || true
+        else
+          kill -TERM "$pid" 2>/dev/null || true
+        fi
         wait "$pid" 2>/dev/null || true
         sleep 1
         if [ "$(count_scratch)" -ne 0 ]; then

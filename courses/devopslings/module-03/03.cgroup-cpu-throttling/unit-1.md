@@ -1,5 +1,5 @@
 ---
-title: "p99 spikes every few seconds and the CPU graph says 40%"
+title: "p99 spikes every few seconds and the CPU graph says 20%"
 ---
 
 ## The situation
@@ -29,6 +29,7 @@ dashboard says there is capacity to spare, and one request in a hundred takes
 | file | answer |
 |---|---|
 | `/root/answers/cause` | one of `throttled`, `starved`, `blocked`, `slowcode` |
+| `/root/answers/evidence` | the name of the kernel counter that proves it |
 
 Then get p99 under **40 ms**, sustained.
 
@@ -37,7 +38,7 @@ loop must stay as it is; do not make the work cheaper.
 
 ## What you're being graded on
 
-The named cause, then 20 seconds of fresh samples with p99 under 40 ms, and a
+The named cause and the counter that proves it, then 20 seconds of fresh samples with p99 under 40 ms, and a
 CPU limit still in place.
 
 <details>
@@ -123,6 +124,8 @@ the tail without giving the service more total CPU.
 <summary>Solution</summary>
 
 ```
+$ echo throttled > /root/answers/cause
+$ echo nr_throttled > /root/answers/evidence
 $ install -d /etc/systemd/system/pricing-api.service.d
 $ cat > /etc/systemd/system/pricing-api.service.d/cpu.conf <<'CONF'
 [Service]

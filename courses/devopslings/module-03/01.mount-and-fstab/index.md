@@ -2,8 +2,8 @@
 kind: lesson
 title: "the fstab line that stops the box half way through boot"
 description: |
-  Somebody added the archive volume to /etc/fstab, tested it with `mount
-  /srv/archive`, and went home. The entry is wrong in a way that only shows up
+  Somebody added the archive volume to /etc/fstab, tested it by mounting the
+  device by hand, and went home. The entry is wrong in a way that only shows up
   when something reads the whole file — which is every boot from now on.
 name: mount-and-fstab
 slug: mount-and-fstab
@@ -46,8 +46,8 @@ tasks:
       uuid=$(blkid -s UUID -o value "$lo")
       printf '%s\n' "$uuid" > /var/lib/devopslings/fstab.uuid
 
-      # Three separate mistakes, all of which survive `mount /srv/archive`
-      # because that command reads only the fields it needs:
+      # Three separate mistakes, none of which `mount <device> <dir>` notices,
+      # because given both arguments it never reads fstab:
       #   - the filesystem type is wrong
       #   - "defaults" is misspelled, so the options field is invalid
       #   - the fsck pass number is 1, which is reserved for the root filesystem
@@ -88,9 +88,13 @@ tasks:
       set +e
       verify_out=$(findmnt --verify 2>&1); verify_rc=$?
       set -e
-      if [ "$verify_rc" -ne 0 ]; then
+      # findmnt --verify exits 0 on warnings, and a type mismatch is only a
+      # warning, so read its findings rather than its status.
+      # The daemon-reload reminder is about systemd's copy, not about the entry.
+      findings=$(printf '%s\n' "$verify_out" | grep '\[[EW]\]' | grep -v 'systemd still uses the old version' || true)
+      if [ "$verify_rc" -ne 0 ] || [ -n "$findings" ]; then
         echo "not yet: findmnt --verify still reports problems:"
-        printf '%s\n' "$verify_out" | grep -iE 'error|warning' | head -5 | sed 's/^/         /'
+        printf '%s\n' "$verify_out" | grep -E '^/|\[[EW]\]' | head -6 | sed 's/^/         /'
         exit 1
       fi
 

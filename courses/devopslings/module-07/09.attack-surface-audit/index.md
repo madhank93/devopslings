@@ -106,25 +106,12 @@ tasks:
         LISTEN 0 ... 0.0.0.0:80    ... python3   (portal.service)
         LISTEN 0 ... 0.0.0.0:9000  ... python3   (metrics-api.service)
 
-        port 80   : the customer portal. Public by design — the internet is meant to
-                    reach it.
-        port 9000 : the internal metrics API. It reports cpu, memory and disk, and it
-                    has no authentication because it was only ever meant to be read
-                    from the box itself. It is listening on 0.0.0.0 — every interface —
-                    so anyone who can route to this host can read it.
+        port 80   : the customer portal.
+        port 9000 : the internal metrics API — cpu, memory and disk, no
+                    authentication. Something on the box reads it locally.
 
-      The portal on 80 is correctly exposed; leave it. The metrics API on 9000 is
-      exposed far beyond its purpose: an unauthenticated internal endpoint answering
-      the whole network. Restrict it to the loopback interface so only the box itself
-      can reach it, without taking it down — something still reads it locally.
-
-      It binds the address in /etc/metrics/bind.conf; change it and restart:
-
-        $ systemctl restart metrics-api
-
-      Confirm the surface afterwards:
-
-        $ ss -ltn | grep -E ':80|:9000'
+      Decide who each listener is for, and make what it is reachable by match that.
+      Nothing that is supposed to keep serving may go down in the process.
 
       Then write /root/answers/surface.md with exactly four lines:
 
@@ -134,7 +121,7 @@ tasks:
         restricted_to: <the interface you bound the metrics API to>
       Q
 
-      echo "scenario ready — metrics API on 9000 exposed to every interface"
+      echo "scenario ready — two services listening on this box"
 
   verify_done:
     needs: [init_scenario]

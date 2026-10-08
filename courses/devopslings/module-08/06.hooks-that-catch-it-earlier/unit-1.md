@@ -19,6 +19,59 @@ pre-commit: staged changes add a gateway credential (pgw_live_...).
 $
 ```
 
+## Your objectives
+
+- Install a pre-commit hook for this repository that refuses a commit whose
+  staged changes add a gateway credential (`pgw_live_` followed by 32 hex
+  characters)
+- Let every other commit through, including changes to the docs, the test
+  fixtures and the lockfile, and with your own gitignored `.env` present
+
+## What you're being graded on
+
+The grader makes commits in a copy of this repository:
+
+- ordinary changes must be allowed: source, docs, a test fixture, the lockfile,
+  and a commit that removes a credential
+- a commit that adds a credential must be refused, in two different files
+
+`rationale.md`, exactly three lines:
+
+```
+no_verify: <what happens when someone commits with --no-verify>
+shared: <does this hook protect a colleague who clones the repo? why>
+backstop: <where the same check also has to run, given the two answers above>
+```
+
+<details>
+<summary>Hint 1 — look at the staged change</summary>
+
+The hook runs before the commit is made, and the thing about to be committed is
+the index, not your files:
+
+```sh
+git diff --cached -U0
+```
+
+Your gitignored `.env` does not appear there. That is the whole reason to use it.
+
+</details>
+<details>
+<summary>Hint 2 — added lines only</summary>
+
+Even `git diff --cached` shows context lines that were already committed. `-U0`
+removes them, and anchoring on `^\+` restricts the match to the added side.
+
+</details>
+<details>
+<summary>Hint 3 — the pattern is the credential's shape</summary>
+
+`pgw_live_` followed by 32 hex characters. Not the word `token` — the docs and
+the test fixtures use it legitimately. Not "32 hex characters" on its own — the
+lockfile's integrity hash is 64 of them.
+
+</details>
+
 ## The hook that blocks all your work
 
 The obvious implementation greps the files:
@@ -127,35 +180,6 @@ Enforcement has to sit where the committer's cooperation is not required:
 The local hook and the server-side check are the same pattern in two places, and
 that duplication is the point: one is fast and optional, the other is slow and
 mandatory. If you have to pick one, pick the one that cannot be skipped.
-
-<details>
-<summary>Hint 1 — look at the staged change</summary>
-
-The hook runs before the commit is made, and the thing about to be committed is
-the index, not your files:
-
-```sh
-git diff --cached -U0
-```
-
-Your gitignored `.env` does not appear there. That is the whole reason to use it.
-
-</details>
-<details>
-<summary>Hint 2 — added lines only</summary>
-
-Even `git diff --cached` shows context lines that were already committed. `-U0`
-removes them, and anchoring on `^\+` restricts the match to the added side.
-
-</details>
-<details>
-<summary>Hint 3 — the pattern is the credential's shape</summary>
-
-`pgw_live_` followed by 32 hex characters. Not the word `token` — the docs and
-the test fixtures use it legitimately. Not "32 hex characters" on its own — the
-lockfile's integrity hash is 64 of them.
-
-</details>
 
 ## Checking yourself
 

@@ -73,8 +73,9 @@ tasks:
       Q
 
       echo "scenario ready — settle-orders exits 0 whether or not it produced anything"
-      LEDGER=/srv/settle/missing.csv /usr/local/bin/settle-orders >/dev/null 2>&1 || true
-      echo "  with a missing ledger, exit status was: $?"
+      rc=0
+      LEDGER=/srv/settle/missing.csv /usr/local/bin/settle-orders >/dev/null 2>&1 || rc=$?
+      echo "  with a missing ledger, exit status was: $rc"
 
   verify_done:
     needs: [init_scenario]
@@ -95,14 +96,17 @@ tasks:
       set -e
       if [ "$rc" -eq 0 ]; then
         echo "not yet: with a ledger that does not exist, settle-orders still exited 0"
-        echo "         fetch-ledger exited 3 and said so on stderr. The shell reported the"
-        echo "         status of the LAST command in the pipeline, which was awk, and awk"
-        echo "         succeeded at processing nothing."
+        echo "         fetch-ledger exited 3 and said so on stderr, and nothing turned"
+        echo "         that into settle-orders' own exit status. Its output:"
+        sed 's/^/           /' /tmp/fail.log | tail -4
         exit 1
       fi
 
-      if [ -s "$out" ]; then
-        echo "not yet: the failing run exited $rc but still wrote a settlement file:"
+      # Even a zero-byte file counts: a fresh, empty settlement.out is exactly
+      # what a downstream reader cannot tell from a quiet night.
+      if [ -e "$out" ]; then
+        echo "not yet: the failing run exited $rc but still left $out behind"
+        echo "         ($(wc -c < "$out") bytes, modified just now):"
         sed 's/^/           /' "$out"
         echo "         a downstream reader cannot tell that from a real settlement."
         exit 1

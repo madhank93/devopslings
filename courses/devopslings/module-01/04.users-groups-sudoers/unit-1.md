@@ -138,13 +138,15 @@ $ visudo -cf /etc/sudoers.d/dana
 
 Two things that bite:
 
-- **Mode `0440`.** sudo ignores files in `sudoers.d` that are group- or
-  world-writable, and does so quietly.
+- **Mode `0440`.** sudo skips a file in `sudoers.d` that is world-writable,
+  so your rule is simply not there — the only sign is a warning line the next
+  time anyone runs sudo.
 - **`visudo -c`.** A syntax error in a sudoers file can lock everyone out of
   sudo, including you. Always check before you rely on it.
 
-Use the absolute path. `dana ALL=(root) NOPASSWD: deploy-status` would match
-whatever `deploy-status` resolves to in dana's `PATH`.
+Use the absolute path. sudoers rejects a bare `deploy-status` outright — a
+rule has to name exactly one binary, not whatever `deploy-status` resolves to
+in dana's `PATH`.
 
 </details>
 

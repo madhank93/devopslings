@@ -15,20 +15,61 @@ CHANGED  /srv/app/current/asset2.js
 ...  (thirteen more) ...
 ```
 
-Sixteen changes. Fifteen of them are `/srv/app/current/*` — today's release,
-rewriting the application. Entirely expected, and it will happen again on the
-next deploy, and the one after that. The sixteenth is not:
+Sixteen changes, like after every release. On a box that deploys ten times a
+day, nobody reads past the first few lines of that report — so nobody knows
+whether anything in it matters.
+
+## Your objectives
+
+- Make `fim-check` worth reading after a deploy: it should show what changed
+  that a deploy does not account for, and nothing else
+- Find the change in today's report that a deploy does not account for
+
+## What you're being graded on
+
+The grader rolls out one more release, then tampers with a watched system file,
+and runs `fim-check` after each:
+
+- the release does not appear in the report at all
+- the tamper does
+- the baseline is still the one taken before today's release, so the change
+  that does not belong still shows
+
+`/root/answers/fim.md`, exactly two lines:
 
 ```
-$ cat /etc/sudoers.d/appdeploy
-appdeploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart app.service
-appdeploy ALL=(ALL) NOPASSWD: ALL          # <- this line
+tampered_file: <the file the monitor should have made obvious>
+stopped_watching: <what you removed from the watch list>
 ```
 
-Someone gave the `appdeploy` account passwordless root over the entire system.
-It is one line in a sixteen-line report that looks like sixteen lines of the
-same thing, and on a box that deploys ten times a day nobody reads it. The
-monitor did its job perfectly and told no one anything.
+<details>
+<summary>Hint 1 — read the report, not just its length</summary>
+
+Fifteen of the sixteen changes are under `/srv/app/current`. Those are the
+deploy. The one that is not is the one that matters — find it.
+
+</details>
+
+<details>
+<summary>Hint 2 — the watch list</summary>
+
+`/etc/fim/watch.list` names what gets hashed. One entry is a directory rewritten
+on every release. Remove that entry; keep the stable system paths.
+
+```
+$ grep -v '/srv/app' /etc/fim/watch.list > /tmp/w && sudo mv /tmp/w /etc/fim/watch.list
+$ fim-check
+```
+
+</details>
+
+<details>
+<summary>Hint 3 — do not re-baseline</summary>
+
+Leave `/var/lib/fim/baseline.sha256` alone. Re-taking it now records the
+tampered sudoers file as known-good and hides the intrusion for real.
+
+</details>
 
 ## A baseline is only as good as its scope
 
@@ -86,7 +127,7 @@ There is a tempting shortcut that makes the report clean and the box less safe:
 re-take the baseline over the current state.
 
 ```
-$ sha256sum -c ... # regenerate baseline from what's on disk now
+$ sha256sum <every watched file> > /var/lib/fim/baseline.sha256   # re-take it from what is on disk now
 ```
 
 Now `fim-check` reports nothing, because the current state *is* the baseline —
@@ -95,35 +136,6 @@ resolved the alert, you have promoted the intrusion to policy. Re-baselining is
 correct only over a state you have verified is clean; doing it to silence a
 report you have not read is how a compromise becomes permanent. The fix here is
 what you watch, not when you snapshot.
-
-<details>
-<summary>Hint 1 — read the report, not just its length</summary>
-
-Fifteen of the sixteen changes are under `/srv/app/current`. Those are the
-deploy. The one that is not is the one that matters — find it.
-
-</details>
-
-<details>
-<summary>Hint 2 — the watch list</summary>
-
-`/etc/fim/watch.list` names what gets hashed. One entry is a directory rewritten
-on every release. Remove that entry; keep the stable system paths.
-
-```
-$ grep -v '/srv/app' /etc/fim/watch.list > /tmp/w && sudo mv /tmp/w /etc/fim/watch.list
-$ fim-check
-```
-
-</details>
-
-<details>
-<summary>Hint 3 — do not re-baseline</summary>
-
-Leave `/var/lib/fim/baseline.sha256` alone. Re-taking it now records the
-tampered sudoers file as known-good and hides the intrusion for real.
-
-</details>
 
 ## Checking yourself
 

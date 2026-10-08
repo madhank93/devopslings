@@ -42,10 +42,12 @@ Then enable and start it.
 ## What you're being graded on
 
 The behaviour, established by doing it. The check kills the process and waits
-for it to come back, and it restarts the whole pair from cold to see whether
-your unit waits for the cache or merely retries until the cache happens to be
-ready. Those look identical once the dust settles and they are not the same
-thing.
+for it to come back, and it restarts the whole pair from cold — once with a
+slow warm-up, once with a fast one — to see whether your unit waits for the
+cache, merely retries until the cache happens to be ready, or sleeps for a
+guessed number of seconds. Those look identical once the dust settles and they
+are not the same thing. It reads the answer out of the journal, so what the feed prints has to
+land there.
 
 <details>
 <summary>Hint 1 — the smallest unit that runs at all</summary>
@@ -165,7 +167,9 @@ would still lose the race. Ordering is only as meaningful as the dependency's
 And this is why `Restart=` is not a substitute: with no `After=`, the feed
 starts immediately, fails, and retries until the cache happens to be ready.
 It ends up running, so it looks fixed. The check reads the journal for that
-first failed attempt.
+first failed attempt. `ExecStartPre=/bin/sleep 5` is the same guess in a
+different place: it covers today's warm-up and nothing else, so the check
+changes how long the warm-up takes.
 
 </details>
 

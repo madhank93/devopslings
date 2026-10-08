@@ -20,15 +20,6 @@ so from the evidence already here: a leak grows with time, and this dies at the
 same input size every run, on the same line, in the same second. Memory use is
 proportional to the input, and the input got bigger.
 
-Two numbers in that output disagree with each other, and neither is the app's
-fault:
-
-```
-$ grep -E 'mem_limit|Xmx' compose.yaml
-    mem_limit: 512m
-      JDK_JAVA_OPTIONS: "-Xmx1g"
-```
-
 ## Your objectives
 
 1. Make the job finish.

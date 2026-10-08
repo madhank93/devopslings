@@ -1,11 +1,12 @@
 ---
 kind: lesson
-title: "the test passed sixty-five commits ago and fails now"
+title: "checkout totals were right two hundred commits ago"
 description: |
-  A calculator worked and now returns the wrong answer, and the commit that
-  broke it is somewhere in sixty-five of them. Reading every diff is the slow
-  way; git bisect finds the exact commit by binary search in about six steps.
-  The grader runs the same search itself, so only the real culprit passes.
+  The checkout total is a cent short, and the commit that broke it is one of
+  two hundred. git bisect finds it in about eight steps, but only if the test
+  driving it can tell "wrong answer" from "doesn't run", because two stretches
+  of that history don't run at all. The grader replays your test under
+  git bisect run, so a lucky guess doesn't pass.
 name: bisect-a-regression
 slug: bisect-a-regression
 createdAt: "2026-08-27"
@@ -26,66 +27,103 @@ tasks:
       git init -q .
       git config user.email dev@example.com
       git config user.name 'Dev'
+      git config advice.detachedHead false
 
-      cat > calc.sh <<'C'
+      mkdir lib
+      cat > total.sh <<'S'
       #!/bin/sh
-      echo $(( 6 * 7 ))
-      C
-
-      cat > test.sh <<'T'
-      #!/bin/sh
-      [ "$(sh calc.sh)" = "42" ]
-      T
-
-      chmod +x calc.sh test.sh
+      # Usage: sh total.sh [cart]   prints the cart total, tax included.
+      set -e
+      . ./lib/money.sh
+      . ./lib/tax.sh
+      sub=0
+      while read -r item price qty; do
+        sub=$(( sub + $(line_total "$price" "$qty") ))
+      done < "${1:-cart.txt}"
+      cents "$(with_tax "$sub")"
+      S
+      cat > lib/money.sh <<'S'
+      line_total() { echo $(( $1 * $2 )); }
+      cents() { printf '%d.%02d\n' $(( $1 / 100 )) $(( $1 % 100 )); }
+      S
+      cat > lib/tax.sh <<'S'
+      TAX_PCT=108
+      # Round half up to the nearest cent.
+      with_tax() { echo $(( ($1 * TAX_PCT + 50) / 100 )); }
+      S
+      cat > cart.txt <<'S'
+      widget 1250 3
+      gadget 899 2
+      cable 150 4
+      S
+      printf '# checkout\n\nPrices are integer cents.\n' > README.md
 
       git add -A
-      git commit -q -m 'c0: initial calculator and test'
+      git commit -q -m 'c0: checkout total with tax'
       git branch -M main
 
-      for i in $(seq 1 64); do
-        if [ "$i" = "41" ]; then
-          sed -i.bak 's/6 \* 7/6 + 7/' calc.sh
-          rm -f calc.sh.bak
-          msg="c$i: simplify the arithmetic in calc.sh"
-        else
-          echo "note $i" >> notes.md
-          msg="c$i: add note $i"
-        fi
+      # c60 looks guilty and is harmless. c85-c115 and c140-c175 do not run at
+      # all. c130 is the real regression, placed so that a test treating
+      # "doesn't run" as bad (or as good) makes bisect land on a span edge.
+      for i in $(seq 1 199); do
+        case $i in
+          60)
+            cat > lib/money.sh <<'S'
+      line_total() { echo $(( $1 * $2 )); }
+      cents() {
+        d=$(( $1 / 100 ))
+        c=$(( $1 % 100 ))
+        printf '%d.%02d\n' "$d" "$c"
+      }
+      S
+            msg="c$i: rewrite cents() rounding (quick hack, please double-check)" ;;
+          85)
+            printf 'fmt_line() {\n  printf "%%s %%s\\n" "$1" "$(cents "$2")"\n' >> lib/money.sh
+            msg="c$i: start fmt_line helper for receipts" ;;
+          116)
+            printf '}\n' >> lib/money.sh
+            msg="c$i: finish fmt_line helper" ;;
+          130)
+            printf 'with_tax() { echo $(( $1 * 108 / 100 )); }\n' > lib/tax.sh
+            msg="c$i: inline TAX_PCT" ;;
+          140)
+            git mv lib/tax.sh lib/rates.sh
+            msg="c$i: move tax rules to lib/rates.sh" ;;
+          176)
+            sed 's#lib/tax.sh#lib/rates.sh#' total.sh > total.sh.new
+            mv total.sh.new total.sh
+            msg="c$i: source lib/rates.sh in total.sh" ;;
+          *)
+            echo "- note $i" >> README.md
+            msg="c$i: docs: note $i" ;;
+        esac
         git add -A
         git commit -q -m "$msg"
       done
 
       cat > questions.txt <<'Q'
-      Somewhere in the last 65 commits, calc.sh stopped producing the right answer.
-      At the tip of main the test fails:
+      Checkout totals are a cent short. For the sample cart, at the tip of main:
 
-        $ sh test.sh; echo $?
-        1
+        $ sh total.sh cart.txt
+        66.39
 
-      At the very first commit it passed. One commit in between turned a working
-      calculator into a broken one, and reading 65 diffs to find it is the slow way.
+      Finance reconciles that cart at 66.40, and at the first commit on main
+      that is what it printed. There are 200 commits between then and now.
 
-      git bisect finds it by binary search: you mark one commit known-bad and one
-      known-good, and git checks out the midpoint for you to test, halving the range
-      each step. Sixty-five commits is about six steps, not sixty-five.
+      Leave two files here:
 
-        $ git bisect start
-        $ git bisect bad main
-        $ git bisect good $(git rev-list --max-parents=0 main)
-        $ git bisect run sh test.sh      # let the test drive each step
-        ...
-        <sha> is the first bad commit
+        bisect-test.sh    a test git bisect run can drive: it decides whether
+                          the checked-out commit is good or bad. The grader
+                          replays it under `git bisect run`, bad = main,
+                          good = the first commit, and it has to land on the
+                          same commit you name.
 
-      When you are done, `git bisect reset` returns you to where you started.
-
-      Write bisect-answer.md with exactly two lines:
-
-        first_bad_commit: <the short or full sha of the commit that broke the test>
-        found_with: <the git command that locates it by binary search>
+        bisect-answer.md  exactly two lines:
+                            first_bad_commit: <sha of the commit that broke it>
+                            found_with: <the git command you ran to find it>
       Q
 
-      echo "scenario ready — 65 commits, one of them broke the test"
+      echo "scenario ready: 200 commits, one of them broke the checkout total"
 
   verify_done:
     needs: [init_scenario]
@@ -94,33 +132,81 @@ tasks:
       set -e
 
       ans=bisect-answer.md
+      script=bisect-test.sh
 
       if [ ! -s "$ans" ]; then
         echo "not yet: bisect-answer.md is missing or empty."
         echo "         Two lines: first_bad_commit and found_with. See questions.txt."
         exit 1
       fi
+      if [ ! -s "$script" ]; then
+        echo "not yet: bisect-test.sh is missing or empty. The grader replays your"
+        echo "         test under git bisect run, so it has to be a file here."
+        exit 1
+      fi
 
-      # Ground truth: find the first bad commit ourselves, by the same binary
-      # search the student runs. Leave the repo exactly as we found it.
       git bisect reset >/dev/null 2>&1 || true
       git checkout -q main 2>/dev/null || true
-      first=$(git rev-list --max-parents=0 main 2>/dev/null)
-      # git bisect leaves HEAD checked out at the first bad commit, so read it
-      # from HEAD rather than parsing the run output — the "is the first bad
-      # commit" line's wording and output stream vary across git versions.
-      truth=""
-      git bisect start >/dev/null 2>&1
-      git bisect bad main >/dev/null 2>&1
-      git bisect good "$first" >/dev/null 2>&1
-      if git bisect run sh test.sh >/dev/null 2>&1; then
-        truth=$(git rev-parse HEAD)
-      fi
-      git bisect reset >/dev/null 2>&1
-      git checkout -q main 2>/dev/null || true
+      root=$(git rev-list --max-parents=0 main 2>/dev/null || true)
+      tmp=$(mktemp -d)
+      trap 'rm -rf "$tmp"' EXIT
 
+      # probe <commit>: run that commit's total.sh in a scratch copy of its
+      # tree, leaving the repo alone. Sets rc and out.
+      probe() {
+        rm -rf "$tmp/tree"; mkdir "$tmp/tree"
+        git archive "$1" | tar -x -C "$tmp/tree"
+        rc=0
+        out=$(cd "$tmp/tree" && sh total.sh cart.txt 2>/dev/null) || rc=$?
+      }
+
+      # landed <cmd...>: the commit `git bisect run <cmd>` names as first bad
+      # between the root and main, or nothing if it did not narrow to one.
+      landed() {
+        git bisect start main "$root" >/dev/null 2>&1
+        if EXPECTED="$expected" git bisect run "$@" > "$tmp/run.log" 2>&1 \
+           && grep -q 'is the first bad commit' "$tmp/run.log"; then
+          git rev-parse refs/bisect/bad
+        fi
+        git bisect reset >/dev/null 2>&1
+        git checkout -q main 2>/dev/null || true
+      }
+
+      # explain <commit>: what that commit shows, for a wrong landing.
+      explain() {
+        probe "$1"
+        if [ "$rc" -ne 0 ]; then
+          echo "         At that commit total.sh does not run at all (exit $rc): it can"
+          echo "         say neither good nor bad. That is a span of history broken for"
+          echo "         an unrelated reason. What should a bisect test return when it"
+          echo "         can't test a commit?"
+        elif [ "$out" = "$expected" ]; then
+          echo "         At that commit the sample cart still totals $out, which is"
+          echo "         right. The break comes later."
+        else
+          bad_out=$out
+          probe "$1^"
+          if [ "$rc" -ne 0 ]; then
+            echo "         That commit prints $bad_out, but the one before it cannot run"
+            echo "         total.sh at all (exit $rc), so nothing shows the break happened"
+            echo "         here rather than earlier. What should a bisect test return"
+            echo "         when it can't test a commit?"
+          else
+            echo "         That commit already prints $bad_out. The break is earlier."
+          fi
+        fi
+      }
+
+      expected=""
+      [ -n "$root" ] && probe "$root" && [ "$rc" -eq 0 ] && expected=$out
+      cat > "$tmp/truth.sh" <<'T'
+      out=$(sh total.sh cart.txt 2>/dev/null) || exit 125
+      [ "$out" = "$EXPECTED" ]
+      T
+      truth=""
+      [ -n "$expected" ] && truth=$(landed sh "$tmp/truth.sh")
       if [ -z "$truth" ]; then
-        echo "not yet: the scenario could not be evaluated — the repository is not"
+        echo "not yet: the scenario could not be evaluated: the repository is not"
         echo "         in the state init_scenario left it. Re-run the lesson."
         exit 1
       fi
@@ -133,33 +219,43 @@ tasks:
         echo "not yet: first_bad_commit is missing or is not a commit hash."
         exit 1
       fi
-
-      # Normalise the student's answer to a full sha and compare. A short hash,
-      # a full hash, or the commit ref all resolve the same way.
-      a_full=$(git rev-parse --verify "${a_sha}^{commit}" 2>/dev/null || true)
+      a_full=$(git rev-parse --verify -q "${a_sha}^{commit}" 2>/dev/null || true)
       if [ -z "$a_full" ]; then
         echo "not yet: first_bad_commit '$a_sha' is not a commit in this repository."
         exit 1
       fi
       if [ "$a_full" != "$truth" ]; then
-        echo "not yet: $a_sha is not the first bad commit."
-        good_side=$(git merge-base --is-ancestor "$a_full" "$truth" 2>/dev/null && echo before || echo after)
-        if [ "$good_side" = "before" ]; then
-          echo "         That commit is still earlier than the break — the test"
-          echo "         passes there. The bad one is after it."
-        else
-          echo "         That commit is after the break — the test already fails by"
-          echo "         then. The first bad one is earlier. bisect reports the"
-          echo "         boundary exactly; re-run it and read the sha it prints."
-        fi
+        echo "not yet: $a_sha ($(git log -1 --format=%s "$a_full")) is not the first bad commit."
+        explain "$a_full"
         exit 1
       fi
 
-      if ! printf '%s' "$a_how" | grep -q 'bisect'; then
+      # Replay the student's test from a copy, so checkouts can't touch it.
+      cp -p "$script" "$tmp/student.sh"
+      if [ -x "$tmp/student.sh" ] && [ "$(head -c 2 "$tmp/student.sh")" = '#!' ]; then
+        s_hit=$(landed "$tmp/student.sh")
+      else
+        s_hit=$(landed sh "$tmp/student.sh")
+      fi
+      if [ -z "$s_hit" ]; then
+        echo "not yet: your answer is right, but git bisect run with bisect-test.sh"
+        echo "         (bad = main, good = the first commit) did not name a single"
+        echo "         first bad commit. Its last words:"
+        tail -3 "$tmp/run.log" 2>/dev/null | sed 's/^/           /'
+        exit 1
+      fi
+      if [ "$s_hit" != "$truth" ]; then
+        echo "not yet: your answer is right, but git bisect run with bisect-test.sh"
+        echo "         lands on $(git rev-parse --short "$s_hit") ($(git log -1 --format=%s "$s_hit"))."
+        explain "$s_hit"
+        exit 1
+      fi
+
+      if ! printf '%s' "$a_how" | grep -Eq 'bisect[[:space:]]+run'; then
         echo "not yet: found_with says '${a_how:-nothing}'. Name the git command"
-        echo "         that locates a regression by binary search."
+        echo "         that ran your test at each step of the binary search."
         exit 1
       fi
 
-      echo "PASS — $(git rev-parse --short "$truth") is the commit that broke the"
-      echo "       test ($(git log -1 --format=%s "$truth")), found by bisect."
+      echo "PASS: $(git rev-parse --short "$truth") ($(git log -1 --format=%s "$truth"))"
+      echo "      broke the total, and bisect-test.sh finds it under git bisect run."

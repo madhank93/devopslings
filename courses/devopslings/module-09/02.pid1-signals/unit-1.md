@@ -60,11 +60,13 @@ it is.
 
 ```
 docker run -d --name pid1-demo devopslings-pid1
-docker exec pid1-demo ps -ef
+docker top pid1-demo                          # every process in the container
+docker exec pid1-demo cat /proc/1/cmdline     # which one is PID 1
 ```
 
-You expected one process. Count how many there are, and note which one has
-PID 1.
+The slim image has no `ps`; `docker top` asks from the host side instead, so
+its PIDs are the host's. You expected one process. Count how many there are,
+and note which one is PID 1 inside the container.
 
 </details>
 
@@ -87,13 +89,16 @@ The first is silently rewritten to `/bin/sh -c "python3 app.py"`. Look up what
 Look at what is actually running:
 
 ```
-$ docker exec pid1-demo ps -ef
-UID    PID  PPID  CMD
-root     1     0  /bin/sh -c python3 app.py
-root     7     1  python3 app.py
+$ docker top pid1-demo
+PID      USER   TIME   COMMAND
+58872    root   0:00   /bin/sh -c python3 app.py
+58916    root   0:00   python3 app.py
+
+$ docker exec pid1-demo cat /proc/1/cmdline | tr '\0' ' '
+/bin/sh -c python3 app.py
 ```
 
-There are two processes. `sh` is PID 1; the application is PID 7.
+There are two processes, and `sh` is PID 1; the application is its child.
 
 `docker stop` signals PID 1, so `sh` gets the `SIGTERM`. A non-interactive
 `sh` waiting on a child does not forward signals to it and does not exit while
@@ -118,9 +123,8 @@ CMD ["python3", "app.py"]
 ```
 
 ```
-$ docker exec pid1-demo ps -ef
-UID    PID  PPID  CMD
-root     1     0  python3 app.py
+$ docker exec pid1-demo cat /proc/1/cmdline | tr '\0' ' '
+python3 app.py
 
 $ time docker stop pid1-demo
 docker stop pid1-demo  0.02s user 0.01s system 4% cpu 0.312 total

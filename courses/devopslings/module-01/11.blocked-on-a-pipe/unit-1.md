@@ -92,8 +92,8 @@ If you want the whole path rather than the innermost frame:
 $ sudo cat /proc/$pid/stack
 ```
 
-That prints the kernel stack, and the second and third frames name the syscall
-it is stuck inside. Between them, `wchan` says *what* it is waiting for and
+That prints the kernel stack, innermost first; the frames under the top one
+trace the path down from the syscall it is stuck inside. Between them, `wchan` says *what* it is waiting for and
 `stack` says *how it got there*.
 
 Copy the `wchan` value into `/root/answers/wchan` now, before you do anything

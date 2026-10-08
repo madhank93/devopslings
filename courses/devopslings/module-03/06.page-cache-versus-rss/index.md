@@ -1,11 +1,10 @@
 ---
 kind: lesson
-title: "the service that is leaking 200 MB, except for the part that is not"
+title: "200 MB and climbing, and the fix on the table is a nightly restart"
 description: |
-  catalog-api's memory climbs all day and never comes down. Most of what the
-  monitoring is counting is not the application's memory at all and will be
-  handed back the moment anything needs it. Underneath that, there is a real
-  leak, and it is much smaller.
+  catalog-api's memory climbs all day and never comes down, and the proposed
+  fix is a nightly restart. Before agreeing to that, find out what the number
+  is made of.
 name: page-cache-versus-rss
 slug: page-cache-versus-rss
 createdAt: "2026-08-04"
@@ -23,24 +22,35 @@ tasks:
 
       # A catalogue the service re-reads on every cycle. Reading it fills the
       # page cache, which is charged to the cgroup and counted by anything
-      # looking at memory.current.
-      dd if=/dev/urandom of=/srv/catalog/catalog.dat bs=1M count=180 status=none
+      # looking at memory.current. Cache is charged to whoever first faults a
+      # page in, so the file leaves init uncached and the service pays for it.
+      python3 - <<'PY'
+      import os
+      with open("/srv/catalog/catalog.dat", "wb") as f:
+          for _ in range(180):
+              f.write(os.urandom(1024 * 1024))
+          f.flush()
+          os.fsync(f.fileno())
+          os.posix_fadvise(f.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+      PY
 
       cat > /usr/local/bin/catalog-api <<'PY'
       #!/usr/bin/env python3
       import time
 
-      # The genuine leak: one 256 KiB buffer retained per cycle, for no reason.
+      # The genuine leak: one 1 MiB buffer retained per cycle, for no reason.
       # Small next to the page cache, and it is the half that never comes back.
+      # Filled, not zeroed: untouched pages are never resident, so a zeroed
+      # buffer would leak address space and never show in anon.
       leaked = []
       cycles = 0
 
       while True:
           with open("/srv/catalog/catalog.dat", "rb") as f:
-              while f.read(4 * 1024 * 1024):
+              while f.read(1024 * 1024):
                   pass
 
-          leaked.append(bytearray(256 * 1024))
+          leaked.append(bytearray(b"\x01") * (1024 * 1024))
           cycles += 1
           with open("/srv/catalog/.cycles", "w") as c:
               c.write(str(cycles))
@@ -195,8 +205,6 @@ tasks:
         exit 1
       fi
 
-      file_bytes=$(awk '/^file /{print $2}' "$cg/memory.stat")
-      file_mb=$(( ${file_bytes:-0} / 1024 / 1024 ))
-      echo "PASS — reclaimable part correctly identified as $want (${file_mb}M of page"
-      echo "       cache), and anonymous memory held flat at $(( a2 / 1024 / 1024 ))M across two rounds."
+      echo "PASS — reclaimable part correctly identified as $want, and anonymous memory"
+      echo "       held flat at $(( a2 / 1024 / 1024 ))M across two rounds of work."
 ---

@@ -2,8 +2,8 @@
 kind: lesson
 title: "one dependency hangs, the other is refused, and both are the same firewall"
 description: |
-  Two calls out of the same service fail at the same moment. One waits thirty
-  seconds and gives up; the other comes back before the log line finishes
+  Two calls out of the same service fail at the same moment. One waits until
+  the client gives up; the other comes back before the log line finishes
   printing. Two rules, two behaviours, and the difference tells you which rule
   you are looking at before you have read any of them.
 name: drop-versus-reject

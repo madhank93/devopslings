@@ -21,7 +21,7 @@ console.log('build 1');
 Look at what that means before looking at any configuration. `?v=2` is a URL
 that has *never been requested before* — that is the entire point of putting a
 build number in it. A cache cannot have a stale copy of a URL it has never
-seen. Unless, of course, it does not think that is a different URL.
+seen.
 
 And a second report, from support: some users are seeing someone else's profile
 page.
@@ -35,6 +35,78 @@ profile: alice
 
 Two symptoms, two lines of configuration, and both lines were added on purpose
 by someone who had a reason.
+
+## Your objective
+
+1. A newly deployed build is served immediately at its own URL. Graded by
+   deploying a build, letting the edge cache it, deploying another, and asking
+   for the new one.
+2. No user is served another user's profile.
+3. **The cache still caches.** Twenty identical requests over about fifteen
+   seconds, and the origin must see no more than three of them.
+
+Then `/root/answers/cache.md`:
+
+```
+key_missing: <one word>
+vary_header: <header name>
+```
+
+## What you're being graded on
+
+The third requirement is the one that makes this a cache lesson rather than a
+correctness lesson. Every one of these "fixes" the first two symptoms:
+
+- `proxy_cache off`
+- `proxy_no_cache 1`
+- putting `$request_id` — or any unique value — in the cache key
+- `proxy_ignore_headers Cache-Control` with `proxy_cache_valid 200 1s` — the
+  origin says `max-age=60`, which overrides `proxy_cache_valid` until it is ignored
+
+And every one of them hands most or all of the traffic to the origin. The twenty
+requests are spread over about fifteen seconds, so a validity of a second or two
+is a miss nearly every time. The origin
+records what it receives, so this is measured directly rather than inferred from
+a header.
+
+<details>
+<summary>Hint 1 — is it even a different URL to the cache?</summary>
+
+```
+$ curl -si 'http://127.0.0.1/asset.js?v=2' | grep -i x-cache
+X-Cache-Status: HIT
+```
+
+A HIT on a URL nobody has ever requested is the whole answer. Something is
+making two different URLs into one key. Read the key, and look up what `$uri`
+contains.
+
+</details>
+
+<details>
+<summary>Hint 2 — ask the origin what it said</summary>
+
+```
+$ curl -si http://172.32.0.11:8080/profile | grep -i vary
+```
+
+The origin is telling the cache how to store that response. Something in the
+edge configuration is deciding not to listen.
+
+</details>
+
+<details>
+<summary>Hint 3 — the entries already on disk</summary>
+
+If both configuration lines are right and bob still gets alice's page, the entry
+that is being served was stored under the old rules. It will not correct itself
+before it expires.
+
+```
+$ find /var/cache/nginx/edge -type f | head
+```
+
+</details>
 
 ## Line one: what makes a cache entry different
 
@@ -135,75 +207,6 @@ every deploy — the usual reflex when a deploy shows stale content — treats t
 symptom, throws away every entry that was fine, and puts the entire origin load
 on the first minute after every release. The reason the deploy did not
 invalidate correctly is a bug, and purging hides it until the next one.
-
-## Your objective
-
-1. A newly deployed build is served immediately at its own URL. Graded by
-   deploying a build, letting the edge cache it, deploying another, and asking
-   for the new one.
-2. No user is served another user's profile.
-3. **The cache still caches.** Twenty identical requests, and the origin must
-   see no more than three of them.
-
-Then `/root/answers/cache.md`:
-
-```
-key_missing: <one word>
-vary_header: <header name>
-```
-
-## What you're being graded on
-
-The third requirement is the one that makes this a cache lesson rather than a
-correctness lesson. Every one of these "fixes" the first two symptoms:
-
-- `proxy_cache off`
-- `proxy_no_cache 1`
-- putting `$request_id` — or any unique value — in the cache key
-- `proxy_cache_valid 200 0s`
-
-And every one of them hands 100% of the traffic to the origin. The origin
-records what it receives, so this is measured directly rather than inferred from
-a header.
-
-<details>
-<summary>Hint 1 — is it even a different URL to the cache?</summary>
-
-```
-$ curl -si 'http://127.0.0.1/asset.js?v=2' | grep -i x-cache
-X-Cache-Status: HIT
-```
-
-A HIT on a URL nobody has ever requested is the whole answer. Something is
-making two different URLs into one key. Read the key, and look up what `$uri`
-contains.
-
-</details>
-
-<details>
-<summary>Hint 2 — ask the origin what it said</summary>
-
-```
-$ curl -si http://172.32.0.11:8080/profile | grep -i vary
-```
-
-The origin is telling the cache how to store that response. Something in the
-edge configuration is deciding not to listen.
-
-</details>
-
-<details>
-<summary>Hint 3 — the entries already on disk</summary>
-
-If both configuration lines are right and bob still gets alice's page, the entry
-that is being served was stored under the old rules. It will not correct itself
-before it expires.
-
-```
-$ find /var/cache/nginx/edge -type f | head
-```
-
-</details>
 
 ## What actually happened
 

@@ -39,10 +39,11 @@ Then make `ledger-sync` complete and write `/srv/ledger/last-sync`.
 
 ## What you're being graded on
 
-The named cause, a successful sync with verification intact, and — the decisive
-one — the time `ledger-sync` itself reports being within two minutes of the
-box's clock. A handshake that succeeds while the skew is still there does not
-pass.
+The named cause, a successful sync, and — the decisive one — the time
+`ledger-sync` itself reports being within two minutes of the box's clock. A
+handshake that succeeds while the skew is still there does not pass. The check
+then puts two impostors on `ledger.internal:8443` — one self-signed, one signed
+by the CA for a different name — and `ledger-sync` must refuse both.
 
 <details>
 <summary>Hint 1 — read the error as a claim about time</summary>

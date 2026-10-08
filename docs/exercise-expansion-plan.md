@@ -137,7 +137,7 @@ the three rules in the file header. Tier in brackets.
 - `arguments-and-usage` [intro] — flags, defaults, and failing loudly on a missing required argument
 - `trap-and-cleanup` [core] — the temp directory survives every interrupt; `trap … EXIT`
 - `parse-do-not-scrape` [core] — the log parser breaks when a field gains a space; the answer is `jq`, not a wider regex
-- `python-for-the-api` [deep] — pagination, retry with backoff, and rate-limit headers; a naive loop misses 40% of records
+- `python-for-the-api` [deep] — pagination, retry with backoff, and rate-limit headers; a naive loop writes 50 of 437 records
 - `when-bash-stops` [architect] — a rubric-graded verdict on which of four scripts should have been a program
 
 ### 03 — Storage, Filesystems & the Kernel · linux-box (priv) · 10

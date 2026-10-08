@@ -49,8 +49,9 @@ A tag can point at a manifest *list*: one entry per platform, and the client
 picks the one matching the machine pulling it. Count the entries you have.
 
 `docker buildx build --platform linux/amd64,linux/arm64 --push` produces the
-list. `--load` cannot: the local image store holds one image, which is why
-multi-platform builds are pushed rather than loaded.
+list. `--load` only helps if your local image store can hold a list (the classic
+one cannot), and the runner does not pull from your laptop anyway: the list has
+to reach the registry.
 
 </details>
 
@@ -139,8 +140,9 @@ contents.** `docker image inspect -f '{{.Architecture}}'` reports what the build
 wrote down. The kernel on the runner reads the ELF header instead, and
 `exec format error` is what it says when those disagree. The same error turns up
 with a `COPY`ed binary built on the host, a base image pulled for the wrong
-platform, and a `#!/bin/bash` script in an image with no bash — anything the
-loader is handed and cannot execute.
+platform, and a script with no `#!` line — anything the loader is handed and
+cannot execute. (A script whose `#!` names a missing interpreter fails
+differently: `no such file or directory`.)
 
 **It runs on your laptop for a reason that will not last.** An arm64 binary in
 an amd64-labelled image runs fine on an arm64 machine, because the label is not
@@ -161,7 +163,7 @@ failures inside the emulator.
 
 For interpreted images there is nothing to cross-compile, but the base image is
 still per-platform, so a multi-platform build is still what publishes a tag both
-architectures can pull. `--load` cannot hold one; a registry is where manifest
-lists live, which is why this exercise pushes to one.
+architectures can pull. A registry is where the machines that pull it look,
+which is why this exercise pushes to one.
 
 </details>

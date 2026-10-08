@@ -1,11 +1,10 @@
 ---
 kind: lesson
-title: "you added the disk, you grew the volume, and df has not moved"
+title: "96% full, a spare disk, and a writer that cannot stop"
 description: |
-  /srv/data is at 96% and there is a spare disk in the box. Adding it to the
-  volume group and extending the logical volume are two steps; the filesystem
-  is a third, and it is the one that makes df change. The service stays up
-  throughout.
+  /srv/data is at 96%, the ingest writer is failing, and there is a spare disk
+  in the box. Grow the volume underneath the running service — no unmount, no
+  restart, and the backlog stays.
 name: lvm-extend-under-pressure
 slug: lvm-extend-under-pressure
 createdAt: "2026-08-04"

@@ -30,15 +30,17 @@ this job is comfortable.
 Then make the job fast again, under the same input. The check watches the pass
 counter and requires the rate to recover.
 
-Two things it will not accept:
+Three things it will not accept:
 
 - a smaller ledger. `LEDGER_MB` stays at 300 — the job's work is the job.
 - a `vm.swappiness` change. That knob is machine-wide here.
+- no memory limit at all. The box is shared; the job keeps a `MemoryMax`.
 
 ## What you're being graded on
 
 The named counter, and at least 120 passes in a ten-second window with the
-service alive throughout and `vm.swappiness` where it started. A job that was
+service alive throughout, a `MemoryMax` still set, and `vm.swappiness` where it
+started. A job that was
 OOM-killed during the check fails, and so does one whose pass counter went
 backwards, because that means it died and restarted rather than made progress.
 

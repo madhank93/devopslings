@@ -27,6 +27,49 @@ a commit is not editable — the blobs stay exactly where they were, reachable
 from history, transferred on every clone. The repository is now the same size
 *and* missing the file the renderer needs.
 
+## Your objectives
+
+- Make a fresh clone of `remotes/app.git` carry less than 1 MB of git history
+- Keep `assets/render.bin` at the tip, byte for byte what it is now
+
+## What you're being graded on
+
+The grader clones `remotes/app.git` with `--no-local` and checks:
+
+- the clone succeeds and has `assets/render.bin`, with the same sha256 as the
+  current atlas (not an LFS pointer file)
+- the atlas arrives through LFS, not as an ordinary git blob
+- the history the clone transferred is under 1 MB
+
+<details>
+<summary>Hint 1 — measure the thing you are trying to change</summary>
+
+```
+$ du -sk app/.git/objects
+```
+
+That number is what a clone transfers. Watch it, not the size of the working
+tree.
+
+</details>
+
+<details>
+<summary>Hint 2 — tracking is not rewriting</summary>
+
+`git lfs track` only affects commits you make from now on. The four atlases are
+already committed; converting them means rewriting the commits that hold them.
+
+</details>
+
+<details>
+<summary>Hint 3 — after a rewrite the branch cannot fast-forward</summary>
+
+Every commit has a new id, so `git push` is rejected. `git push --force origin
+main` is what publishes the rewritten history — and it carries the LFS objects
+with it.
+
+</details>
+
 ## Why binary revisions cost full price
 
 Git stores each version of a file as its own object and packs them with delta
@@ -98,35 +141,6 @@ in its object database, unreachable, until it repacks or prunes. What changes
 immediately is what a *clone* transfers: a fetch sends reachable objects only,
 so a new machine gets the small history straight away, and the origin's own disk
 catches up on its next gc.
-
-<details>
-<summary>Hint 1 — measure the thing you are trying to change</summary>
-
-```
-$ du -sk app/.git/objects
-```
-
-That number is what a clone transfers. Watch it, not the size of the working
-tree.
-
-</details>
-
-<details>
-<summary>Hint 2 — tracking is not rewriting</summary>
-
-`git lfs track` only affects commits you make from now on. The four atlases are
-already committed; converting them means rewriting the commits that hold them.
-
-</details>
-
-<details>
-<summary>Hint 3 — after a rewrite the branch cannot fast-forward</summary>
-
-Every commit has a new id, so `git push` is rejected. `git push --force origin
-main` is what publishes the rewritten history — and it carries the LFS objects
-with it.
-
-</details>
 
 ## Checking yourself
 

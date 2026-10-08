@@ -72,11 +72,9 @@ tasks:
       #
       # Written when every record was flat, short, and machine-generated.
       set -euo pipefail
-      grep -o '"duration_ms": *[0-9]*' /srv/events/events.jsonl \
-        | awk -F: '$2 + 0 > 500' \
-        | while read -r _; do :; done
-      grep '"duration_ms": *[5-9][0-9][0-9]' /srv/events/events.jsonl \
-        | sed -n 's/.*"service": *"\([^"]*\)".*/\1/p' \
+      sed -n 's/.*"service": *"\([^"]*\)".*duration_ms[^0-9]*\([0-9][0-9]*\).*/\2 \1/p' \
+          /srv/events/events.jsonl \
+        | awk '$1 > 500 {print $2}' \
         | sort -u
       SH
       chmod 0755 /usr/local/bin/slow-services

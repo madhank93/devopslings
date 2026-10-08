@@ -133,8 +133,8 @@ tasks:
       if [ "${retained:-0}" -gt "$ceiling" ]; then
         echo "not yet: the service emitted $(human "$emitted") and $(human "$retained") of it is"
         echo "still on disk. Multiply that by a week of real traffic and by every"
-        echo "container on the host. The daemon writes stdout to a file and, by"
-        echo "default, never stops."
+        echo "container on the host. It ran with the '$driver' driver and log options"
+        echo "$(docker inspect -f '{{json .HostConfig.LogConfig.Config}}' "$cid" 2>/dev/null || echo '?')"
         exit 1
       fi
 

@@ -1,5 +1,5 @@
 ---
-title: "the report that has been missing 40% of the records all year"
+title: "the report that has been missing most of the records all year"
 ---
 
 ## The situation
@@ -35,14 +35,16 @@ Write every record exactly once, sorted, to `/srv/api/records.txt`.
 
 - **The API paginates.** The response tells you how to continue.
 - **Some requests fail with 503.** Pages 2 and 5 fail on their first attempt,
-  and page 5 fails again on its second — one blind retry is not enough.
+  and page 5 fails again on its second — one blind retry is not enough. Back
+  off between attempts.
 - **One request returns 429 with `Retry-After`.** The server counts requests
   arriving before that deadline, and the check requires that count to be zero.
 
 ## What you're being graded on
 
 437 distinct ids, no duplicates, sorted, `REC-00001` through `REC-00437`, and
-zero rate-limit violations recorded by the server.
+two counters kept by the server: requests that arrived before a `Retry-After`
+deadline, and retries sent within 0.2 s of a 503. Both must be zero.
 
 <details>
 <summary>Hint 1 — follow the pagination the response describes</summary>

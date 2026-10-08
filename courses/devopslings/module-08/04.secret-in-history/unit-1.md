@@ -15,8 +15,11 @@ e34f4b9  feat: handler 8
 ...
 ```
 
-The tip is clean. The file is not on disk, `grep -r pgw_live .` finds nothing,
-and the config now comes from the environment. It looks handled.
+The tip is clean. The file is not on disk, and the deploy now reads
+`GATEWAY_TOKEN` from `deploy/.env`, which is gitignored. It looks handled.
+
+The gateway's token API is on hand as `./gateway` — `issue`, `revoke <token>`,
+`auth <token>`, `list`.
 
 ```
 $ git log --oneline -S 'pgw_live_9f2a7c4e1b8d3a6f5e0c2b9d4a7f1e8c'
@@ -25,6 +28,67 @@ a768b9d  chore: add deploy config
 ```
 
 It is not handled. It is in the history, which means it is in every clone.
+
+## Your objectives
+
+- Get the token out of history: present in no object reachable from any ref,
+  while every handler commit, the initial commit and the tip's files survive
+- Leave nothing that anyone holding a copy of the leaked value can use, with the
+  deploy still able to authenticate
+
+## What you're being graded on
+
+- every commit is still in history and the tip's files are intact: only
+  `deploy/config.yml` is rewritten out
+- no object reachable from any ref contains the leaked value
+- `deploy/.env` sets a `GATEWAY_TOKEN` that the gateway accepts, the leaked
+  value no longer authenticates, and the new token is not in any reachable
+  object either
+
+`rotation.md`, two lines:
+
+```
+purged_with: <the command you used to rewrite history>
+why: <one line: why rewriting history alone would not have closed the incident>
+```
+
+<details>
+<summary>Hint 1 — find where the value actually lives</summary>
+
+```
+$ git log --oneline -S 'pgw_live_9f2a7c4e1b8d3a6f5e0c2b9d4a7f1e8c'
+```
+
+`-S` searches the content of every commit's diff, not the tip. Two commits
+carry the value: the one that added the file and the one that deleted it.
+
+</details>
+
+<details>
+<summary>Hint 2 — rewrite, don't delete</summary>
+
+```
+$ git filter-branch -f \
+    --index-filter 'git rm --cached --ignore-unmatch deploy/config.yml' \
+    --prune-empty -- --all
+```
+
+`--index-filter` edits each commit's index without checking out a tree.
+`-- --all` makes it cover every ref, not just the current branch.
+
+</details>
+
+<details>
+<summary>Hint 3 — check what still points at the old commits</summary>
+
+```
+$ git for-each-ref refs/original
+```
+
+`filter-branch` keeps your pre-rewrite tips there as a backup. While those refs
+exist, the old commits — and the blob — are still reachable.
+
+</details>
 
 ## A commit that deletes a file keeps the file
 
@@ -128,52 +192,29 @@ The token is still valid.
 Rewriting history is an edit to *your copy* of the object graph. It does not
 reach: the clone on a laptop that pulled last week, the fork, the CI cache, the
 backup, the mirror on the internal server, the build log that echoed the config,
-or whoever already read it. A secret that has been committed to a repository has
+or whoever already read it. On a hosted forge it does not even reach the whole
+server-side copy: GitHub keeps every pull request's commits under `refs/pull/*`,
+which a force-push cannot touch, and old commits stay fetchable by hash until
+support purges them. A secret that has been committed to a repository has
 to be treated as disclosed from the moment it was committed — the only action
 that makes it safe is **revoking it at the issuer and reissuing a new one**.
+
+Rotation has two halves, and each is easy to do alone:
+
+```
+$ ./gateway issue                      # a new token, for the deploy
+$ ./gateway revoke pgw_live_9f2a…      # the leaked one stops working
+```
+
+Issue without revoke leaves the leaked value working next to its replacement.
+Revoke without issuing — or without putting the new token where the deploy reads
+it — takes production down with it. And the new token goes into the untracked
+`deploy/.env`, never a commit, or the rotation has leaked its own result.
 
 The purge is still worth doing. It stops the next person from finding it, and it
 is what you owe anyone who clones tomorrow. But it is cleanup after the incident,
 not the response to it. Rotation is the response. Do it first — a rewrite takes
 minutes to plan and a revoke takes seconds.
-
-<details>
-<summary>Hint 1 — find where the value actually lives</summary>
-
-```
-$ git log --oneline -S 'pgw_live_9f2a7c4e1b8d3a6f5e0c2b9d4a7f1e8c'
-```
-
-`-S` searches the content of every commit's diff, not the tip. Two commits
-carry the value: the one that added the file and the one that deleted it.
-
-</details>
-
-<details>
-<summary>Hint 2 — rewrite, don't delete</summary>
-
-```
-$ git filter-branch -f \
-    --index-filter 'git rm --cached --ignore-unmatch deploy/config.yml' \
-    --prune-empty -- --all
-```
-
-`--index-filter` edits each commit's index without checking out a tree.
-`-- --all` makes it cover every ref, not just the current branch.
-
-</details>
-
-<details>
-<summary>Hint 3 — check what still points at the old commits</summary>
-
-```
-$ git for-each-ref refs/original
-```
-
-`filter-branch` keeps your pre-rewrite tips there as a backup. While those refs
-exist, the old commits — and the blob — are still reachable.
-
-</details>
 
 ## Checking yourself
 
@@ -191,11 +232,24 @@ $ ls handler_8.py deploy/README.md
 Zero reachable objects hold the value, and the rest of the work — every handler
 commit, the initial commit, the tip's files — came through the rewrite intact.
 
+```
+$ ./gateway auth pgw_live_9f2a7c4e1b8d3a6f5e0c2b9d4a7f1e8c
+401 unauthorized
+$ ./gateway auth "$(sed -n 's/^GATEWAY_TOKEN=//p' deploy/.env)"
+200 ok
+```
+
+The leaked value is dead, and the deploy's token is a live one that was never
+committed.
+
 <details>
 <summary>Solution</summary>
 
 ```sh
-# 1. Rotate first: revoke pgw_live_9f2… at the gateway and issue a new token.
+# 1. Rotate first: a new token for the deploy, and the leaked one revoked.
+new=$(./gateway issue)
+printf 'GATEWAY_TOKEN=%s\n' "$new" > deploy/.env
+./gateway revoke pgw_live_9f2a7c4e1b8d3a6f5e0c2b9d4a7f1e8c
 
 # 2. Rewrite every commit, dropping the file that held it.
 git filter-branch -f \
@@ -214,8 +268,7 @@ git gc --prune=now
 
 ```
 purged_with: git filter-branch --index-filter
-rotated: yes
-why: the token was already pushed and cloned, so rewriting my history does not invalidate the credential
+why: the token was already pushed and cloned, and a rewrite of my history does not reach those copies or invalidate the credential
 ```
 
 </details>

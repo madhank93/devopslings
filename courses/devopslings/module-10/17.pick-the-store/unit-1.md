@@ -111,9 +111,9 @@ case tells you both are bounded. Case 3: 200,000 customers × 30 endpoints is
 6 million *before* the histogram buckets that a p99 needs — and staging already
 fell over at two million.
 
-Cardinality is a property of the labels, not of the volume. Case 3 has *fewer*
-events than case 4 by a factor of fifty and is the one that cannot go in the
-metrics store.
+Cardinality is a property of the labels, not of the volume. Case 3 has four
+million events a day against case 4's seventeen billion, and it is the one that
+cannot go in the metrics store.
 
 The fix is not a bigger metrics server. It is to stop treating a
 high-cardinality dimension as a label: keep the events as rows, index them by
@@ -143,8 +143,8 @@ that must see them. Append-only and modest volume make the other three stores
 sound plausible; none of them gives you a transaction around the pair. Not a
 throughput decision and not a durability one — all four are durable.
 
-**Case 3 — per-customer SLO.** Same shape as case 4 and a fiftieth of the
-volume. It is not a metrics workload, because customer id is a
+**Case 3 — per-customer SLO.** Same shape as case 4 and a four-thousandth of
+the volume. It is not a metrics workload, because customer id is a
 high-cardinality dimension and a metrics store keeps a series per combination.
 Rows in Postgres, partitioned by day, indexed on (customer, time).
 

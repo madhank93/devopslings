@@ -184,7 +184,7 @@ tasks:
       A successful reply contains pooled-ok-2026.
       Q
 
-      echo "scenario ready — an idle pooled connection dies after about 15s"
+      echo "scenario ready — an idle pooled connection fails when it is reused"
       ip netns exec pool-client /opt/pool/probe.py 25 2>&1 | sed 's/^/  /' || true
 
   verify_done:

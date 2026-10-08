@@ -1,25 +1,32 @@
 #!/bin/bash
 set -e
 
-# Add the load balancer (and loopback) to the ignore list
+# Behind the load balancer, count the last X-Forwarded-For entry: the one the
+# LB appended. Anyone else is counted by the address it connected from.
+cat > /etc/fail2ban/filter.d/web-login.conf <<'CFG'
+[Definition]
+failregex = ^10\.9\.0\.9 \S+ \S+ \[[^]]*\] "[A-Z]+ [^"]*" 401 .*"(?:[^"]*, )?<ADDR>"$
+            ^<HOST> \S+ \S+ \[[^]]*\] "[A-Z]+ [^"]*" 401 
+ignoreregex =
+CFG
+
 cat > /etc/fail2ban/jail.local <<'CFG'
 [DEFAULT]
 backend = polling
 
-[sshd]
+[web-login]
 enabled  = true
-logpath  = /var/log/auth.log
+filter   = web-login
+logpath  = /var/log/app/access.log
 maxretry = 5
 findtime = 600
 bantime  = 3600
 ignoreip = 127.0.0.1/8 10.9.0.9
 CFG
 
-# Validate the config
 fail2ban-client -t
 
-# Write the answer file
 cat > /root/answers/fail2ban.md <<'ANS'
 wrongly_banned_ip: 10.9.0.9
-fixed_with: ignoreip
+real_client_in: X-Forwarded-For (last entry, only when the peer is the load balancer)
 ANS

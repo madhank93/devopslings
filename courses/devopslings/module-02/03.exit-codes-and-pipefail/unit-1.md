@@ -63,7 +63,7 @@ supposed to be empty.
 The whole picture is in `PIPESTATUS`:
 
 ```
-$ LEDGER=/nope fetch-ledger "$LEDGER" | grep ',SETTLED,' | awk '...' > /dev/null
+$ fetch-ledger /nope | grep ',SETTLED,' | awk '...' > /dev/null
 $ echo "${PIPESTATUS[@]}"
 3 1 0
 ```

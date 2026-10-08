@@ -4,175 +4,180 @@ title: "the brute-force jail is about to ban the load balancer"
 
 ## The situation
 
-fail2ban is watching for SSH brute-force, and it is about to succeed at exactly
-the wrong thing. Look at what it sees:
+A fail2ban jail, `web-login`, watches the login service's access log and bans
+any address that racks up five failed logins (HTTP 401) in ten minutes. Ask it
+what it would do with the log as it stands:
 
 ```
-$ fail2ban-regex /var/log/auth.log sshd
+$ fail2ban-regex /var/log/app/access.log web-login
 ...
-Lines: 12 lines, 0 ignored, 12 matched, 0 missed
+Lines: 44 lines, 0 ignored, 39 matched, 5 missed
+$ fail2ban-regex -o ip /var/log/app/access.log web-login | sort | uniq -c
+     31 10.9.0.9
+      8 192.0.2.77
 ```
 
-Twelve failed logins, all matched by the sshd filter. Now look at where they
-came from:
+`10.9.0.9` is the load balancer. Every user of the site comes through it, so
+the moment this jail runs, it bans the site's front door. fail2ban's own log
+will say it stopped a brute-force attack.
+
+Someone has already suggested adding `10.9.0.9` to `ignoreip` and moving on.
+
+The log is nginx's `combined` format with one extra field on the end, the
+request's `X-Forwarded-For` header:
 
 ```
-$ grep -oE 'from [0-9.]+' /var/log/auth.log | sort | uniq -c
-     12 from 10.9.0.9
+10.9.0.9 - - [28/Sep/2026:20:05:50 +0000] "POST /login HTTP/1.1" 401 17 "-" "Mozilla/5.0" "198.51.100.23"
 ```
 
-Every single one from `10.9.0.9`. The jail's `maxretry` is 5, so five failures
-from one address is a ban — and this address has twelve. The moment the jail
-runs, `10.9.0.9` is banned.
+## Your objectives
 
-`10.9.0.9` is the load balancer. Every SSH session on this box arrives through
-it, so from the box's point of view every connection — and every failed login —
-comes from that one address. Ban it and you have not blocked an attacker; you
-have blocked the single door every legitimate user comes through. The site goes
-dark, and fail2ban's own log will proudly say it stopped a brute-force attack.
+Fix the jail (`/etc/fail2ban/jail.local` and
+`/etc/fail2ban/filter.d/web-login.conf`) so that:
 
-## Why every attacker looks like one IP
+- whoever is really hammering `/login` gets banned;
+- the load balancer is never banned;
+- a user who mistypes a password once or twice is never banned;
+- nobody can get someone else banned, or dodge a ban, by sending a made-up
+  `X-Forwarded-For` header.
 
-This is the same fact as the `real-ip` lesson in the proxy module, seen from the
-security side. A proxy or load balancer terminates the client's connection and
-opens its own to the backend, so the backend sees the *proxy's* address as the
-source. The real client's address is carried separately — in an
-`X-Forwarded-For` header for HTTP, or via PROXY protocol for raw TCP — and
-`sshd` writing to `auth.log` records the address it actually received the
-connection from, which is the load balancer.
-
-So a per-source-IP rule like fail2ban's counts every client's failures against
-the proxy. One fumbled password from each of a hundred users, and the proxy
-crosses `maxretry` in seconds. The mechanism that is supposed to isolate one bad
-actor instead aggregates everyone into a single one, and bans the thing they
-have in common.
-
-## The immediate fix: exempt the load balancer
-
-fail2ban has a directive for "never ban this, whatever it does": `ignoreip`. Add
-the load balancer to the sshd jail:
+Keep the jail enabled. Then write `/root/answers/fail2ban.md`:
 
 ```
-[sshd]
-enabled  = true
-logpath  = /var/log/auth.log
-maxretry = 5
-ignoreip = 127.0.0.1/8 10.9.0.9
+wrongly_banned_ip: <the address the original jail would have banned>
+real_client_in: <the log field that carries the real client address>
 ```
 
-Validate the change the same way you would any jail edit — a config fail2ban
-cannot parse is one it will not load, leaving you with no protection at all:
+## What you're being graded on
 
-```
-$ fail2ban-client -t
-OK: configuration test is successful
-$ fail2ban-client -d | grep -i ignoreip
-['set', 'sshd', 'addignoreip', '127.0.0.1/8', '10.9.0.9']
-```
-
-`fail2ban-client -d` prints the *parsed* configuration — what fail2ban would
-actually load, with every include and default resolved — so it is the honest
-check that the ignore actually took, not just that a line is present in a file.
-
-## What ignoreip does and does not fix
-
-Exempting the load balancer stops the outage, and it is the right first move. Be
-clear about what it costs, though: now that the one visible source is ignored,
-fail2ban sees failed logins from `10.9.0.9` and ignores every one of them —
-including the real brute-force attempts, which also arrive from `10.9.0.9`. The
-jail is still running, but against this log it can no longer ban anyone. You have
-traded a jail that bans everyone for a jail that bans no one.
-
-The real fix is upstream: get the client's true address into the log the jail
-reads, so failures are counted per actual client again. That means the load
-balancer passing the source address through — PROXY protocol to sshd, or a
-forwarded-for field the filter can be pointed at — and a `failregex` that reads
-the client address rather than the connection's. Then `ignoreip` on the load
-balancer is still correct (the LB's own address should never be banned) but it no
-longer blinds the jail, because the addresses being counted are the clients'
-again.
-
-`ignoreip` is the incident response — it stops the site going down in the next
-five minutes. Fixing the logged source address is the actual repair. A jail that
-cannot see who its clients are is not protecting them; it is just deciding
-whether to ban all of them or none.
+The grader starts a private fail2ban-server with your configuration, points the
+jail at fresh traffic with new, random client addresses, and reads back which
+addresses it banned. It includes the load balancer's health checks, users with
+a couple of typos, a brute-force run through the load balancer, and a host
+connecting directly with a forged header. Hard-coding this log's addresses will
+not pass. It also checks `fail2ban-client -t` and the answer file.
 
 <details>
-<summary>Hint 1 — see what fail2ban sees</summary>
+<summary>Hint 1 — whose failures are these, really?</summary>
+
+Read the log, not just the counts. Group the 401s by the last field instead of
+the first:
 
 ```
-$ fail2ban-regex /var/log/auth.log sshd
-$ grep -oE 'from [0-9.]+' /var/log/auth.log | sort | uniq -c
+$ awk '$9 == 401 {print $1, $NF}' /var/log/app/access.log | sort | uniq -c | sort -rn
 ```
 
-All the failures share one source address. That address is the load balancer,
-not an attacker.
+The first field is whoever opened the TCP connection to this box. Behind a
+load balancer, that is the load balancer for every proxied request. Now ask
+what `ignoreip = 10.9.0.9` would leave the jail able to ban.
 
 </details>
 
 <details>
-<summary>Hint 2 — the ignore directive</summary>
+<summary>Hint 2 — which part of the header can you believe?</summary>
 
-Add the load balancer's address to `ignoreip` in the `[sshd]` jail:
+`X-Forwarded-For` is a request header, so a client can send any value it likes.
+A load balancer *appends* the address it accepted the connection from, so on a
+request that came through it, the **last** entry is the one the load balancer
+vouches for and everything before it is whatever the client typed. Look at the
+`203.0.113.66` lines.
 
-```
-ignoreip = 127.0.0.1/8 10.9.0.9
-```
-
-Do not disable the jail — real attackers still need catching once the logs carry
-their real addresses.
+And a request that did *not* come through the load balancer has no one
+vouching for its header at all. Look at `192.0.2.77`.
 
 </details>
 
 <details>
-<summary>Hint 3 — validate the parsed config</summary>
+<summary>Hint 3 — two failregex lines, in order</summary>
+
+A filter can list several `failregex` lines, one per indented line; fail2ban
+uses the first one that matches. `<ADDR>` matches an IP address and nothing
+else. One regex for lines whose peer is `10.9.0.9`, taking the last
+forwarded address; one for everything else, taking the peer. Then decide what
+should happen to the load balancer's own requests that carry no forwarded
+address at all.
+
+Test before you rely on it:
 
 ```
+$ fail2ban-regex -o ip /var/log/app/access.log web-login | sort | uniq -c
 $ fail2ban-client -t
-$ fail2ban-client -d | grep -i ignoreip
 ```
-
-`-t` confirms the file parses; `-d` shows the effective ignore list fail2ban
-would load.
 
 </details>
-
-## Checking yourself
-
-```
-$ fail2ban-client -t
-OK: configuration test is successful
-$ fail2ban-client -d | grep addignoreip
-['set', 'sshd', 'addignoreip', '127.0.0.1/8', '10.9.0.9']
-```
-
-The jail is still enabled, and the load balancer is exempt from it.
 
 <details>
 <summary>Solution</summary>
 
-Add `ignoreip` to the sshd jail in `/etc/fail2ban/jail.local`:
+**Why the jail was wrong.** A proxy terminates the client's connection and
+opens its own to the backend, so the backend's first log field, `$remote_addr`,
+is the proxy for every proxied request. A per-source rule like fail2ban's then
+adds every user's failures together and bans the one thing they have in
+common. `ignoreip` on the load balancer stops that ban, and also stops every
+other ban. The brute-force run arrives from `10.9.0.9` too, so a jail that
+ignores it bans nobody.
+
+**The fix** is to count failures against the client address, taken only from
+a source you trust:
+
+- peer is the load balancer: use the **last** `X-Forwarded-For` entry, the one
+  it appended. Taking the first entry lets `203.0.113.66` put a fresh forged
+  value there on every request and never reach `maxretry`.
+- any other peer: use the peer address and ignore the header. Believing
+  `X-Forwarded-For` from anyone ("trust everyone") lets `192.0.2.77` get
+  `198.51.100.23` banned while escaping itself.
+- the load balancer's own requests (health checks, `X-Forwarded-For: -`) fall
+  through to the peer rule, so `ignoreip` still exempts `10.9.0.9`. Now it only
+  exempts the load balancer, not everyone behind it.
+
+`/etc/fail2ban/filter.d/web-login.conf`:
 
 ```
-[DEFAULT]
-backend = polling
+[Definition]
+failregex = ^10\.9\.0\.9 \S+ \S+ \[[^]]*\] "[A-Z]+ [^"]*" 401 .*"(?:[^"]*, )?<ADDR>"$
+            ^<HOST> \S+ \S+ \[[^]]*\] "[A-Z]+ [^"]*" 401 
+ignoreregex =
+```
 
-[sshd]
-enabled  = true
-logpath  = /var/log/auth.log
-maxretry = 5
-findtime = 600
-bantime  = 3600
+`/etc/fail2ban/jail.local`, one line added:
+
+```
+[web-login]
+...
 ignoreip = 127.0.0.1/8 10.9.0.9
 ```
 
-```bash
-sudo fail2ban-client -t
 ```
+$ fail2ban-regex -o ip /var/log/app/access.log web-login | sort | uniq -c | sort -rn
+     15 10.9.0.9
+     10 203.0.113.66
+      8 192.0.2.77
+      ...
+$ fail2ban-client -t
+OK: configuration test is successful
+```
+
+`10.9.0.9` still appears, for its health checks, and `ignoreip` covers it. The
+attacker and the direct spoofer cross `maxretry`; users with one or two typos
+do not.
 
 ```
 wrongly_banned_ip: 10.9.0.9
-fixed_with: ignoreip
+real_client_in: X-Forwarded-For
 ```
+
+**Doing it at the web server instead.** nginx's `real_ip` module does the same
+job one layer up: `set_real_ip_from 10.9.0.9; real_ip_header X-Forwarded-For;`
+rewrites `$remote_addr` to the forwarded client, only for requests from that
+peer, taking the rightmost untrusted entry. Then the stock filter reads the
+right address. `set_real_ip_from 0.0.0.0/0` is the same "trust everyone" mistake
+as above.
+
+**What about SSH?** This only works because HTTP carries the client address in
+the request. sshd has no equivalent: OpenSSH does not accept PROXY protocol, so
+behind a TCP proxy `auth.log` records only the proxy's address. The real
+options are a layer-4 load balancer that preserves the client source address
+(direct server return, or transparent proxying), or doing the rate limiting
+and banning at the load balancer, which can see the client.
 
 </details>

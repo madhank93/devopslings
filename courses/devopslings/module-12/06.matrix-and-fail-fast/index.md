@@ -19,6 +19,16 @@ tasks:
     init: true
     timeout_seconds: 900
     run: |
+      # A protection rule left by another lesson (any name, any pattern) would
+      # refuse the seed force-push, so every rule on the repository goes first.
+      for rule in $(curl -fsS -u devops:devopslings \
+                      "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections" 2>/dev/null \
+                    | tr ',' '\n' | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p' \
+                    | sed 's/%/%25/g; s/ /%20/g; s/\*/%2A/g; s/?/%3F/g; s/\[/%5B/g; s/]/%5D/g; s|/|%2F|g' || true); do
+        curl -fsS -u devops:devopslings -X DELETE \
+          "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections/${rule}" >/dev/null 2>&1 || true
+      done
+
       work=$(mktemp -d)
       trap 'rm -rf "$work"' EXIT
 
@@ -214,24 +224,43 @@ tasks:
         exit 1
       fi
       if [ "$gate" != "success" ]; then
+        integ=$(context_status "$head_sha" 'integration')
         echo "not yet: 'gate' reports '$gate' on a commit whose code is fine."
-        echo "The integration shard fails on its first attempt in a fresh container and"
-        echo "passes on the next one. Making the gate honest without dealing with that"
-        echo "turns a flaky suite into a red main."
+        if [ "$integ" = "failure" ]; then
+          echo "The integration shard reported 'failure': it fails on its first attempt in"
+          echo "a fresh container and passes on the next one. Making the gate honest"
+          echo "without dealing with that turns a flaky suite into a red main."
+        else
+          echo "The integration shard reported '${integ:-nothing}', so the gate failed on its"
+          echo "own. Read the gate job's log for what it compared."
+        fi
         exit 1
       fi
 
-      # And the half that the first one is not: a genuine failure in one shard
-      # has to reach the gate.
-      cat >> src/contract.test.js <<'JS'
+      # A cancelled or skipped shard cannot be staged on act_runner, so a gate
+      # that only rules out 'failure' is caught by reading it instead.
+      negated=$(printf '%s\n' "$wf" | grep -v '^[[:space:]]*#' \
+        | grep -E "!=[[:space:]]*['\"]?failure|![[:space:]]*(failure\(\)|contains\([^)]*failure)" || true)
+      if [ -n "$negated" ]; then
+        echo "not yet: the gate passes anything that is not a failure:"
+        printf '%s\n' "$negated" | sed 's/^[[:space:]]*/  /'
+        echo "A shard that was cancelled or skipped did not pass either, and that test"
+        echo "lets it through. Ask whether the shards succeeded, not whether they failed."
+        exit 1
+      fi
 
-      test("grader: a contract the code does not meet", () => {
-        assert.strictEqual(applyDiscount(100, 10), 91);
+      # And the half that the first one is not: a genuine failure has to reach
+      # the gate. It goes in the flaky shard, because "that one is usually fine"
+      # is the exemption this has to reject.
+      cat >> src/integration.test.js <<'JS'
+
+      test("grader: pricing service returns the wrong price", () => {
+        assert.strictEqual(90, 91);
       });
       JS
 
       git add -A
-      git commit -qm "grader: break the contract shard"
+      git commit -qm "grader: break the integration shard"
       if ! git push -q origin main 2>/dev/null; then
         echo "not yet: could not push the failing commit"
         exit 1
@@ -239,15 +268,15 @@ tasks:
       probe_sha=$(git rev-parse HEAD)
 
       probe_gate=$(context_status "$probe_sha" 'gate')
-      probe_shard=$(context_status "$probe_sha" 'contract')
+      probe_shard=$(context_status "$probe_sha" 'integration')
       cd /
       restore
       trap - EXIT
 
       if [ "$probe_shard" != "failure" ]; then
-        echo "not yet: a commit with a failing assertion in the contract shard reported"
-        echo "'${probe_shard:-nothing}' for that shard. The shard itself has to fail before"
-        echo "anything downstream can notice."
+        echo "not yet: a commit with an assertion that fails on every attempt in the"
+        echo "integration shard reported '${probe_shard:-nothing}' for that shard. A retry has"
+        echo "to give up and fail; an exemption for the flaky shard hides a real failure."
         exit 1
       fi
 
@@ -263,7 +292,7 @@ tasks:
           echo "Check the actions tab, and run the check again once it has finished."
           exit 1
         fi
-        echo "not yet: the contract shard failed and 'gate' reported '${probe_gate}'."
+        echo "not yet: the integration shard failed and 'gate' reported '${probe_gate}'."
         echo "'needs:' orders jobs, it does not import their verdict, and 'if: always()'"
         echo "asks the gate to run even when what it needs did not succeed. A summary job"
         echo "that never reads the result of what it waited for is a green light wired to"

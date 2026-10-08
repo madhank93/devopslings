@@ -5,8 +5,8 @@ description: |
   The secret that had to be rewritten out of history should never have been
   committed. A pre-commit hook can refuse it — but a hook that greps your files
   blocks every commit you make, because your own .env holds a real token, and a
-  hook that greps for the word "token" blocks the docs. The grader commits six
-  times in a copy of your repository and requires the right answer on all six,
+  hook that greps for the word "token" blocks the docs. The grader commits
+  in a copy of your repository and requires the right answer every time,
   then asks what `--no-verify` does to the whole idea.
 name: hooks-that-catch-it-earlier
 slug: hooks-that-catch-it-earlier
@@ -97,9 +97,9 @@ tasks:
       working directory finds the .env and blocks everything you ever commit,
       including this repository's ordinary changes.
 
-      The grader makes six commits in a copy of this repository: four that must be
-      allowed, and two that add a credential — in two different files — and must be
-      refused.
+      The grader makes commits in a copy of this repository: ordinary ones that must
+      be allowed, and ones that add a credential — in two different files — that
+      must be refused.
 
       Then write rationale.md with exactly three lines:
 
@@ -229,6 +229,21 @@ tasks:
         exit 1
       fi
 
+      # Cleaning up after a leak removes the credential; the diff still contains
+      # it, on a removed line. A hook that refuses that commit blocks the fix.
+      git reset -q --hard "$base"
+      mkdir -p deploy
+      printf 'api_token: %s\n' "$tok" > deploy/config.yml
+      git add deploy/config.yml
+      git commit -q --no-verify -m 'grader: the leak' >/dev/null 2>&1
+      git rm -q deploy/config.yml
+      if ! git commit -q -m 'grader: remove the leak' >/dev/null 2>&1; then
+        echo "not yet: the hook refused a commit that removes the credential. The"
+        echo "         staged diff mentions it only on a removed (-) line. Match added"
+        echo "         lines (^\\+), or the hook blocks the very commit that cleans up."
+        exit 1
+      fi
+
       # Back to the learner's repository for the written answer.
       cd - >/dev/null
       rm -rf "$work"
@@ -256,7 +271,7 @@ tasks:
         echo "         about .git/hooks decides that."
         exit 1
       fi
-      if ! printf '%s' "$a_bs" | grep -qE 'ci|server|pre-receive|receive|remote|push|scan|pipeline|forge|github|gitlab|review'; then
+      if ! printf '%s' "$a_bs" | grep -qE '\b(ci|server|pre-receive|receive|remote|push|scan|pipeline|forge|github|gitlab|review)'; then
         echo "not yet: backstop says '${a_bs:-nothing}'. If the hook can be skipped with"
         echo "         a flag and does not travel with a clone, name the place that"
         echo "         checks the same thing where neither is true."

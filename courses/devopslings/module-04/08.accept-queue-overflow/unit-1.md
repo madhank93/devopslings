@@ -9,41 +9,42 @@ window is not full of errors — it is empty. Nothing. As if the requests were
 never made.
 
 That emptiness is the most useful fact available, and it is usually read as the
-least useful. The application cannot log a connection it was never given. So
-whatever went wrong, went wrong before `accept()` returned — which means it
-happened in the kernel, on the application's behalf.
+least useful.
 
 ```
 $ /opt/queue/load.py 100
-connected=5 failed=95
+connected=64 failed=36
 ```
 
-Ninety-five clients could not connect to a listening socket on a box with no
-load worth mentioning.
+A hundred clients arriving together, and a third of them could not connect to a
+listening socket on a box with no load worth mentioning. The split moves from
+run to run; the failures do not go away.
 
 ## Your objective
 
-Make all 100 connections succeed with no overflows counted. Two numbers cap the
-queue and the smaller one wins. Do not make the worker faster — it stands in for
-a busy application, and a real one will not speed up because you asked.
+Make all 100 connections succeed with no overflows counted. Do not make the
+worker faster — it stands in for a busy application, and a real one will not
+speed up because you asked.
 
 ## What you're being graded on
 
-`somaxconn` at least 128, the config's backlog at least 128, the *running*
-listener showing the larger limit, the accept loop unchanged, and 100 clients
-connecting with zero listen overflows.
+100 simultaneous clients connecting with zero listen overflows, against the
+same slow accept loop — and every limit on the listener's queue at least 128, as
+read back from the running process, not only from the files that configure it.
 
 <details>
 <summary>Hint 1 — the kernel counted what the application could not</summary>
 
 ```
 $ nstat -az | grep -E 'ListenOverflows|ListenDrops'
-TcpExtListenOverflows   95
-TcpExtListenDrops       95
+TcpExtListenOverflows   312
+TcpExtListenDrops       312
 ```
 
-Ninety-five. The same number that failed. The kernel knew exactly what happened
-and wrote it to a counter that nothing scrapes and no dashboard shows.
+More than there were clients: every retried SYN that found the queue full was
+counted again. The kernel knew exactly what happened and wrote it to a counter
+that nothing scrapes and no dashboard shows. The application cannot log a
+connection it was never given.
 
 </details>
 
@@ -61,7 +62,8 @@ On a LISTEN socket these are not bytes.
 - **Recv-Q** — completed connections waiting for the application to accept them
 - **Send-Q** — the maximum the queue can hold
 
-Recv-Q is at Send-Q. The queue is full, and it is four deep.
+Recv-Q is past Send-Q — the kernel holds one more than the limit before it
+calls the queue full. The queue is full, and it is four deep.
 
 </details>
 
@@ -89,28 +91,34 @@ A listening socket has two, and confusing them costs an afternoon.
 
 **The SYN queue** (half-open). A SYN arrives, the kernel replies SYN-ACK and
 waits for the final ACK. Sized by `tcp_max_syn_backlog`. Overflow here is
-counted as `TcpExtTCPReqQDrop` and is what SYN floods target.
+counted as `TcpExtTCPReqQFullDrop` (or `TCPReqQFullDoCookies` when SYN cookies
+step in) and is what SYN floods target.
 
 **The accept queue** (fully established, waiting for the application). The
 handshake is complete. The kernel is holding a working connection that nobody has
 picked up. Sized by `min(listen() backlog, net.core.somaxconn)`. Overflow here is
 `TcpExtListenOverflows`.
 
-This lesson is entirely the second one. The handshake succeeded. The connection
-existed. It was thrown away because there was nowhere to put it.
+This lesson is entirely the second one. It was full, and a full accept queue
+throws work away at both ends of the handshake.
 
 ## Why the client sees a timeout
 
-When the accept queue is full, the default behaviour is to **drop the ACK
-silently** — `tcp_abort_on_overflow=0`. The client believes the handshake
-completed, because from its side it did. It sends its request into a connection
-the server has no record of, gets nothing back, retransmits, and eventually times
-out.
+While the accept queue is full, the kernel **drops new SYNs silently**. The
+client retransmits — at one-second intervals on a current kernel, backing off
+after that — and if the queue has not drained before its connect timeout, it
+gives up. Every dropped SYN adds one to `ListenOverflows`.
 
-Setting `tcp_abort_on_overflow=1` sends a RST instead, so clients fail fast. That
-sounds better and usually is not: it converts a brief burst that would have
-drained in milliseconds into a wall of hard errors. The default is a deliberate
-bet that most overflows are transient.
+A handshake that was already under way when the queue filled fails differently:
+the client's final ACK is dropped (`tcp_abort_on_overflow=0`, the default). The
+client believes it is connected, because from its side it is, sends its request
+into a connection the server has no record of, and times out on the read
+instead.
+
+Setting `tcp_abort_on_overflow=1` answers that second case with a RST, so
+clients fail fast. That sounds better and usually is not: it converts a brief
+burst that would have drained in milliseconds into a wall of hard errors. The
+default is a deliberate bet that most overflows are transient.
 
 Either way the application never hears about it. There is no callback for "a
 connection was made for you and discarded".
@@ -166,7 +174,7 @@ to everything that happens before the application is involved: the accept queue,
 the listener's address, the firewall, the route.
 
 **`nstat -az` is the first command for "the network is dropping packets".** It is
-almost never the network. `ListenOverflows`, `ListenDrops`, `TCPReqQDrop` and
+almost never the network. `ListenOverflows`, `ListenDrops`, `TCPReqQFullDrop` and
 `PruneCalled` each name a specific mechanism, and the counter is already there.
 
 **Look for the second cap.** `min(app, kernel)` is a recurring shape: backlog and

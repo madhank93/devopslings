@@ -48,16 +48,19 @@ binary itself reporting 1.1, and `apt-mark showhold` empty.
 <details>
 <summary>Hint 1 — "kept back" is apt being explicit, not apt being vague</summary>
 
-The wording is a real signal and the four causes say different things:
+The wording is a real signal, and the four causes do not all say the same
+thing:
 
-- **kept back** — apt wants to upgrade it and something is stopping it.
+- **kept back** — apt can see the upgrade and something is stopping it. A hold
+  prints this, and so does an upgrade that needs new packages `apt-get upgrade`
+  will not add.
 - **deferred due to phasing** — this box is not in the rollout wave yet.
-- **not upgraded** in the trailing count, with no per-package list — usually
-  new dependencies.
+- **nothing at all** — a pin that demotes the new version makes apt stop
+  wanting it, so there is nothing to keep back.
 
-You have "kept back", by name, with the package listed. That narrows it
-immediately — and the nightly job printed this line every night for three
-weeks, into a log nobody reads, while exiting 0.
+You have "kept back", by name, with the package listed. That narrows it to two
+— and the nightly job printed this line every night for three weeks, into a log
+nobody reads, while exiting 0.
 
 </details>
 
@@ -89,6 +92,10 @@ else entirely.
 
 <details>
 <summary>Hint 3 — the list nobody checks</summary>
+
+That leaves hold and new dependencies. `apt-get -s full-upgrade` settles the
+second: it is allowed to add packages, and it still does not touch
+ledger-tools. Then:
 
 ```
 $ apt-mark showhold

@@ -28,11 +28,11 @@ about a gigabyte a week on a table holding two and a half megabytes of data.
 
 ## What you're being graded on
 
-The grader requires that nothing is left sitting in an open transaction, that
-`inventory` still has the relfilenode it started with — a rewrite gives the
-space back and takes the table offline to do it — and that `n_dead_tup` has
-come down. Then it runs ten more restock passes and requires the file not to
-grow. You also fill in `/work/answers/bloat.md`.
+The grader requires that `n_dead_tup` has come down and that nothing is still
+stopping vacuum from removing what comes next, and that `inventory` still has
+the relfilenode it started with — a rewrite gives the space back and takes the
+table offline to do it. Then it runs ten more restock passes and requires the
+file not to grow. You also fill in `/work/answers/bloat.md`.
 
 <details>
 <summary>Hint 1 — ask vacuum what it found</summary>
@@ -44,8 +44,8 @@ VACUUM (VERBOSE) inventory;
 ```
 
 ```
-tuples: 0 removed, 50000 remain, 499470 are dead but not yet removable
-removable cutoff: 1177, which was 0 XIDs old when operation ended
+tuples: 0 removed, 550000 remain, 500000 are dead but not yet removable
+removable cutoff: 812, which was 10 XIDs old when operation ended
 ```
 
 Half a million dead row versions, none of them removable. That is not a
@@ -73,9 +73,9 @@ SELECT pid, application_name, state,
 ```
 
 `backend_xmin` is the oldest transaction id that session still needs to be able
-to see. Nothing newer than the lowest `backend_xmin` on the server can be
-removed by vacuum, anywhere in the database — one forgotten transaction pins
-the horizon for every table.
+to see. Nothing newer than the lowest `backend_xmin` in the database can be
+removed by vacuum, from any table in it — one forgotten transaction pins the
+horizon for every table.
 
 Note the state. It is not running a query and it is not blocked on a lock. It
 ran one statement and has been sitting in `idle in transaction` ever since.
@@ -142,17 +142,18 @@ real xid by writing. `backend_xmin IS NOT NULL` is the predicate that tells
 them apart, and an alert on `idle in transaction` alone will page you for
 sessions that cost nothing while missing the ones that do.
 
-**One held snapshot pins the horizon for the entire server.** Not for its
-table, not for its database — the oldest `backend_xmin` anywhere holds back
-vacuum everywhere. A forgotten session on a reporting database bloats the
-tables that a completely unrelated job is updating. This is the same mechanism
+**One held snapshot pins the horizon for the whole database.** Not for the
+table it read — the oldest `backend_xmin` among the database's sessions holds
+back vacuum on every table in it, and a replication slot or a standby's
+`hot_standby_feedback` can do the same across the whole server. A forgotten
+report bloats the tables that a completely unrelated job is updating. This is the same mechanism
 as lock-contention's blocker, except that nothing waits and nothing errors, so
 nobody notices for a week.
 
-**`idle in transaction` is the state to alert on.** Not long-running queries —
-those are visible and someone is usually watching them. A session that ran one
-statement and stopped is doing no work, holds no lock anyone is waiting for,
-and is the most expensive thing on the server.
+**The age of the oldest `backend_xmin` is the number to alert on.** Not
+long-running queries — those are visible and someone is usually watching them.
+A session that ran one statement and stopped is doing no work, holds no lock
+anyone is waiting for, and is the most expensive thing on the server.
 `idle_in_transaction_session_timeout` ends them for you, and there is very
 little reason not to set it.
 

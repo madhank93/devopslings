@@ -110,8 +110,11 @@ that is actually listening".
 $ openssl s_client -connect 10.94.1.9:8443 -servername api.partner.internal
 ...
 subject=CN=api-internal.partner.example
-Verify return code: 21 (unable to verify the first certificate)
+Verify return code: 0 (ok)
 ```
+
+`0 (ok)` is about the chain only: `s_client` does not compare the name unless
+you ask it to with `-verify_hostname api.partner.internal`. Read the subject.
 
 By this rung the TCP connection is established — that is what makes it distinct
 from everything below. The handshake is a separate negotiation on top of a

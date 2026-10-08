@@ -3,10 +3,7 @@ kind: lesson
 title: "two routes, two 5xx, and the same three restarts will not fix either"
 description: |
   The dashboard says the gateway is throwing 5xx on two endpoints. One is a 502
-  and one is a 504, they have completely different causes, and only one of them
-  has anything to do with a setting on the proxy. The nginx error log tells them
-  apart in one line each — and the first instinct, restarting nginx, changes
-  nothing about either.
+  and one is a 504, and restarting nginx has changed nothing about either.
 name: 502-vs-504
 slug: 502-vs-504
 createdAt: "2026-08-23"

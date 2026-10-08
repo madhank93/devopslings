@@ -104,8 +104,8 @@ tasks:
 
       dig api.internal. @127.0.0.1 returns the correct address every time.
 
-      The fix is in /etc/resolv.conf. Do not change /etc/dnsmasq.d/lab.conf,
-      do not add anything to /etc/hosts, and keep the search line present.
+      Do not change /etc/dnsmasq.d/lab.conf, do not add anything to
+      /etc/hosts, and keep the search line in /etc/resolv.conf present.
 
       The corp.internal wildcard belongs to another team. In a real network you
       could not delete it even if you wanted to, so this box is what you fix.

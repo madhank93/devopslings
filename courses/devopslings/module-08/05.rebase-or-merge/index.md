@@ -239,11 +239,13 @@ tasks:
 
       got=$(b 10000 85)
       if [ "$got" != 1000 ]; then
-        echo "not yet: total 10000 85 gives $got, want 1000. Both changes are present"
-        echo "         but they run in the wrong order: the tier bonus is added to the"
-        echo "         percentage first and the cap applies to the result, so 85 becomes"
-        echo "         95 and then 90. Capping first leaves 85 alone, and the bonus"
-        echo "         then lifts it to 95 — back over the cap the hotfix enforces."
+        echo "not yet: total 10000 85 gives $got, want 1000. A 10000 subtotal at 85"
+        echo "         percent gets the bonus (95) and must then be capped at 90."
+        if [ "$got" = 500 ]; then
+          echo "         Both changes are present, but the cap runs first: it sees 85,"
+          echo "         leaves it, and the bonus then lifts it to 95 — over the cap."
+          echo "         The cap has to be the last thing that touches the percentage."
+        fi
         exit 1
       fi
 
@@ -270,7 +272,7 @@ tasks:
         echo "         tiered-pricing while on main makes 'ours' main as well."
         exit 1
       fi
-      if ! printf '%s' "$a_why" | grep -qE 'clamp|cap|hotfix|fix|drop|lose|lost|discard|overwrit|test'; then
+      if ! printf '%s' "$a_why" | grep -qE '\b(clamp|cap|hotfix|fix|drop|lose|lost|discard|overwrit|test)'; then
         echo "not yet: why says '${a_why:-nothing}'. Say what taking one side whole would"
         echo "         have thrown away."
         exit 1

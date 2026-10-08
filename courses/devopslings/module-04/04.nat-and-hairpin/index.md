@@ -4,8 +4,8 @@ title: "everyone can reach the service except the network it lives on"
 description: |
   The published address works from outside. From a machine sitting next to the
   service, on the same subnet, the same address does not. The DNAT rule fires
-  correctly in both cases — and in one of them the reply comes back wearing the
-  wrong return address.
+  correctly in both cases, the service sees the connection arrive, and in one
+  of them it never completes.
 name: nat-and-hairpin
 slug: nat-and-hairpin
 createdAt: "2026-08-07"
@@ -112,8 +112,8 @@ tasks:
         ip netns exec client curl http://203.0.113.10/
 
       The DNAT rule fires in both cases; you can watch the counter climb with
-      `nft list table ip pubnat`. Nothing is being filtered. The service is up
-      and is serving the request that arrives.
+      `nft list table ip pubnat`. Nothing is being filtered, and the service
+      is up.
 
       Make the published address work from the internal network as well, while
       keeping it working from outside.

@@ -2,10 +2,8 @@
 kind: lesson
 title: "the load balancer says both nodes are healthy and half the requests fail"
 description: |
-  Two backends behind HAProxy, one of which cannot do its job because the thing
-  it depends on is gone. Its process is running, so the health check passes, so
-  it stays in rotation, so half of everything 503s — and the graph of "healthy
-  backends" reads 2/2 throughout.
+  Two backends behind HAProxy, half of everything 503s, and the graph of
+  "healthy backends" reads 2/2 throughout.
 name: health-check-that-lies
 slug: health-check-that-lies
 createdAt: "2026-08-23"
@@ -105,11 +103,9 @@ tasks:
         a  ->  172.32.0.11:8080   admin 8081
         b  ->  172.32.0.11:8090   admin 8091
 
-      Both answer /health with 200. One of them cannot serve a request, because
-      the dependency it needs is gone. Ask each of them directly and compare:
+      Ask each of them directly and compare:
 
         curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/health
-        curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/ready
         curl -s -o /dev/null -w '%{http_code}\n' http://172.32.0.11:8090/orders
 
       The load balancer configuration is /etc/haproxy/haproxy.cfg. It is yours.
@@ -139,10 +135,8 @@ tasks:
 
            liveness | readiness
 
-      Raising the check interval is the usual first move and it is the wrong
-      direction: the check was not too frequent, it was asking the wrong
-      question, and every second it takes to notice is a second of failed
-      requests.
+      Checking more often is the usual first move. On its own it changes
+      nothing here.
       Q
 
       echo "scenario ready — 2/2 backends 'healthy', half the requests failing"

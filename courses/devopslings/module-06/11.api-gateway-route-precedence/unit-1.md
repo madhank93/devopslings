@@ -89,9 +89,8 @@ So a regex beats a longer plain prefix, always, whatever order they are written
 in. That is why moving the block changed nothing: step 2 already found it, and
 step 4 threw it away.
 
-```
-man 8 nginx  # or the location directive in the nginx docs
-```
+The rule is written down under the `location` directive in the nginx docs:
+`https://nginx.org/en/docs/http/ngx_http_core_module.html#location`.
 
 Two of these routes are prefixes, one is a regex, and that is the whole bug.
 

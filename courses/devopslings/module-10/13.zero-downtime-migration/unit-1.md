@@ -23,14 +23,15 @@ Three million rows.
 
 - Get `amount` onto the table as a numeric in whole units, with `amount_cents`
   gone and every row's value preserved
-- Do it without the shop ever being refused a read
+- Do it without the shop ever being refused a read or a write
 
 ## What you're being graded on
 
-While your `/work/app/migrate.sh` runs, the grader reads a row by primary key
-every 200ms with `lock_timeout = '1s'`. That query names no column the
-migration touches, so the only thing that can refuse it is a lock on the table
-— and none may be. Afterwards `payments.amount` must be numeric, `amount_cents`
+While your `/work/app/migrate.sh` runs, the grader reads one row by primary key
+and updates another, at random, every 200ms, each with `lock_timeout = '1s'`.
+Neither names a column the migration touches, so the read can only be refused
+by a lock on the table, and the write only by a lock on its row held for over a
+second — and none may be. Afterwards `payments.amount` must be numeric, `amount_cents`
 must be gone, the row count unchanged, no nulls, and the total must still match
 what it was before divided by a hundred. You also fill in
 `/work/answers/migration.md`.
@@ -111,8 +112,10 @@ UPDATE payments SET amount = amount_cents / 100.0
  WHERE id >= $lo AND id < $lo + 100000 AND amount IS NULL;
 ```
 
-Each statement takes row locks, which readers do not wait on, and finishes
-quickly enough that it is never the thing anybody is queued behind. The
+Each statement takes row locks, which readers do not wait on, and commits
+quickly enough that a writer queued on one of its rows waits a fraction of a
+second. One `UPDATE` over the whole table holds every row it has changed until
+it commits, and a write to any of them waits the full length of the pass. The
 `amount IS NULL` makes the pass re-runnable, so an interrupted backfill is
 resumed rather than restarted.
 

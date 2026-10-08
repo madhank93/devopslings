@@ -64,15 +64,18 @@ Compare that list against what the image needs at runtime.
 </details>
 
 <details>
-<summary>Hint 2 — the obvious fix does not fix it</summary>
+<summary>Hint 2 — the obvious fix is not the boundary</summary>
 
-Replacing `COPY . .` with a few narrow `COPY` lines makes the *image* smaller
-and leaves the transfer exactly where it was.
+Try it: change the Dockerfile to copy only `app.py`, build again, and read the
+`transferring context` line. BuildKit reads the Dockerfile first and fetches
+only the paths the instructions name, so the number drops.
 
-Worth proving to yourself rather than taking on faith: change the Dockerfile to
-copy only `app.py`, build again, and read the `transferring context` line. Then
-work out what the ordering must be — which happens first, the client reading
-your Dockerfile, or the client sending the directory.
+Now copy what the app actually needs — `templates/` and `web/` — and read it
+again. `web/` drags `web/node_modules` with it. Narrow `COPY` lines make this
+Dockerfile send less; they do not change what the context *is*. The next
+`COPY . .`, a builder that ships the whole directory (the legacy builder,
+kaniko, a CI tool that tars the checkout), and `.git` is back. The grader
+measures the context itself, not what one Dockerfile asks for.
 
 </details>
 
@@ -123,12 +126,13 @@ base plus the app.
 
 ### The part worth remembering
 
-`docker build .` is two programs. The **client** packs the directory named by the
-final argument into a tar and uploads it to the **daemon**; the daemon then reads
-the Dockerfile and runs the instructions. The upload is finished before the first
-instruction is read, which is why no `COPY` line can influence it. `.dockerignore`
-is the only thing that can, because the client reads it first and leaves the
-matching paths out of the tar.
+`docker build .` is two programs. The **client** offers the directory named by
+the final argument — the build context — to the **builder**, which runs the
+instructions. BuildKit reads the Dockerfile first and pulls only the paths
+`COPY` and `ADD` name; the legacy builder, and most tools that are not BuildKit,
+tar up the whole directory before anything runs. Either way, `.dockerignore`
+is the boundary: paths it matches are never sent, whatever the Dockerfile says
+or whichever builder reads it.
 
 Consequences worth carrying:
 
@@ -143,7 +147,7 @@ Consequences worth carrying:
 - **The context is part of the cache key.** A `.git` directory that changes on
   every commit invalidates `COPY . .` on every commit, which is half of what
   `layer-cache-and-size` was about. Excluding it makes the cache behave.
-- **Patterns are matched by the daemon's own matcher**, not by a shell: `*` does
+- **Patterns are matched by Docker's own matcher**, not by a shell: `*` does
   not cross a `/`, `**` does, a leading `!` re-includes something an earlier line
   excluded, and later lines win. `!` is how you write "none of `web` except
   `web/dist`".

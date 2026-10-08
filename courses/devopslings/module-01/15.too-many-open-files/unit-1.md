@@ -8,9 +8,9 @@ title: "EMFILE, and the ulimit that never reached the service"
 
 ```
 $ journalctl -u feed-gateway -o cat -n 4
-feed-gateway: ready, 0 shards open
-Traceback (most recent call last):
-  File "/usr/local/bin/feed-gateway", line 8, in <module>
+  File "/usr/local/bin/feed-gateway", line 9, in <module>
+    shards = [open(p, "a") for p in sorted(glob.glob("/srv/feed/shards/*.log"))]
+              ~~~~^^^^^^^^
 OSError: [Errno 24] Too many open files: '/srv/feed/shards/shard-61.log'
 ```
 

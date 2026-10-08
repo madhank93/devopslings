@@ -4,6 +4,7 @@ set -euo pipefail
 
 install -d /root/answers
 echo throttled > /root/answers/cause
+echo nr_throttled > /root/answers/evidence
 
 # CPUQuota=20% with the default 100ms period gives the cgroup 20ms of CPU per
 # 100ms window. A request needs ~15ms, so any request that starts more than 5ms

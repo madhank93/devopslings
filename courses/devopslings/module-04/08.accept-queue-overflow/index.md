@@ -3,9 +3,8 @@ kind: lesson
 title: "clients time out and the server's log is empty"
 description: |
   The application never sees these connections, so it cannot log them, so every
-  investigation starts on the network. The kernel accepted them on the
-  application's behalf, ran out of room to hold them, and dropped the rest —
-  and it kept a counter about it that nobody reads.
+  investigation starts on the network. The kernel knows exactly what happened
+  to them, and it wrote it down in a counter that nobody reads.
 name: accept-queue-overflow
 slug: accept-queue-overflow
 createdAt: "2026-08-08"
@@ -81,21 +80,38 @@ tasks:
       # for anything behind a load balancer.
       cat > /opt/queue/load.py <<'PY'
       #!/usr/bin/env python3
-      import socket, sys
+      import socket, sys, threading
 
+      # Concurrent, not one after another: a client that waits for each
+      # connect before starting the next never has more than one in flight,
+      # and SYN retries hide the overflow from it entirely.
       N = int(sys.argv[1]) if len(sys.argv) > 1 else 100
       ok = fail = 0
       socks = []
-      for _ in range(N):
+      lock = threading.Lock()
+      go = threading.Event()
+
+      def client():
+          global ok, fail
           s = socket.socket()
           s.settimeout(3.0)
+          go.wait()
           try:
               s.connect(("127.0.0.1", 9200))
-              ok += 1
-              socks.append(s)
+              with lock:
+                  ok += 1
+                  socks.append(s)
           except OSError:
-              fail += 1
+              with lock:
+                  fail += 1
               s.close()
+
+      threads = [threading.Thread(target=client) for _ in range(N)]
+      for t in threads:
+          t.start()
+      go.set()
+      for t in threads:
+          t.join()
       print(f"connected={ok} failed={fail}")
       for s in socks:
           s.close()
@@ -117,14 +133,9 @@ tasks:
 
         ss -lnt 'sport = :9200'
 
-      For a LISTEN socket those two columns are not what they are elsewhere:
-      Recv-Q is how many completed connections are waiting to be accepted, and
-      Send-Q is the maximum the queue can hold.
-
       Make all 100 connections succeed with no overflows counted.
 
-      Two numbers cap that queue and the smaller one wins. Raising one and not
-      the other changes nothing. Do not make the worker faster — the accept loop
+      Do not make the worker faster — the accept loop
       is standing in for a busy application, and a real one will not speed up
       because you asked.
       Q

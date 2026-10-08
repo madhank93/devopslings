@@ -1,5 +1,5 @@
 ---
-title: "you added the disk, you grew the volume, and df has not moved"
+title: "96% full, a spare disk, and a writer that cannot stop"
 ---
 
 ## The situation

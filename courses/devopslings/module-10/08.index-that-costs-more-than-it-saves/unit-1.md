@@ -12,7 +12,7 @@ spring. It is now roughly a third as fast.
 /work/app/bench.sh
 ```
 
-`orders` has six indexes. Three came with the schema. The others were added
+`orders` has six indexes. Four came with the schema. The other two were added
 over the year by people fixing real read problems, one at a time, each of them
 obviously worth it at the time. Nobody has asked since whether anything still
 reads through them.
@@ -118,7 +118,7 @@ SELECT indexrelname, idx_scan FROM pg_stat_user_indexes
 ```
 
 Four indexes are each carrying one query. Two are carrying nothing, and between
-them they are 450MB of B-tree being maintained on every insert.
+them they are nearly 800MB of B-tree being maintained on every insert.
 
 ```sql
 DROP INDEX orders_lower_reference_idx;

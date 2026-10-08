@@ -7,8 +7,9 @@ title: "the regex that was right until someone wrote a sentence"
 `slow-services` reports which services had a request slower than 500 ms:
 
 ```bash
-grep '"duration_ms": *[5-9][0-9][0-9]' /srv/events/events.jsonl \
-  | sed -n 's/.*"service": *"\([^"]*\)".*/\1/p' \
+sed -n 's/.*"service": *"\([^"]*\)".*duration_ms[^0-9]*\([0-9][0-9]*\).*/\2 \1/p' \
+    /srv/events/events.jsonl \
+  | awk '$1 > 500 {print $2}' \
   | sort -u
 ```
 
@@ -42,6 +43,7 @@ auth
 cart
 checkout
 inventory
+order
 ```
 
 Now read the log and check each one by hand:
@@ -50,10 +52,10 @@ Now read the log and check each one by hand:
 $ jq -c '{service, duration_ms}' /srv/events/events.jsonl
 ```
 
-`cart` has a duration of 40. `inventory` has 120. Both are in the output. And
-`order api` and `billing` are both over 500 and both missing.
+`cart` has a duration of 40. `inventory` has 120. Both are in the output.
+`billing` is over 500 and missing. And there is no service called `order`.
 
-Four wrong answers, in two directions, from one line of `grep`.
+Four wrong answers, in both directions, from one line of `sed`.
 
 </details>
 
@@ -62,16 +64,18 @@ Four wrong answers, in two directions, from one line of `grep`.
 
 | record | what happened |
 |---|---|
-| `cart` | its message contains the literal text `"duration_ms": 9999` |
-| `inventory` | matched `4200` from the nested `upstream` object |
-| `order api` | present, but a space in the name was fine — this one is a red herring for the *pattern*, not the parse |
-| `billing` | its fields are in a different order, and `sed` was anchored on `service` coming after `duration_ms` |
-| `email` | exactly 500, and the rule is *strictly* greater |
+| `cart` | the greedy `.*` before `duration_ms` found the last one on the line — inside its message, `\"duration_ms\": 9999` |
+| `inventory` | same greed, different victim: the last `duration_ms` is the nested `upstream` one, `4200` |
+| `order api` | extracted correctly as `1503 order api`, then `awk` split it on the space and printed `order` |
+| `billing` | its fields are in a different order, and the pattern needs `service` before `duration_ms` |
 
-Now try to fix it with a better regex. Anchor to the start of the record, and
-you break `billing`. Exclude the `upstream` object, and you need to know how
-deep it nests. Handle `500` correctly, and `[5-9][0-9][0-9]` also fails on
-`1503` — four digits — which is why `order api` was only ever found by luck.
+Now try to fix it with a better regex. Require the quote in `"duration_ms":` and
+`cart` goes away, because inside a JSON string that quote is escaped — but
+`inventory`'s nested field is still unescaped and still after `service`. Take
+the first `duration_ms` instead of the last, and `billing` is still missing.
+Allow either field order, and you need two patterns that must not both match.
+Print everything after the first field instead of `$2`, and you have encoded
+"the name is the rest of the line".
 
 Each patch fixes one case and adds an assumption. That is the signature of
 parsing the wrong thing: the rules keep growing and never converge, because
@@ -116,8 +120,9 @@ Two lines of work, and none of the assumptions.
 The original was not sloppy. It was written against real data, it was tested
 against that data, and it was correct. What changed was not the code but the
 inputs — and the code had silently encoded assumptions about them that nobody
-wrote down: that `duration_ms` appears once per line, that it is followed by
-`service`, that it has three digits, that message text never resembles a field.
+wrote down: that `duration_ms` appears once per line, that it comes after
+`service`, that a service name is one word, that message text never resembles a
+field.
 
 Three things worth keeping:
 

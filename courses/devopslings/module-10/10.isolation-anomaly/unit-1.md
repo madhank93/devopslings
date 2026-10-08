@@ -54,8 +54,9 @@ COMMIT;
                                       COMMIT;
 ```
 
-Session 2 blocked on its `UPDATE` until session 1 committed — the row lock did
-its job. Then it wrote 99500 over the top of 99500. Both transactions were
+Had session 2's `UPDATE` arrived before session 1's `COMMIT`, it would have
+blocked on the row lock until that commit — the lock does its job. Either way
+it writes 99500 over the top of 99500. Both transactions were
 serialised on the write and the answer is still wrong, because the number
 session 2 wrote was worked out from a read that happened before session 1
 existed.

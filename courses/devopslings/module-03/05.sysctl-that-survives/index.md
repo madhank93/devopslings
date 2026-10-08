@@ -38,6 +38,7 @@ tasks:
       CONF
 
       systemctl restart systemd-sysctl.service >/dev/null 2>&1 || true
+      sha256sum /etc/sysctl.d/99-vendor-net.conf | awk '{print $1}' > /var/lib/devopslings/sysctl.vendor.sha256
 
       printf '/etc/sysctl.d/99-vendor-net.conf\n' > /var/lib/devopslings/sysctl.override
       printf '120\n' > /var/lib/devopslings/sysctl.want
@@ -56,6 +57,9 @@ tasks:
 
       The check re-applies the configuration the way a boot does and re-reads
       the value. `sysctl -w` on its own will not survive that.
+
+      Leave the vendor file as it is: it belongs to acme-baseline, which
+      rewrites it on every run.
       Q
 
       echo "scenario ready — 10-edge-proxy.conf asks for 120 and the running value is $(cat /proc/sys/net/ipv4/tcp_keepalive_time)"
@@ -78,6 +82,15 @@ tasks:
         echo "not yet: /root/answers/override says '$got_file'"
         echo "         expected the file that is applied AFTER 10-edge-proxy.conf and sets"
         echo "         the same key. Run 'sysctl --system' and read the order."
+        exit 1
+      fi
+
+      # The vendor file is managed elsewhere; an edit there is reverted by the
+      # next baseline run and takes the fix with it.
+      if [ "$(sha256sum "$want_file" 2>/dev/null | awk '{print $1}')" != "$(cat /var/lib/devopslings/sysctl.vendor.sha256)" ]; then
+        echo "not yet: $want_file has been edited or removed."
+        echo "         It says 'managed by configuration': the next acme-baseline run puts"
+        echo "         it back, and 7200 with it. Leave it alone and win on ordering."
         exit 1
       fi
 

@@ -149,7 +149,8 @@ tasks:
       2. A user must never be served another user's profile.
 
       3. The cache must still be a cache. Twenty identical requests are sent
-         and the origin must see no more than three of them. Turning caching
+         over about fifteen seconds and the origin must see no more than three
+         of them. Turning caching
          off, or making every request a miss, fixes the first two problems and
          is not a fix — it moves every byte of load onto the origin.
 
@@ -226,8 +227,11 @@ tasks:
       curl -s -o /dev/null -m 8 "$probe" 2>/dev/null || true
       curl -s -X POST -m 5 "$admin/admin/reset" >/dev/null 2>&1 || true
       deploy "$new"
+      # Spread over ~15s, so a validity of a second or two cannot pass as a
+      # cache: it would expire between requests and each expiry is a miss.
       for _ in $(seq 1 20); do
         curl -s -o /dev/null -m 8 "$probe" 2>/dev/null || true
+        sleep 0.75
       done
       seen=$(curl -s -m 5 "$admin/admin/received" 2>/dev/null | grep -c 'asset.js' || true)
       : "${seen:=0}"
@@ -235,8 +239,9 @@ tasks:
         echo "not yet: twenty identical requests reached the origin $seen times."
         echo "         Correct and uncached is not the goal — the edge exists so the"
         echo "         origin does not see this traffic. A key with something unique in"
-        echo "         it, no_cache, or caching turned off all pass the two checks above"
-        echo "         and hand every request to the origin."
+        echo "         it, no_cache, a validity of a few seconds, or caching turned off"
+        echo "         all pass the two checks above and hand the origin the traffic."
+        echo "         The twenty were spread over about fifteen seconds."
         exit 1
       fi
 

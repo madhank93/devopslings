@@ -66,15 +66,16 @@ $ journalctl -u checkout-api -n 3
 ```
 
 The unit sets `StartLimitBurst=3` within `StartLimitIntervalSec=30`. After
-three failures in that window systemd stops trying, and it will keep refusing
-until you clear the rate-limit state:
+three failures in that window systemd stops trying, and a manual start inside
+the window is refused too. Waiting out the 30 seconds works; so does clearing
+the rate-limit state:
 
 ```
 systemctl reset-failed checkout-api.service
 ```
 
-This catches people constantly. The service looks like it is ignoring your fix
-when in fact it is refusing to attempt one.
+This catches people constantly: fix, start, and within the window the service
+looks like it is ignoring your fix when in fact it is refusing to attempt one.
 
 </details>
 
@@ -151,8 +152,9 @@ start` does nothing — systemd is PID 1, and it does not inherit your shell's
 environment. The service starts with the same empty environment as before.
 
 **`systemctl set-environment` or a `systemd-run` override.** These do work, and
-they are gone on the next reboot. The check restarts the service specifically
-to separate a fix that lives on disk from one that lives in memory.
+they are gone on the next reboot. The check clears the manager's environment
+the way a reboot would, then restarts the service, to separate a fix that
+lives on disk from one that lives in memory.
 
 ### Why the error was hidden
 

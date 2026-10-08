@@ -2,10 +2,9 @@
 kind: lesson
 title: "the connection tracker is filling up and nothing is connecting"
 description: |
-  A metrics shipper sends fire-and-forget UDP. No replies, no sessions, nothing
-  to keep track of — and the kernel is keeping track of every packet anyway,
-  for five minutes each. The box is idle and the table it uses to accept new
-  connections is filling with flows that ended before they were recorded.
+  The box is nearly idle and new connections are being dropped anyway, because
+  the table the kernel uses to accept them is full. The only thing on the box
+  with any volume is a metrics shipper that never opens a connection.
 name: conntrack-under-load
 slug: conntrack-under-load
 createdAt: "2026-08-08"
@@ -101,22 +100,16 @@ tasks:
       sleep 1
 
       cat > /root/questions.txt <<'Q'
-      This box ships metrics over UDP to a collector. Fire and forget: one
-      packet per metric, a fresh source port each time, no reply expected and
-      none sent.
+      This box ships metrics over UDP to a collector. During the afternoon
+      peak it stops accepting new connections, and dmesg says:
 
-      Watch what one burst costs:
+        nf_conntrack: table full, dropping packet
+
+      Watch what one burst of metrics costs:
 
         cat /proc/sys/net/netfilter/nf_conntrack_count
         /opt/metrics/ship.py 2000
         cat /proc/sys/net/netfilter/nf_conntrack_count
-
-      Two thousand packets that are already finished leave two thousand entries
-      in the connection tracking table, each held for five minutes. On a busy
-      afternoon the table fills, and once it is full the kernel starts dropping
-      the packets that would have created new entries — which includes the SYN
-      of every genuine inbound connection. The box refuses connections while
-      doing nothing.
 
       Make a 2000-packet burst cost fewer than 200 conntrack entries, with the
       collector still receiving the metrics.
@@ -183,6 +176,26 @@ tasks:
         echo "         arriving. Untracked is not the same as dropped."
         exit 1
       fi
+
+      # 4. Only the metrics flow may be untracked. A blanket notrack also passes
+      #    the count, and takes NAT and stateful filtering away from everything
+      #    else the box sends or receives.
+      conntrack -D -p udp --dport 9126 >/dev/null 2>&1 || true
+      conntrack -D -p udp --dport 9127 >/dev/null 2>&1 || true
+      python3 -c 'import socket; socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(b"x", ("10.67.0.5", 9126))'
+      ip netns exec collector python3 -c 'import socket; socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(b"x", ("10.67.0.1", 9127))'
+      sleep 1
+      for probe in "9126 sent from this box to 10.67.0.5" "9127 arriving at this box from 10.67.0.5"; do
+        port=${probe%% *}
+        if ! conntrack -L -p udp --dport "$port" 2>/dev/null | grep -q "dport=$port"; then
+          echo "not yet: one UDP packet to port $port, ${probe#* }, left no"
+          echo "         conntrack entry."
+          echo "         the metrics are untracked, and so is traffic that has nothing to"
+          echo "         do with them. Match the collector's address and port, not"
+          echo "         everything that passes the hook."
+          exit 1
+        fi
+      done
 
       echo "PASS — a 2000-packet burst now costs $delta conntrack entries and the"
       echo "       collector still received about $received of them."

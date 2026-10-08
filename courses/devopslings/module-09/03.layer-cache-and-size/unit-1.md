@@ -19,10 +19,6 @@ REPOSITORY         TAG      SIZE
 devopslings-size   latest   1.16GB
 ```
 
-Both complaints have the same root: the Dockerfile does not distinguish between
-what you need to *build* the app and what you need to *run* it, and it does not
-order its layers by how often they change.
-
 ## Your objectives
 
 1. Get the image under 250 MB.

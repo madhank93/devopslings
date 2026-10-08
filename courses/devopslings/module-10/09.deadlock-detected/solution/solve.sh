@@ -50,8 +50,8 @@ cat > /work/answers/deadlock.md <<'MD'
 # the two transactions?
 what-postgres-did: it picked one of the two as the victim, aborted it and rolled its whole transaction back, leaving the other to finish
 
-# Both jobs walk the same six rows. Name the two columns they sort by —
-# they are not the same column, and that is the bug.
+# Both jobs walk the same six rows. Name the column each one sorts
+# them by.
 the-two-orders: reconcile sorts by id ascending and audit sorts by placed_at descending, which over this batch is the exact reverse
 
 # One line: why does catching the error and retrying the transaction not

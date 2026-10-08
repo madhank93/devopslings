@@ -26,82 +26,6 @@ That is the thing worth internalising before touching anything: **mail
 authentication is a DNS problem wearing a mail costume.** The sending host is
 configured correctly. The domain is not.
 
-## The three mechanisms, and what each one actually asks
-
-They are usually recited as a list. They are not a list; they answer three
-different questions and they fail in three different ways.
-
-**SPF — was this machine allowed to send?**
-
-The receiver takes the domain of the **envelope sender** (`MAIL FROM`, not the
-`From:` header), looks up its TXT record, and asks whether the IP that just
-connected is on the list.
-
-```
-$ dig +short TXT corp.example
-"v=spf1 ip4:203.0.113.7 -all"
-```
-
-The mail leaves this box on `10.93.0.1`. The record names an address that has
-never sent it — someone's old relay, most likely, kept after a migration. `-all`
-at the end means *and nobody else*, so the answer is `fail`.
-
-SPF proves nothing about the message. It authorises a machine, and only for the
-duration of one hop: **forward the mail and SPF breaks**, because the forwarder
-is now the sending IP and it is not in your record.
-
-**DKIM — was this message signed by the domain, and is it unaltered?**
-
-The sender signs selected headers and the body with a private key and puts the
-result in the message:
-
-```
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=corp.example;
- i=@corp.example; q=dns/txt; s=mail; t=1787351626; h=from : to :
- subject : date; bh=ugSQRef2XWWmVh5xRZogH7z7JiVfK2e+yEWXSLp62jU=;
- b=iLrH27tA2v6qMpcCf0s9270jJinmfxUf2/KDcRxW0677fhkrAd7ILtK5Ii5DXv0lUg1v1
-```
-
-Two tags matter here. `d=` is the signing domain and `s=` is the **selector**,
-and the receiver joins them to build the name it looks the public key up at:
-
-```
-<selector>._domainkey.<domain>   →   mail._domainkey.corp.example
-```
-
-There is no such record on this domain, so the receiver has a signature and
-nothing to check it with. The signature travels with the message, so unlike SPF
-it survives forwarding — but any relay that rewrites a signed header or the body
-(a mailing list appending a footer, for instance) breaks it.
-
-**DMARC — do either of those belong to the address the human sees?**
-
-SPF checks the envelope sender. DKIM checks the signing domain. Neither of them
-looks at the `From:` header, which is the only address a person is shown — and
-that gap is exactly what spoofing lives in. Mail can pass SPF for
-`bounces.marketing-tool.example` while the `From:` says
-`ceo@yourbank.example`.
-
-DMARC closes it, with two requirements:
-
-1. **At least one** of SPF or DKIM passes, and
-2. that one is **aligned** — its domain matches the domain in `From:`.
-
-*One*, not both, and this is deliberate: forwarding kills SPF and keeps DKIM;
-a mailing list can break DKIM and keep SPF. Requiring either one means normal
-mail survives normal handling.
-
-Then the policy — `p=none`, `p=quarantine`, `p=reject` — tells the receiver what
-to do when neither is aligned. `p=none` means *do nothing, just tell me*, which
-is where an unconfigured domain sits and why nothing here is bouncing.
-
-```
-$ dig +short TXT _dmarc.corp.example
-```
-
-Nothing. No record, no policy, `dmarc=none`, and the filter is left to guess —
-which it does, unfavourably.
-
 ## Your objective
 
 Three things.
@@ -187,6 +111,82 @@ Change one record, send one message, read one header. Changing all three and
 sending once tells you only that something is still wrong.
 
 </details>
+
+## The three mechanisms, and what each one actually asks
+
+They are usually recited as a list. They are not a list; they answer three
+different questions and they fail in three different ways.
+
+**SPF — was this machine allowed to send?**
+
+The receiver takes the domain of the **envelope sender** (`MAIL FROM`, not the
+`From:` header), looks up its TXT record, and asks whether the IP that just
+connected is on the list.
+
+```
+$ dig +short TXT corp.example
+"v=spf1 ip4:203.0.113.7 -all"
+```
+
+The mail leaves this box on `10.93.0.1`. The record names an address that has
+never sent it — someone's old relay, most likely, kept after a migration. `-all`
+at the end means *and nobody else*, so the answer is `fail`.
+
+SPF proves nothing about the message. It authorises a machine, and only for the
+duration of one hop: **forward the mail and SPF breaks**, because the forwarder
+is now the sending IP and it is not in your record.
+
+**DKIM — was this message signed by the domain, and is it unaltered?**
+
+The sender signs selected headers and the body with a private key and puts the
+result in the message:
+
+```
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=corp.example;
+ i=@corp.example; q=dns/txt; s=mail; t=1787351626; h=from : to :
+ subject : date; bh=ugSQRef2XWWmVh5xRZogH7z7JiVfK2e+yEWXSLp62jU=;
+ b=iLrH27tA2v6qMpcCf0s9270jJinmfxUf2/KDcRxW0677fhkrAd7ILtK5Ii5DXv0lUg1v1
+```
+
+Two tags matter here. `d=` is the signing domain and `s=` is the **selector**,
+and the receiver joins them to build the name it looks the public key up at:
+
+```
+<selector>._domainkey.<domain>   →   mail._domainkey.corp.example
+```
+
+There is no such record on this domain, so the receiver has a signature and
+nothing to check it with. The signature travels with the message, so unlike SPF
+it survives forwarding — but any relay that rewrites a signed header or the body
+(a mailing list appending a footer, for instance) breaks it.
+
+**DMARC — do either of those belong to the address the human sees?**
+
+SPF checks the envelope sender. DKIM checks the signing domain. Neither of them
+looks at the `From:` header, which is the only address a person is shown — and
+that gap is exactly what spoofing lives in. Mail can pass SPF for
+`bounces.marketing-tool.example` while the `From:` says
+`ceo@yourbank.example`.
+
+DMARC closes it, with two requirements:
+
+1. **At least one** of SPF or DKIM passes, and
+2. that one is **aligned** — its domain matches the domain in `From:`.
+
+*One*, not both, and this is deliberate: forwarding kills SPF and keeps DKIM;
+a mailing list can break DKIM and keep SPF. Requiring either one means normal
+mail survives normal handling.
+
+Then the policy — `p=none`, `p=quarantine`, `p=reject` — tells the receiver what
+to do when neither is aligned. `p=none` means *do nothing, just tell me*, which
+is where an unconfigured domain sits and why nothing here is bouncing.
+
+```
+$ dig +short TXT _dmarc.corp.example
+```
+
+Nothing. No record, no policy, `dmarc=none`, and the filter is left to guess —
+which it does, unfavourably.
 
 ## What actually happened
 

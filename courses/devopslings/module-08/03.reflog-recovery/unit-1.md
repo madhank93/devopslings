@@ -23,8 +23,59 @@ Two features and the v2.0 release are gone from the branch. The files are off
 disk, `VERSION` is back to v1.0, and `git log` shows a single commit. It looks
 like a morning of work destroyed by one command.
 
-It was not destroyed. It was unreferenced, which is a different and recoverable
-thing.
+## Your objectives
+
+- Get the work back onto `main`: `VERSION` at v2.0 and both feature files
+  restored, as the commits that were lost, not new ones that happen to look the
+  same
+
+## What you're being graded on
+
+- `main` is checked out and contains the original release commit, the same sha
+- the tip has `VERSION` at v2.0 and both feature files, with no uncommitted
+  changes to tracked files
+
+`recovery.md`, exactly two lines:
+
+```
+recovered_version: <what VERSION should say once the work is back>
+found_with: <the command that showed you where the lost commits were>
+```
+
+<details>
+<summary>Hint 1 — the commits are in the reflog</summary>
+
+```
+$ git reflog
+```
+
+Each line is a former position of `HEAD`. The one just before the reset —
+`HEAD@{1}` — is the tip of the lost work, the "release: ship v2.0" commit.
+
+</details>
+
+<details>
+<summary>Hint 2 — point the branch back</summary>
+
+```
+$ git reset --hard HEAD@{1}
+```
+
+or use the sha shown next to the release commit in the reflog. Either moves
+`main` back to the release and restores the files.
+
+</details>
+
+<details>
+<summary>Hint 3 — confirm the whole release is back</summary>
+
+```
+$ cat VERSION            # shipped: v2.0
+$ ls feature-a.txt feature-b.txt SHIPPED
+$ git log --oneline      # all four commits again
+```
+
+</details>
 
 ## reset --hard moves a pointer; it does not delete commits
 
@@ -78,41 +129,6 @@ tracks commits and HEAD moves, not your uncommitted working-tree changes. A
 `reset --hard` over uncommitted edits does lose them, because there was never a
 commit to keep a reference to. Committing early is what makes the safety net
 exist.
-
-<details>
-<summary>Hint 1 — the commits are in the reflog</summary>
-
-```
-$ git reflog
-```
-
-Each line is a former position of `HEAD`. The one just before the reset —
-`HEAD@{1}` — is the tip of the lost work, the "release: ship v2.0" commit.
-
-</details>
-
-<details>
-<summary>Hint 2 — point the branch back</summary>
-
-```
-$ git reset --hard HEAD@{1}
-```
-
-or use the sha shown next to the release commit in the reflog. Either moves
-`main` back to the release and restores the files.
-
-</details>
-
-<details>
-<summary>Hint 3 — confirm the whole release is back</summary>
-
-```
-$ cat VERSION            # shipped: v2.0
-$ ls feature-a.txt feature-b.txt SHIPPED
-$ git log --oneline      # all four commits again
-```
-
-</details>
 
 ## Checking yourself
 

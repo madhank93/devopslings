@@ -4,8 +4,7 @@ title: "every request stalls for five seconds and then succeeds"
 description: |
   Nothing fails. Everything is slow by the same suspiciously round amount. The
   name resolves instantly, the service responds instantly, and between those two
-  facts the client spends five seconds talking to an address that was answered
-  correctly and routed nowhere.
+  facts the client spends five seconds waiting on something.
 name: ipv6-preferred-and-broken
 slug: ipv6-preferred-and-broken
 createdAt: "2026-08-07"
@@ -116,8 +115,7 @@ tasks:
 
         - resolution is instant       getent hosts app.internal
         - the service is instant      curl http://172.31.0.10:8080/
-        - nothing is being dropped    the request never reaches the wire at all
-                                      during the five seconds
+        - nothing errors              the fetch succeeds, every time
 
       Make the fetch complete in under two seconds.
 

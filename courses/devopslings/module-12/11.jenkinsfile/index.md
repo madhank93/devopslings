@@ -316,18 +316,23 @@ tasks:
       restore
       trap - EXIT
 
+      if [ "$result" = "UNSTABLE" ]; then
+        echo "not yet: a commit whose tests genuinely fail reported 'UNSTABLE' — yellow, not"
+        echo "red. catchError or unstable() recorded the failure without failing the build,"
+        echo "and a release gate has to fail it."
+        exit 1
+      fi
       if [ "$result" != "FAILURE" ]; then
         echo "not yet: a commit whose tests genuinely fail reported '${result:-nothing}'."
-        echo "The freestyle job ran './tests.sh || true', which is how it published"
-        echo "broken builds for months. A stage that cannot fail is not a gate."
+        echo "Something between the test script and the build result swallowed its exit"
+        echo "status. A stage that cannot fail is not a gate."
         exit 1
       fi
 
       if [ "$published_after" = "$bad_sha" ]; then
-        echo "not yet: the build failed and ${bad_sha} was published anyway."
-        echo "In Declarative Pipeline the stages after a failing one do not run — unless"
-        echo "the failure was swallowed inside the stage, which puts you back where the"
-        echo "freestyle job was."
+        echo "not yet: the build failed and ${bad_sha} was published anyway. The build"
+        echo "result was right and the publish ran regardless — look at when the publish"
+        echo "step runs: before the test stage, or in a post block that also runs on failure."
         exit 1
       fi
 

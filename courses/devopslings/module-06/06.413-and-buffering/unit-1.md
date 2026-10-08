@@ -22,9 +22,69 @@ $ curl -s http://172.32.0.11:8081/admin/received
 POST /upload
 ```
 
-One entry, from the small upload that worked. The large one never reached it.
-Something in front refused to pass it on, and that something is the only thing
-between the client and the app.
+One entry, from the small upload that worked.
+
+## Your objective
+
+1. A 25 MB upload succeeds and the application reports all 26214400 bytes.
+2. 64 MB is still refused with 413. A limit has to remain.
+3. Uploads are streamed: the application hears about one while the client is
+   still sending it. This is measured by uploading at a throttled rate.
+
+Then `/root/answers/upload.md`:
+
+```
+rejected_by: <proxy | origin>
+limit_bytes: <the limit before you changed anything, in bytes>
+```
+
+## What you're being graded on
+
+**The three requirements above, behaviourally.** The streaming check times when
+the application first records the upload, not when it finishes.
+
+**And attributing the 413 correctly**, to the component whose own records
+show it happened there.
+
+<details>
+<summary>Hint 1 — find out who is answering</summary>
+
+```
+$ head -c 2000000 /dev/zero | curl -si --data-binary @- http://127.0.0.1/upload | head -3
+$ tail -2 /var/log/nginx/error.log
+$ curl -s http://172.32.0.11:8081/admin/received
+```
+
+An error page with a `Server: nginx` banner, a matching line in nginx's error
+log, and nothing at the origin. Three independent statements about which
+component produced the 413.
+
+</details>
+
+<details>
+<summary>Hint 2 — the limit, and the reason for it</summary>
+
+`client_max_body_size` is the directive. It defaults to `1m` and can be set at
+`http`, `server` or `location` level — put it where the uploads are, not on the
+whole server.
+
+Setting it to `0` means unbounded, which the grader refuses. Pick a number that
+covers the 25 MB the endpoint is for.
+
+</details>
+
+<details>
+<summary>Hint 3 — why the origin hears about it so late</summary>
+
+```
+$ head -c 5242880 /dev/zero | curl -s --limit-rate 1000k --data-binary @- -o /dev/null http://127.0.0.1/upload &
+$ while sleep 0.5; do curl -s http://172.32.0.11:8081/admin/received | tail -1; done
+```
+
+The request appears at the origin only when the client has finished sending.
+`proxy_request_buffering` decides that, and it is on by default.
+
+</details>
 
 ## 413 is the proxy's own answer
 
@@ -101,70 +161,6 @@ Streaming is right when the upstream wants to act on the data as it arrives, or
 when uploads are large enough that spooling them twice is silly. Buffering is
 right when the upstream is expensive per connection and the internet is full of
 slow clients.
-
-## Your objective
-
-1. A 25 MB upload succeeds and the application reports all 26214400 bytes.
-2. 64 MB is still refused with 413. A limit has to remain.
-3. Uploads are streamed: the application hears about one while the client is
-   still sending it. This is measured by uploading at a throttled rate.
-
-Then `/root/answers/upload.md`:
-
-```
-rejected_by: <proxy | origin>
-limit_bytes: <the limit before you changed anything, in bytes>
-```
-
-## What you're being graded on
-
-**The three requirements above, behaviourally.** The 64 MB check is what stops
-`client_max_body_size 0`; the throttled check is what distinguishes a raised
-limit from a raised limit plus streaming.
-
-**And attributing the 413 correctly.** Saying the origin rejected it, when the
-origin's own record shows it never received the request, is the specific mistake
-this lesson exists to break.
-
-<details>
-<summary>Hint 1 — find out who is answering</summary>
-
-```
-$ head -c 2000000 /dev/zero | curl -si --data-binary @- http://127.0.0.1/upload | head -3
-$ tail -2 /var/log/nginx/error.log
-$ curl -s http://172.32.0.11:8081/admin/received
-```
-
-An error page with a `Server: nginx` banner, a matching line in nginx's error
-log, and nothing at the origin. Three independent statements about which
-component produced the 413.
-
-</details>
-
-<details>
-<summary>Hint 2 — the limit, and the reason for it</summary>
-
-`client_max_body_size` is the directive. It defaults to `1m` and can be set at
-`http`, `server` or `location` level — put it where the uploads are, not on the
-whole server.
-
-Setting it to `0` means unbounded, which the grader refuses. Pick a number that
-covers the 25 MB the endpoint is for.
-
-</details>
-
-<details>
-<summary>Hint 3 — why the origin hears about it so late</summary>
-
-```
-$ head -c 5242880 /dev/zero | curl -s --limit-rate 1000k --data-binary @- -o /dev/null http://127.0.0.1/upload &
-$ while sleep 0.5; do curl -s http://172.32.0.11:8081/admin/received | tail -1; done
-```
-
-The request appears at the origin only when the client has finished sending.
-`proxy_request_buffering` decides that, and it is on by default.
-
-</details>
 
 ## What actually happened
 

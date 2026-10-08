@@ -57,7 +57,7 @@ pidstat 1 3
 ```
 
 `%CPU` per process, sampled. A process holding 200 MB and using 0% CPU is
-not why your load average is at 4. `free -m` will confirm there is plenty of
+not why your load average is climbing. `free -m` will confirm there is plenty of
 memory available.
 
 One warning about reading its output: the `Command` column is the executable
@@ -131,10 +131,10 @@ systemctl stop queue-worker@3.service
 ```
 $ pidstat 1 2
 UID       PID    %usr %system  %CPU   CPU  Command
-0         198    0.00    0.00   0.00     1  queue-worker
-0         206    0.00    0.00   0.00     0  queue-worker
-0         221    0.00    0.00   0.00     2  cache-warmer
 ```
+
+No rows. `pidstat` lists only processes that used CPU in the interval, and
+nothing on the box is busy any more.
 
 ### What actually happened
 

@@ -19,6 +19,16 @@ tasks:
     init: true
     timeout_seconds: 900
     run: |
+      # A protection rule left by another lesson (any name, any pattern) would
+      # refuse the seed force-push, so every rule on the repository goes first.
+      for rule in $(curl -fsS -u devops:devopslings \
+                      "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections" 2>/dev/null \
+                    | tr ',' '\n' | sed -n 's/.*"rule_name":"\([^"]*\)".*/\1/p' \
+                    | sed 's/%/%25/g; s/ /%20/g; s/\*/%2A/g; s/?/%3F/g; s/\[/%5B/g; s/]/%5D/g; s|/|%2F|g' || true); do
+        curl -fsS -u devops:devopslings -X DELETE \
+          "http://127.0.0.1:3000/api/v1/repos/devops/checkout/branch_protections/${rule}" >/dev/null 2>&1 || true
+      done
+
       api="http://127.0.0.1:3000/api/v1"
       auth="-u devops:devopslings"
       work=$(mktemp -d)
@@ -221,6 +231,50 @@ tasks:
         echo "not yet: the tip of main reports '${state:-no run}'. This commit's tests"
         echo "pass against the dependency its lockfile names — get the pipeline green"
         echo "on it before worrying about the cache."
+        exit 1
+      fi
+
+      # A key that misses on every commit is also honest, and useless. A commit
+      # that leaves the dependencies alone has to restore them and not install.
+      echo "grader: nothing to see here" > GRADER.md
+      git add -A
+      git commit -qm "grader: a change that touches no dependency"
+      if ! git push -q origin main 2>/dev/null; then
+        echo "not yet: could not push the grader's commit"
+        exit 1
+      fi
+      same_sha=$(git rev-parse HEAD)
+      same_state=$(settled_status "$same_sha")
+      run=$(curl -fsS $auth "${api}/repos/${repo}/actions/tasks?limit=50" 2>/dev/null \
+              | tr '{' '\n' | grep "$same_sha" \
+              | sed -n 's/.*"run_number":\([0-9]*\).*/\1/p' | head -1 || true)
+      logs=""
+      if [ -n "$run" ]; then
+        logs=$(curl -fsS $auth \
+          "http://127.0.0.1:3000/${repo}/actions/runs/${run}/jobs/0/logs" 2>/dev/null || true)
+      fi
+      if [ "$same_state" != "success" ]; then
+        echo "not yet: a commit that only adds a markdown file reported '${same_state:-no run}'."
+        echo "It changes nothing the build depends on."
+        exit 1
+      fi
+      if [ -z "$logs" ]; then
+        echo "not yet: could not read the job log for the grader's commit (run '${run:-none}')"
+        exit 1
+      fi
+      if ! printf '%s' "$logs" | grep -q 'Cache restored from key'; then
+        echo "not yet: run #${run}, for a commit that only adds a markdown file, did not"
+        echo "restore the dependency cache. What the cache step said:"
+        printf '%s\n' "$logs" | grep -E 'Cache (not found|restored)' \
+          | sed 's/^[0-9TZ:.-]* /  /' | head -2 || true
+        echo "The dependencies did not change, so the key should not have either. A key"
+        echo "that is new on every commit is never wrong, and never saves an install."
+        exit 1
+      fi
+      if printf '%s' "$logs" | grep -Eq 'added [0-9]+ packages?'; then
+        echo "not yet: run #${run}, for a commit that only adds a markdown file, restored"
+        echo "the cache and then installed the dependencies anyway ('added … package' is"
+        echo "in the log). The install is the ninety seconds the cache exists to skip."
         exit 1
       fi
 

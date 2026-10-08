@@ -3,8 +3,8 @@ kind: lesson
 title: "set -e is at the top and the failure went through anyway"
 description: |
   provision-tenant starts with `set -euo pipefail` and still completed a tenant
-  whose database was never created. There are four contexts where `set -e` is
-  suspended by design, and this script manages to hit all of them.
+  whose database was never created. `set -e` is not broken; it is doing
+  exactly what it is specified to do.
 name: set-e-does-not-do-that
 slug: set-e-does-not-do-that
 createdAt: "2026-08-04"
@@ -122,7 +122,8 @@ tasks:
 
         if [ "$rc" -eq 0 ]; then
           echo "not yet: with '$step' failing, provision-tenant still exited 0"
-          echo "         that step is called from $(hint_for "$step")."
+          echo "         in the original script that step is called from"
+          echo "         $(hint_for "$step")."
           printf '%s\n' "$outp" | tail -3 | sed 's/^/           /'
           rm -f /srv/tenants/fail-*
           exit 1

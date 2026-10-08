@@ -111,7 +111,9 @@ tasks:
         exit 1
       fi
 
-      # Prove it: restart from scratch and require it to come back on its own.
+      # Prove it: drop anything held only in the manager's environment, as a
+      # reboot would, then restart and require it to come back on its own.
+      systemctl unset-environment DATABASE_URL >/dev/null 2>&1 || true
       rm -f /run/checkout-api/ready
       systemctl restart checkout-api.service
       for _ in $(seq 15); do
@@ -119,7 +121,8 @@ tasks:
         sleep 1
       done
       if [ ! -f /run/checkout-api/ready ]; then
-        echo "not yet: the service did not come back after a restart"
+        echo "not yet: the service did not come back after a restart with a clean"
+        echo "         manager environment (as after a reboot)"
         exit 1
       fi
 

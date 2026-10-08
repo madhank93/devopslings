@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
 
+# Rotate first: the value has been out since it was committed, so the response
+# is a new token for the deploy and the old one revoked at the issuer.
+old=$(sed -n 's/^GATEWAY_TOKEN=//p' deploy/.env)
+new=$(./gateway issue)
+printf 'GATEWAY_TOKEN=%s\n' "$new" > deploy/.env
+./gateway revoke "$old" >/dev/null
+
 # Rewrite every commit, dropping the file that held the token. --index-filter
 # edits the index directly, so it never checks a tree out — far faster than
 # --tree-filter over a whole history. --prune-empty discards the commit that
@@ -22,6 +29,5 @@ git gc --prune=now --quiet
 
 cat > rotation.md <<ANS
 purged_with: git filter-branch --index-filter
-rotated: yes
-why: the token was already pushed and cloned, so rewriting my history does not invalidate the credential
+why: the token was already pushed and cloned, and a rewrite of my history does not reach those copies or invalidate the credential
 ANS

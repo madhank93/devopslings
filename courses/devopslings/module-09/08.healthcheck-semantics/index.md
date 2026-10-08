@@ -213,9 +213,9 @@ tasks:
         elapsed=$(( $(date +%s) - start ))
         echo "not yet: 'up --wait' failed after ${elapsed}s:"
         printf '%s\n' "$wait_out" | tail -6 | sed 's/^/    /'
-        echo "The check is right and it starts too early: the first ten seconds are a"
-        echo "legitimate warm-up, the retries run out inside it, and the container is"
-        echo "marked unhealthy before it ever had a chance."
+        echo "The check command itself passed both runs above, so what is left is its"
+        echo "timing: if interval x retries runs out inside the ten-second warm-up, the"
+        echo "container is marked unhealthy before it ever had a chance."
         exit 1
       fi
       elapsed=$(( $(date +%s) - start ))
