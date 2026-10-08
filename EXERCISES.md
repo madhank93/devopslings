@@ -1924,7 +1924,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 2 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 13 exercises · 3 shipped · 1 intro · 8 core · 2 deep · 2 architect
 
 - **set-a-timeout** *(intro)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -1964,7 +1964,7 @@ failures transfer to any provider.
   *Check:* the bad message is isolated, the queue drains, and nothing is lost.
   *Source:* own.
 
-- **graceful-shutdown** *(core)* — a deploy drops in-flight requests.
+- **graceful-shutdown** *(core · shipped)* — a deploy drops in-flight requests.
   *First guess:* longer grace period.
   *Check:* zero failed requests through a rolling restart under load.
   *Source:* own.

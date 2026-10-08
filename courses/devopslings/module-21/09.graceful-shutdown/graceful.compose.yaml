@@ -1,0 +1,40 @@
+# Lesson-local services, layered over sandboxes/chaos-stack/compose.yaml.
+# Relative paths resolve against the sandbox directory, not this file's.
+x-orders: &orders
+  build: ./app
+  # tini as PID 1 forwards signals, so SIGTERM reaches app.py as it would any
+  # process that is not PID 1.
+  init: true
+  command: ["python3", "-u", "/srv/app.py"]
+  volumes:
+    - ../../scratch/graceful-shutdown:/srv:ro
+  stop_grace_period: "${STOP_GRACE_PERIOD:-10s}"
+  healthcheck:
+    test: ["CMD-SHELL", "python3 -c \"import urllib.request;urllib.request.urlopen('http://localhost:8080/ready')\""]
+    interval: 2s
+    timeout: 3s
+    retries: 15
+
+services:
+  orders-a: *orders
+  orders-b: *orders
+
+  # A third replica outside the load balancer, for the check to send SIGTERM
+  # to and watch.
+  probe:
+    <<: *orders
+    ports:
+      - "127.0.0.1:18093:8080"
+
+  lb:
+    image: haproxy:3.0-alpine
+    volumes:
+      - ../../courses/devopslings/module-21/09.graceful-shutdown/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "18092:8080"
+      - "127.0.0.1:18094:8404"
+    depends_on:
+      orders-a:
+        condition: service_healthy
+      orders-b:
+        condition: service_healthy
