@@ -1115,7 +1115,7 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 17 exercises · 17 shipped · 2 intro · 6 core · 8 deep · 1 architect
+`db-stack` · 18 exercises · 18 shipped · 2 intro · 6 core · 9 deep · 1 architect · 1 drill
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1265,6 +1265,20 @@ engine (`db_bench`) for the write-stall exercise.
   constraint — access pattern, consistency requirement, durability, or
   cardinality — graded against a rubric that rejects "it scales better".
   *Source:* own.
+
+- **database-triage-drill** *(deep · drill)* — checkout is slow and some
+  requests time out; the cause is one of five, drawn at random each run: a
+  migration queued behind a session idle in transaction, an orphaned prepared
+  transaction holding a row lock, replica replay paused, the lookup's index
+  rebuilt on lower(reference), an n_distinct override lying to the planner.
+  *First guess:* raise the timeout, send the read to the primary, or force the
+  index with enable_seqscan off.
+  *Check:* checkout.sh unchanged and 2 of 3 checkouts complete; the migration
+  lands, stock adds up to placed orders (rollback, not commit), the replica is
+  still a standby, and the lookup plans as an index scan with a sane estimate;
+  the idx_scan=0 unique constraint on checkout_attempts survives; `triage.md`
+  names cause, evidence and a detection signal with a threshold.
+  *Source:* own; the module's lock, replica and planner lessons as one triage order.
 
 ---
 
