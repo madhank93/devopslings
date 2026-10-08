@@ -55,7 +55,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 01 — Linux & Terminal Triage
-`linux-box` · 18 exercises · 18 shipped · 4 intro · 12 core · 2 deep
+`linux-box` · 19 exercises · 19 shipped · 4 intro · 12 core · 3 deep · 1 drill
 
 - **find-the-evidence** *(intro · shipped)* — a service misbehaved an hour ago and its own
   log file is empty. Four places hold evidence: the unit's journal, `dmesg`, the
@@ -175,6 +175,19 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   time namespaces virtualise only `CLOCK_MONOTONIC` and boottime, and `date -s`
   inside the box would move the clock for every container on the machine. The
   lesson says so.
+
+- **box-triage-drill** *(deep · drill)* — `POST /orders` fails on box; the cause
+  is one of five, drawn at random each run: a deleted file held open filling the
+  disk, inodes exhausted by empty part files, a config typo that leaves the unit
+  failed, a hardening drop-in's LimitNOFILE, a spool directory restored root-owned.
+  *First guess:* delete the biggest log, remount bigger, chmod 777, or run it by hand.
+  *Check:* the grader's own POST succeeds; the listener is orders.service as
+  `orders`, program and config paths unchanged, `/srv/orders` still 48M/4000
+  inodes, the spool not world-writable and the 40 pending orders intact, and the
+  seeded cause fixed where systemd reads it; `log/orders.log.1` (large, noisy,
+  closed) survives; `triage.md` names cause, evidence and a detection signal with
+  a threshold.
+  *Source:* own; the module's failure modes as one repeatable triage order.
 
 ---
 
