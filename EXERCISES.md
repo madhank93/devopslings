@@ -1371,7 +1371,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 12 — CI/CD
-`ci-stack` + `jenkins-stack` · 11 exercises · 11 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`ci-stack` + `jenkins-stack` · 12 exercises · 12 shipped · 1 intro · 8 core · 2 deep · 1 architect · 1 drill
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1462,6 +1462,23 @@ engine (`db_bench`) for the write-stall exercise.
   *Note:* stackless — the fleet and the signals are a small simulator the
   lesson ships, and the grader runs its own copy so editing it proves nothing.
   *Source:* Cloudflare 2019, as the delivery-side lesson.
+
+- **pipeline-triage-drill** *(deep · drill · shipped)* — release 1.4 went green
+  through the pipeline and staging fails its smoke test; the cause is one of
+  five, drawn at random each run: a renamed npm script so the tests silently
+  never run, a gate with `if: always()` that never reads its shards, a cache
+  key that ignores the lockfile, a hotfix branch that wrote staging after main,
+  a promote of a `:latest` tag the build no longer pushes.
+  *First guess:* retag staging by hand, un-skip the nightly-only test, or key
+  the cache on the commit.
+  *Check:* the tip of main's `deploy-staging` succeeded and staging is exactly
+  `checkout:<tip sha>`; the grader's own smoke test passes in it; the test jobs
+  report five passing tests; both test files match 1.4; per-fault probes (a
+  failing cart shard, a lockfile-only change, a hotfix push, a fresh main
+  push) each have to behave; a second `docker build` and a per-commit cache
+  key are rejected; the nightly-only test stays skipped; `triage.md` names
+  cause, evidence and a detection signal with a threshold.
+  *Source:* own; the module's pipeline failures as one repeatable triage order.
 
 ---
 
