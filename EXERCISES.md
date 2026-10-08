@@ -1954,9 +1954,9 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 3 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 13 exercises · 4 shipped · 1 intro · 8 core · 2 deep · 2 architect
 
-- **set-a-timeout** *(intro)* — the one-line change, before any of the patterns.
+- **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
   forever, and the answer names the two different timeouts involved — connect
   and read — and which one the seeded fault exercised.
