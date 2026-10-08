@@ -654,9 +654,17 @@ referrers API signatures attach to. Each lesson names the Harbor equivalent.
   measured and taught: zot drops a manifest from the repository the moment its
   last tag moves, where Distribution and Harbor keep it untagged until garbage
   collection — what a registry keeps is a registry decision.
+- **push-pull-and-mutable-tags** *(shipped)* — production deploys
+  `shop/web:latest` with `pull_policy: always`, CI pushes every build to
+  `latest`, and the nightly restart quietly deployed a debug release candidate
+  nobody released. Re-tagging the release as `latest` fixes it until CI next
+  runs; pinning `:1.4.0` reads as a fix and is still a tag. Graded by acting as
+  CI — push to `latest`, run the routine deploy — and requiring production not
+  to move, with the deploy file naming the release by digest. Harbor's tag
+  immutability and ECR's `IMMUTABLE` are taught as the registry-side second
+  line, which cannot help `latest`.
 
-Still to build: Harbor tag immutability, after `:latest` changed under a running
-deploy · a retention policy that ate the rollback · `cosign` sign and verify ·
+Still to build: a retention policy that ate the rollback · `cosign` sign and verify ·
 `syft` SBOM + `trivy` scan, with an exception that expires · pinning the base
 image by digest · **dependency confusion**, where an internal name resolves to a
 public package · scoped robot accounts · the left-pad and event-stream

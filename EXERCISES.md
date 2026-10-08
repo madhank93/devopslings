@@ -1512,13 +1512,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 11 — Artifacts & Supply Chain
-<<<<<<< HEAD
-`ci-stack` (Harbor)
-||||||| parent of afb2f48 (feat(module-11): add push-your-first-image)
-`ci-stack` (Harbor) · 9 exercises · 1 intro · 5 core · 2 deep · 1 architect
-=======
-`registry-stack` (zot) · 9 exercises · 1 shipped · 1 intro · 5 core · 2 deep · 1 architect
->>>>>>> afb2f48 (feat(module-11): add push-your-first-image)
+`registry-stack` (zot)
 
 - **push-your-first-image** *(intro · shipped)* — tag it, push it, push a second
   build under the same moving tag, pull both back on another client.
@@ -1527,8 +1521,8 @@ engine (`db_bench`) for the write-stall exercise.
   not the image ID `docker images` prints.
   *Source:* own.
 
-- **push-pull-and-mutable-tags** *(core)* — `:latest` changed under a running deploy.
-  *First guess:* re-tag and redeploy.
+- **push-pull-and-mutable-tags** *(core · shipped)* — `:latest` changed under a running deploy.
+  *First guess:* re-tag and redeploy; or pin the version tag, which is still a tag.
   *Check:* deployment pinned by digest; a re-pushed tag no longer changes what runs.
   *Source:* own.
 

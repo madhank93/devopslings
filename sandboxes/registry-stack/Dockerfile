@@ -14,7 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl jq socat less procps vim-tiny \
-      docker-cli docker-buildx skopeo apache2-utils \
+      docker-cli docker-buildx docker-compose skopeo apache2-utils \
     && rm -rf /var/lib/apt/lists/*
 
 RUN case "$TARGETARCH" in amd64) a=x86_64 ;; arm64) a=arm64 ;; *) exit 1 ;; esac \
