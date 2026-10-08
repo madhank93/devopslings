@@ -1924,7 +1924,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 1 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 13 exercises · 2 shipped · 1 intro · 8 core · 2 deep · 2 architect
 
 - **set-a-timeout** *(intro)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -1951,7 +1951,7 @@ failures transfer to any provider.
   recovery — all three transitions observed.
   *Source:* own.
 
-- **pool-exhaustion** *(core)* — one slow endpoint starves every other endpoint.
+- **pool-exhaustion** *(core · shipped)* — one slow endpoint starves every other endpoint.
   *Check:* bulkheads or per-route pools keep the healthy routes serving.
   *Source:* own.
 
