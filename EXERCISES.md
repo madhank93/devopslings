@@ -707,7 +707,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 11 exercises · 11 shipped · 1 intro · 8 core · 1 deep · 1 architect
+`web-stack` · 12 exercises · 12 shipped · 1 intro · 8 core · 2 deep · 1 architect · 1 drill
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -840,9 +840,26 @@ table, the connection tracker, the accept queue, and the packets themselves.
   *Check:* four requests each reach the backend they were meant for, the
   authenticated route still refuses a request with no token, the rate limit
   still counts per client rather than per gateway, and the answer names the
-  order the gateway applies its rules in — host, then path length, then method
-  and headers.
+  order the gateway applies its rules in — host (the server block), then the kind of location match (exact,
+  `^~` prefix, regexes in file order, longest prefix), and only then method and
+  headers.
   *Source:* own.
+
+- **web-triage-drill** *(deep · drill)* — since last night's deploy some requests
+  to the shop fail or hang; the cause is one of five, drawn at random each run:
+  `/api/` lost proxy_pass's trailing slash, `/reports/` lost its own read timeout,
+  the asset cache key uses `$uri`, `/upload` lost its body limit, `/ws` stopped
+  forwarding `Upgrade`.
+  *First guess:* raise the timeout or body limit for the whole server, turn the
+  cache off, or delete the rate limiter whose 429s fill last night's log.
+  *Check:* the grader walks the customer visit itself; each route is answered by
+  the service that owns it under the path it owns (no `rewrite`, no bodies from
+  nginx), reports are waited for at their real five seconds, a stalled API still
+  gives up in under five, 64 MB is still a 413, a new build is served under its
+  new URL while ten requests cost the origin at most two; the per-client limiter
+  and `access.log.1` (a scraper's 429s) survive; `triage.md` names cause,
+  evidence and a detection signal with a threshold.
+  *Source:* own; the module's proxy seams as one repeatable next-hop triage.
 
 ---
 
