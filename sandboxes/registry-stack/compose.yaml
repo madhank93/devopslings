@@ -1,0 +1,59 @@
+# registry-stack — the substrate for module 11.
+#
+# zot rather than Harbor. Harbor publishes amd64-only images and is about nine
+# containers; zot is one multi-arch container implementing the same OCI
+# distribution API, plus the features this module grades: per-repository access
+# control, retention policies, and the referrers API cosign signs into.
+#
+# 127.0.0.1:15000 is the registry's address from the host, from the daemon
+# behind the mounted socket, and (forwarded) from inside the box. One name
+# everywhere, because a signed or pinned reference has to mean the same image
+# to every client that reads it.
+services:
+  registry-init:
+    build: .
+    volumes:
+      - registry-config:/etc/registry
+    entrypoint: ["/opt/registry-defaults/seed.sh"]
+    restart: "no"
+
+  registry:
+    image: ghcr.io/project-zot/zot:v2.1.21
+    container_name: devopslings-zot
+    depends_on:
+      registry-init:
+        condition: service_completed_successfully
+    # Not zot's default /etc/zot: compose creates every container before starting
+    # any, and an empty volume mounted over a path the image populates is filled
+    # with the image's own config before registry-init can seed it.
+    command: ["serve", "/etc/registry/config.json"]
+    volumes:
+      # zot watches this file and reloads access control, users and retention
+      # without a restart, so a lesson's fix takes effect as soon as it is saved.
+      - registry-config:/etc/registry
+      - registry-data:/var/lib/registry
+    ports:
+      - "15000:5000"
+
+  box:
+    build: .
+    container_name: devopslings-registry-box
+    hostname: workstation
+    depends_on:
+      - registry
+    volumes:
+      # Root-equivalent on the host, as in ci-stack: the box builds and runs
+      # images on the host's daemon, the way a laptop or a CI runner does.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - registry-config:/etc/registry
+    # zot's image has no shell, so the box reports for both: it is healthy once
+    # the registry answers through the forwarded address.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://127.0.0.1:15000/v2/"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  registry-config:
+  registry-data:

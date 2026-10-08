@@ -1512,11 +1512,19 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 11 — Artifacts & Supply Chain
+<<<<<<< HEAD
 `ci-stack` (Harbor)
+||||||| parent of afb2f48 (feat(module-11): add push-your-first-image)
+`ci-stack` (Harbor) · 9 exercises · 1 intro · 5 core · 2 deep · 1 architect
+=======
+`registry-stack` (zot) · 9 exercises · 1 shipped · 1 intro · 5 core · 2 deep · 1 architect
+>>>>>>> afb2f48 (feat(module-11): add push-your-first-image)
 
-- **push-your-first-image** *(intro)* — tag it, push it, pull it back on another host.
-  *Check:* the image is pullable from Harbor by a second client, and the answer
-  states what the tag actually names and what the digest names.
+- **push-your-first-image** *(intro · shipped)* — tag it, push it, push a second
+  build under the same moving tag, pull both back on another client.
+  *Check:* both builds are pullable by digest from a client that built neither,
+  and the recorded digests are the manifests `latest` named after each push —
+  not the image ID `docker images` prints.
   *Source:* own.
 
 - **push-pull-and-mutable-tags** *(core)* — `:latest` changed under a running deploy.

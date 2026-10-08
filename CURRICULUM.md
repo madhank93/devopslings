@@ -638,11 +638,24 @@ read its own write.
 
 ## Delivery
 
-### 11 — Artifacts & Supply Chain
-`ci-stack`
+### 11 — Artifacts & Supply Chain · *partly shipped*
+`registry-stack`
 
-Push your first image, and learn what the tag names versus what the digest
-names · Harbor tag immutability, after `:latest` changed under a running
+zot, not Harbor: Harbor ships amd64-only images across about nine containers,
+and zot is one multi-arch container with the same OCI distribution API and the
+features the module grades — per-repository access control, retention, and the
+referrers API signatures attach to. Each lesson names the Harbor equivalent.
+
+- **push-your-first-image** *(shipped)* — build a page, push it under a
+  version and under `latest`, push a second build the same way, and record the
+  digest `latest` named each time. Graded by a second client that never built
+  either image. The trap is the hash `docker images` prints: that is the image
+  ID, the digest of the config, and the registry has never heard of it. Also
+  measured and taught: zot drops a manifest from the repository the moment its
+  last tag moves, where Distribution and Harbor keep it untagged until garbage
+  collection — what a registry keeps is a registry decision.
+
+Still to build: Harbor tag immutability, after `:latest` changed under a running
 deploy · a retention policy that ate the rollback · `cosign` sign and verify ·
 `syft` SBOM + `trivy` scan, with an exception that expires · pinning the base
 image by digest · **dependency confusion**, where an internal name resolves to a
