@@ -955,7 +955,7 @@ each lesson says so.
 ---
 
 ## 08 — Version Control
-no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core · 1 deep · 1 architect
+no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core · 2 deep · 1 architect · 1 drill
 
 - **branch-commit-merge** *(intro · shipped)* — the loop, done properly once.
   *Check:* a feature branch is merged with its history intact, and the answer
@@ -999,6 +999,17 @@ no sandbox (scratch git repos) · 8 exercises · 8 shipped · 1 intro · 5 core 
   false positive on the fixture repo; the written rationale must address what
   happens when someone uses `--no-verify`.
   *Source:* own.
+
+- **git-recovery-drill** *(deep · drill)* — the release check fails on a fresh
+  clone of main; the cause is one of five, drawn at random each run: commits
+  reset away and force-pushed, a regression deep in history, a merge that kept
+  one side, a submodule pinned backwards, a live token in an old commit.
+  *First guess:* patch the total, or rewrite history until the check goes green.
+  *Check:* the grader's own release check passes on a fresh recursive clone;
+  history, per-rule behaviour, the gitlink, original hashes and revocation are
+  checked so each sidestep fails; `docs/example.env` (a test-mode placeholder)
+  survives; `triage.md` names cause, evidence and a detection signal with a threshold.
+  *Source:* own; the module's recoveries as one repeatable triage order.
 
 ---
 
