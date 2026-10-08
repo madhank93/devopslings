@@ -1532,7 +1532,7 @@ engine (`db_bench`) for the write-stall exercise.
   by attempting the rollback.
   *Source:* own.
 
-- **cosign-sign-and-verify** *(core)* — an unsigned image reaches staging.
+- **cosign-sign-and-verify** *(core · shipped)* — an unsigned image reaches staging.
   *First guess:* trust the registry.
   *Check:* signed images deploy, an unsigned or re-tagged one is rejected.
   *Source:* roadmap.sh supply chain.
