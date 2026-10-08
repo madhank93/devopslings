@@ -4,4 +4,4 @@
 set -eu
 [ -f /etc/registry/config.json ] && exit 0
 cp /opt/registry-defaults/config.json /etc/registry/config.json
-htpasswd -Bbc /etc/registry/htpasswd devops devopslings
+htpasswd -Bbc /etc/registry/htpasswd devops devopslings 2>/dev/null

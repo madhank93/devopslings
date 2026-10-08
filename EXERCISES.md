@@ -1526,7 +1526,7 @@ engine (`db_bench`) for the write-stall exercise.
   *Check:* deployment pinned by digest; a re-pushed tag no longer changes what runs.
   *Source:* own.
 
-- **retention-ate-the-rollback** *(core)* — the image you need to roll back to is gone.
+- **retention-ate-the-rollback** *(core · shipped)* — the image you need to roll back to is gone.
   *First guess:* rebuild the old commit; the build is not reproducible.
   *Check:* a retention policy that keeps what the rollback window requires, proven
   by attempting the rollback.

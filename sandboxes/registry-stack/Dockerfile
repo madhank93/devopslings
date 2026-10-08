@@ -25,6 +25,7 @@ RUN case "$TARGETARCH" in amd64) a=x86_64 ;; arm64) a=arm64 ;; *) exit 1 ;; esac
  && chmod +x /usr/local/bin/cosign
 
 COPY defaults/ /opt/registry-defaults/
+RUN ln -s /opt/registry-defaults/reset-registry /usr/local/bin/reset-registry
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
 WORKDIR /work

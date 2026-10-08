@@ -20,6 +20,7 @@ tasks:
     timeout_seconds: 300
     run: |
       reg=127.0.0.1:15000
+      reset-registry
       repo=$reg/shop/web
       echo devopslings | docker login "$reg" -u devops --password-stdin >/dev/null 2>&1
 

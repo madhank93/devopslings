@@ -21,6 +21,7 @@ tasks:
     timeout_seconds: 300
     run: |
       reg=127.0.0.1:15000
+      reset-registry
       crane auth login "$reg" -u devops -p devopslings >/dev/null 2>&1
 
       # Start from an empty repository. A tag left by an earlier attempt would

@@ -663,8 +663,19 @@ referrers API signatures attach to. Each lesson names the Harbor equivalent.
   to move, with the deploy file naming the release by digest. Harbor's tag
   immutability and ECR's `IMMUTABLE` are taught as the registry-side second
   line, which cannot help `latest`.
+- **retention-ate-the-rollback** *(shipped)* — v1.8.0 has a bug and the
+  rollback to v1.7.0 fails with `MANIFEST_UNKNOWN`: a registry-wide "keep the
+  last eight tags" policy, written to stop CI builds filling the disk, counted
+  releases and branch builds together, and a release lasts as long as it takes
+  main to get eight commits. The team rebuilt the old tag and shipped untested
+  bytes. Graded by replaying a release cycle — 24 CI builds around three
+  releases — through the student's policy, waiting for real retention passes,
+  then pulling each release and counting the CI builds left. Turning retention
+  off or into `dryRun` keeps the releases by giving up the clean-up, and is
+  refused. zot logs every keep/delete decision with the rule behind it, which is
+  how the student diagnoses it.
 
-Still to build: a retention policy that ate the rollback · `cosign` sign and verify ·
+Still to build: `cosign` sign and verify ·
 `syft` SBOM + `trivy` scan, with an exception that expires · pinning the base
 image by digest · **dependency confusion**, where an internal name resolves to a
 public package · scoped robot accounts · the left-pad and event-stream
