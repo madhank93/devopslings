@@ -278,8 +278,8 @@ once, and then runs at 03:00 against input you did not imagine.
 ---
 
 ## 03 — Storage, Filesystems & the Kernel
-`linux-box` (loop devices, LVM, cgroup v2) · 10 exercises · all shipped ·
-1 intro · 4 core · 4 deep · 1 architect
+`linux-box` (loop devices, LVM, cgroup v2) · 11 exercises · all shipped ·
+1 intro · 4 core · 5 deep · 1 architect · 1 drill
 
 Where "the disk is slow" and "we are out of memory" turn out to be four
 different things each.
@@ -434,6 +434,24 @@ different things each.
   window is always the trailing one, and the distinction the lesson is about
   disappears.
   *Source:* own.
+
+- **storage-triage-drill** *(deep · drill)* — ingest's p99 has degraded and some
+  of its writes fail; the cause is one of five, drawn at random each run, each a
+  different layer under one service: a platform drop-in setting `CPUQuota=2%`, a
+  `MemoryMax` that pages it into swap, an LV extended without its filesystem, an
+  fstab entry that came back as the wrong disk, and a sysctl baseline narrowing
+  `ip_local_port_range` to ten ports. On every draw catalog-warm holds its own
+  volume at 60–80% `%util` with direct reads that ingest never touches.
+  *First guess:* catalog-warm, the loudest graph; or the runtime fix that does not
+  survive — `systemctl set-property --runtime`, `sysctl -w`, a `mount` by hand,
+  `tcp_tw_reuse=1`.
+  *Check:* with ingest restarted it meets its deadline with no failed writes and
+  no OOM kill, keeping a CPU and a memory limit; the seeded layer is fixed where
+  it lives (unit drop-in, filesystem size, fstab resolving to the right image,
+  sysctl config re-applied); catalog-warm and its data are untouched; `triage.md`
+  names the drawn cause, its kernel evidence, and a detection signal with a
+  threshold.
+  *Source:* own; the module's failure modes as one repeatable triage order.
 
 ---
 
