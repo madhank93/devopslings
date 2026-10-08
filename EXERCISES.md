@@ -179,7 +179,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 02 — Scripting & Automation
-`linux-box` · 9 exercises · 9 shipped · 2 intro · 5 core · 1 deep · 1 architect
+`linux-box` · 10 exercises · 10 shipped · 2 intro · 5 core · 2 deep · 1 architect · 1 drill
 
 The roadmap says "learn a programming language" and stops. This module is the
 part that actually bites: a script that works on your machine, on your files,
@@ -245,6 +245,22 @@ once, and then runs at 03:00 against input you did not imagine.
   structures, or error handling — graded against a rubric that rejects
   "it felt cleaner".
   *Source:* own.
+
+- **nightly-job-drill** *(deep · drill)* — settle-nightly logged "done" and exited
+  0, and last night's settlement report is wrong; the cause is one of five, drawn
+  at random each run: `$(ls)` splitting a batch named with a space, `pipefail`
+  removed under a failing paginated service, `local x=$(cmd)` hiding a failed
+  service from `set -e`, a batch converted in place and reused truncated after a
+  timeout kill, and a report appended to on a second run.
+  *First guess:* the `ERROR rates-mirror` line that is in every night's log, or
+  regenerating the report by hand and leaving the job as it was.
+  *Check:* last night's report matches the batches; the grader's own nights —
+  healthy, a spaced batch name, a failing accounts page, failing chargebacks, a
+  run killed by `TERM` then retried, a run twice — each either publish the right
+  report with exit 0 or exit non-zero with no report; the rates warning still
+  reaches the log and the four services are unchanged; `triage.md` names cause,
+  evidence and a detection signal with a threshold.
+  *Source:* own; the module's failure modes as one repeatable triage order.
 
 ---
 
