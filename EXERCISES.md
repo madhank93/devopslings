@@ -1014,7 +1014,7 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 12 exercises · 12 shipped · 1 intro · 8 core · 3 deep
+`none` (scratch workspace) · 13 exercises · 13 shipped · 1 intro · 8 core · 4 deep · 1 drill
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -1096,6 +1096,21 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
   *Check:* the shaper still works, effective capabilities are exactly
   `CAP_NET_ADMIN`, and mounting a tmpfs inside it is refused.
   *Source:* roadmap.sh security basics.
+
+- **container-triage-drill** *(deep · drill)* — `./deploy.sh` ends in "container
+  api is unhealthy", and that is the whole ticket. One fault is seeded per run,
+  drawn from five: a memory limit under the 160MB cache (exit 137, silent logs),
+  a health check with no `start_period` against a 12s warm-up, `QUOTES_URL`
+  pointing at the host's published port, a volume mount point the non-root uid
+  cannot write, and `*.json` in `.dockerignore` keeping the catalogue out of the
+  image. The quotes service logs an ERROR on every request and is never the cause.
+  *First guess:* the loud ERROR in the quotes logs, or more health-check retries.
+  *Check:* from an empty volume the deploy goes healthy and `/quote` answers;
+  non-root, limit set and ≤512MB, `/ready` check noticing a dead container within
+  10s, quotes by service name, no bind mounts, volume owned by the app uid and
+  not world-writable, application and quotes.py untouched; `answers/triage.md`
+  names the cause, the evidence and a detection signal with a threshold.
+  *Source:* own; ps → inspect → logs → /ready → exec → image as a repeatable drill.
 
 ---
 
