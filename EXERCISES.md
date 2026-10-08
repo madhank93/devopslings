@@ -882,7 +882,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 07 — Security Hardening & Access Control
-`linux-box` · 12 exercises · 9 shipped · 1 intro · 7 core · 3 deep · 1 architect
+`linux-box` · 13 exercises · 10 shipped · 1 intro · 7 core · 4 deep · 1 architect · 1 drill
 
 AppArmor, not SELinux: every sandbox is Debian, and SELinux does not enforce
 meaningfully inside a container. The mechanism transfers; the tool differs, and
@@ -969,6 +969,23 @@ each lesson says so.
   graded against a rubric that requires a named attacker capability rather than
   "hackers", and rejects controls with no stated cost.
   *Source:* own.
+
+- **hardening-audit-drill** *(deep · drill)* — the pre-audit compliance scan
+  reports one finding against the reports host; the finding is one of five,
+  drawn at random each run, against a written baseline: a sudo grant wider than
+  the runbook's one command, a stray setuid bit on a non-system binary, a
+  world-readable credential, the service unit switched to root by a drop-in,
+  an extra sshd port from a drop-in.
+  *First guess:* delete the grant, the binary or the key, stop the service or
+  sshd, or strip setuid from the newest file in the scan.
+  *Check:* every baseline item holds — `sudo -l -U` lists exactly the one
+  command and the operator can still run it, no setuid file `dpkg -S` cannot
+  name and `reports-fetch` still fetches a report, the key `root:reports` with
+  nothing for other and still readable by the service, the unit enabled and
+  running as `reports` in config and in fact, sshd on 22 only in `sshd -T` and
+  in `ss`; `/usr/bin/passwd` (the newest setuid file, package-owned) survives;
+  `triage.md` names cause, audit evidence and a detection rule.
+  *Source:* own; the module's controls as one repeatable audit order.
 
 ---
 
