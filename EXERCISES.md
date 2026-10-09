@@ -1954,7 +1954,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 5 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 13 exercises · 6 shipped · 1 intro · 8 core · 2 deep · 2 architect
 
 - **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -1968,7 +1968,7 @@ failures transfer to any provider.
   budget and at least 95% of checkouts still answer 200 with a price.
   *Source:* own.
 
-- **retry-storm** *(core)* — the retry that turns a blip into an outage.
+- **retry-storm** *(core · shipped)* — the retry that turns a blip into an outage.
   *First guess:* retry harder.
   *Check:* upstream request rate stays bounded during the fault window.
   *Source:* own.
