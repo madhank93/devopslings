@@ -1954,7 +1954,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 8 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 13 exercises · 9 shipped · 1 intro · 8 core · 2 deep · 2 architect
 
 - **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -1991,7 +1991,7 @@ failures transfer to any provider.
   *Check:* replayed requests produce exactly one side effect.
   *Source:* own.
 
-- **dead-letter-queue** *(core)* — one poison message stops the queue.
+- **dead-letter-queue** *(core · shipped)* — one poison message stops the queue.
   *Check:* the bad message is isolated, the queue drains, and nothing is lost.
   *Source:* own.
 
