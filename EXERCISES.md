@@ -1954,7 +1954,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 6 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 13 exercises · 7 shipped · 1 intro · 8 core · 2 deep · 2 architect
 
 - **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -1973,7 +1973,7 @@ failures transfer to any provider.
   *Check:* upstream request rate stays bounded during the fault window.
   *Source:* own.
 
-- **backoff-and-jitter** *(core)* — synchronised retries from 200 clients.
+- **backoff-and-jitter** *(core · shipped)* — synchronised retries from 200 clients.
   *Check:* request arrivals are spread; recovery time drops measurably.
   *Source:* own.
 
