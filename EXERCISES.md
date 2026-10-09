@@ -1954,7 +1954,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 7 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 13 exercises · 8 shipped · 1 intro · 8 core · 2 deep · 2 architect
 
 - **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -1986,7 +1986,7 @@ failures transfer to any provider.
   *Check:* bulkheads or per-route pools keep the healthy routes serving.
   *Source:* own.
 
-- **idempotency-keys** *(core)* — at-least-once delivery charges twice.
+- **idempotency-keys** *(core · shipped)* — at-least-once delivery charges twice.
   *First guess:* deduplicate in the client.
   *Check:* replayed requests produce exactly one side effect.
   *Source:* own.
