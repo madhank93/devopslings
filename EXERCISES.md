@@ -40,13 +40,14 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 287 exercises across 27 modules and 13 sandboxes. 140 shipped,
-147 specified. Modules 01–05 are complete: all 71 of their exercises pass the
-contract test. By tier: 29 intro · 164 core · 63 deep · 31 architect.
+**Counts**: 294 exercises across 27 modules and 13 sandboxes. 142 shipped,
+152 specified. Modules 01–06, 08, 09, 10 and 12 are complete: all 132 of their
+exercises pass the contract test. By tier: 29 intro · 167 core · 67 deep ·
+31 architect.
 
-Per module: 01/18 · 02/9 · 03/10 · 04/20 · 05/15 · 06/10 · 07/12 · 08/8 · 09/12 ·
-10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
-20/15 · 21/13 · 22/11 · 23/10 · 24/13 · 25/7 · 26/9 · 27/4.
+Per module: 01/18 · 02/9 · 03/10 · 04/20 · 05/15 · 06/11 · 07/12 · 08/8 · 09/12 ·
+10/17 · 11/9 · 12/12 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
+20/15 · 21/13 · 22/12 · 23/10 · 24/13 · 25/7 · 26/9 · 27/4.
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
 each have an `intro` rung. Modules 24, 26 and 27 do not, because they are built
@@ -2091,7 +2092,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 13 exercises · 9 shipped · 1 intro · 8 core · 2 deep · 2 architect
+`chaos-stack` · 14 exercises · 10 shipped · 1 intro · 8 core · 3 deep · 2 architect · 1 drill
 
 - **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -2159,6 +2160,24 @@ failures transfer to any provider.
   survives the failure of what it reports on — and the capacity-removal path is
   bounded so a single command cannot exceed the blast radius.
   *Source:* published AWS postmortem, simplified.
+
+- **resilience-triage-drill** *(deep · drill)* — checkout fails its game day, a
+  replayed pricing incident (resets, a rush with pricing slow, then pricing
+  hung); the cause is one of five settings, drawn at random each run, each a
+  pattern from this module set to a plausible wrong value: a 30s timeout that
+  outlasts the 8s hang, an empty fallback price, `RETRY_ON` including `4xx`, a
+  breaker threshold of 50 the outage never reaches, and a bulkhead as wide as
+  the 16 worker threads. On every draw recommendations fail on every browse —
+  a decommissioned service refusing instantly, which costs nothing.
+  *First guess:* the recommendations errors; or retuning every setting to
+  known-good values.
+  *Check:* a 42s k6 game day whose thresholds are the grade — resets retried,
+  every customer answered, nobody past the 3s budget, browse p95 under 500ms,
+  slow pricing still used — two of them read from pricing's own counters
+  (repeats after a 404, calls while hung); exactly one setting changed,
+  `RECS_URL` untouched; `triage.md` names the drawn cause, the report number
+  that proves it, and a detection signal with a threshold.
+  *Source:* own; the module's failure modes as one repeatable triage order.
 
 ---
 
