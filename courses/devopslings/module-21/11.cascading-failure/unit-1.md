@@ -137,15 +137,15 @@ service that sets it and leaves every other caller of product exposed.
 
 ```
 PRODUCT_TO_REVIEWS_TIMEOUT=0.6
-PRODUCT_TO_REVIEWS_POOL=4
+PRODUCT_TO_REVIEWS_POOL=6
 ```
 
 All the other hops stay at `0`.
 
 ```
-/account  — answered: 100.0%, p95: 3ms
-/checkout — answered: 100.0%, p95: 9ms
-/product  — answered: 100.0%, p95: 603ms; with reviews before the fault: 100.0%
+/account  — answered: 100.0%, p95: 4ms
+/checkout — answered: 100.0%, p95: 16ms
+/product  — answered: 100.0%, p95: 607ms; with reviews before the fault: 99.4%
 requests that waited over 0.5s for a thread — gateway: 0, orders: 0, product: 0
 ```
 
@@ -157,15 +157,20 @@ without the reviews widget.
 The two settings sit on the one hop that touches the slow dependency, and each
 does a different job.
 
-- **The pool is the bulkhead.** Calls to reviews can hold 4 of product's 8
-  threads, never more. However slow reviews gets, product keeps 4 threads for
-  `/stock` and for pages that render without reviews. Every service above
+- **The pool is the bulkhead.** Calls to reviews can hold 6 of product's 8
+  threads, never more. However slow reviews gets, product keeps 2 threads for
+  `/stock` and for pages that render without reviews — both take milliseconds,
+  so 2 is plenty.
+- **The pool has to fit a normal day.** 40 pages a second at about 50ms each
+  is two calls in flight on average, and bursts go well above that. A call that
+  finds the pool full is refused, not queued, so a pool of 4 already turns away
+  a few percent of healthy lookups before anything is slow. Every service above
   product is protected without being configured, because product never stops
   answering them.
-- **The timeout keeps the bulkhead moving.** Without it, each of the 4 slots is
+- **The timeout keeps the bulkhead moving.** Without it, each of the 6 slots is
   held for the full 3 seconds. With it, a slot comes back after 0.6s. 0.6 is
   high enough not to cut off the normal 300ms lookups, and a slow reviews still
-  costs at most 4 threads.
+  costs at most 6 threads.
 
 Limits on the hops above product would not have helped. They stop a caller
 from waiting, but the work it abandoned still holds product's threads.

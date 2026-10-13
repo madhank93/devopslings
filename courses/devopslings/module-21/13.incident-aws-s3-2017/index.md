@@ -229,10 +229,11 @@ tasks:
         echo "not yet: $conf is missing or empty"
         exit 1
       fi
-      regions=$(sed -n 's/^[[:space:]]*regions[[:space:]]*=[[:space:]]*//p' "$conf" | tail -1 | tr ',' ' ')
+      # Parsed exactly as post-status.sh parses it.
+      regions=$(sed -n 's/^regions=//p' "$conf" | tr ',' ' ')
       if [ -z "${regions// /}" ]; then
-        echo "not yet: $conf has no regions= line. The console needs somewhere to"
-        echo "         load from; known regions are: $known"
+        echo "not yet: $conf has no line starting 'regions=' (the console reads it"
+        echo "         exactly that way, no spaces). Known regions are: $known"
         exit 1
       fi
       for r in $regions; do
@@ -413,13 +414,14 @@ tasks:
       field() { awk -v k="$1:" 'index($0, k) == 1 { sub(/^[^:]*:[ \t]*/, ""); print; exit }' "$ans"; }
       has() { grep -Eqi "$1" <<<"$2"; }
 
-      # True when some sentence of $2 matches $1 and is not negated — so
-      # "it was not human error" does not count as blaming a human.
+      # True when some sentence of $2 matches $1 and is not negated or
+      # dismissed — so "it was not human error" and "being more careful only
+      # lowers the rate" do not count as blaming a human.
       asserts() {
         local s
         while IFS= read -r s; do
           has "$1" "$s" || continue
-          has "\b(not|never|no|nor|neither|rather than|instead of)\b|n't\b" "$s" && continue
+          has "\b(not|never|no|nor|neither|rather than|instead of|only|cannot|futile|inevitable|unavoidable|insufficient|useless)\b|n't\b" "$s" && continue
           return 0
         done < <(tr '.;!?' '\n\n\n\n' <<<"$2")
         return 1
@@ -511,6 +513,12 @@ tasks:
         echo "not yet: status_dependency gives a reason the summary does not. AWS says"
         echo "         it could not update per-service status because of a dependency."
         echo "         Run ./replay.sh: the console fails to load. What does it load from?"
+      elif has '\b(mov\w*|migrat\w*|relocat\w*)\b' "$dep" \
+           && ! has '\b(multi-region|multiple regions|more than one region|(two|several|multiple) regions|across)\b' "$dep"; then
+        fail=1
+        echo "not yet: status_dependency moves the console to another region. That moves"
+        echo "         the problem with it: an outage there is the one it cannot report."
+        echo "         What lets it work when any one region is down?"
       else
         miss=""
         has '\b(status|dashboard|shd|console)\b' "$dep" || miss="status"

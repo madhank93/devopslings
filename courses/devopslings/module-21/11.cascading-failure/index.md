@@ -131,6 +131,10 @@ tasks:
         if awk -v t="$rt" 'BEGIN { exit !(t + 0 > 0 && t + 0 < 0.3) }'; then
           echo "One lookup in ten takes 300ms on a normal day, and PRODUCT_TO_REVIEWS_TIMEOUT=$rt"
           echo "abandons every one of them. A timeout has to sit above normal, not at the fault."
+        elif [ "${rp:-0}" -gt 0 ] && [ "$rp" -lt 6 ]; then
+          echo "PRODUCT_TO_REVIEWS_POOL=$rp refuses a call that finds it full. On a normal day"
+          echo "about two reviews calls are in flight and bursts go higher, so some healthy"
+          echo "lookups find all $rp slots taken. Size the pool to the normal day first."
         else
           echo "Something above is failing calls that a healthy reviews would have answered."
         fi

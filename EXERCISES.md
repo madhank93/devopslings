@@ -40,8 +40,8 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 294 exercises across 27 modules and 13 sandboxes. 142 shipped,
-152 specified. Modules 01–06, 08, 09, 10 and 12 are complete: all 132 of their
+**Counts**: 294 exercises across 27 modules and 13 sandboxes. 146 shipped,
+148 specified. Modules 01–06, 08, 09, 10, 12 and 21 are complete: all 146 of their
 exercises pass the contract test. By tier: 29 intro · 167 core · 67 deep ·
 31 architect.
 
@@ -2092,7 +2092,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 14 exercises · 10 shipped · 1 intro · 8 core · 3 deep · 2 architect · 1 drill
+`chaos-stack` · 14 exercises · 14 shipped · 1 intro · 8 core · 3 deep · 2 architect · 1 drill
 
 - **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -2138,21 +2138,21 @@ failures transfer to any provider.
   *Check:* zero failed requests through a rolling restart under load.
   *Source:* own.
 
-- **load-shedding** *(deep)* — degrading on purpose beats collapsing by accident.
+- **load-shedding** *(deep · shipped)* — degrading on purpose beats collapsing by accident.
   *Check:* under 3× capacity, the service sheds the excess and keeps p99 for the rest.
   *Source:* own.
 
-- **cascading-failure** *(deep)* — one slow dependency takes down three healthy services.
+- **cascading-failure** *(deep · shipped)* — one slow dependency takes down three healthy services.
   *Check:* the blast radius is contained; the unrelated services stay up.
   *Source:* own.
 
-- **incident-knight-capital-2012** *(architect · replay)* — a deploy to seven of
+- **incident-knight-capital-2012** *(architect · replay · shipped)* — a deploy to seven of
   eight hosts, and a flag that meant something else on the eighth.
   *Check:* the reconstruction shows the divergence, and the fix makes a partial
   deploy detectable before it trades.
   *Source:* published SEC filing and analyses, heavily simplified.
 
-- **incident-aws-s3-2017** *(architect · replay)* — a typo in a runbook command
+- **incident-aws-s3-2017** *(architect · replay · shipped)* — a typo in a runbook command
   removes more capacity than intended, and the systems that would have told you
   depended on the thing that was down.
   *First guess:* the fix is to be more careful when typing.

@@ -272,7 +272,8 @@ tasks:
           echo "not yet: on the incident fleet preflight.sh named smars-$n, which matches"
           echo "         release/ exactly:"
           show
-          echo "         A gate that names healthy hosts sends the on-call to the wrong one."
+          echo "         Name only the hosts that are not safe: at 09:29 every host in a"
+          echo "         refusal reads as one to pull."
           exit 1
         fi
       done
@@ -349,12 +350,13 @@ tasks:
       has() { grep -Eqi "$1" <<<"$2"; }
 
       # True when some sentence of $2 matches $1 and is not negated — so
-      # "it was not human error" does not count as blaming a human.
+      # "it was not human error" does not count as blaming a human. $3, if
+      # given, is an extra pattern that also disqualifies a sentence.
       asserts() {
         local s
         while IFS= read -r s; do
           has "$1" "$s" || continue
-          has "\b(not|never|no|nor|neither|rather than|instead of)\b|n't\b" "$s" && continue
+          has "\b(not|never|no|nor|neither|rather than|instead of)\b|n't\b${3:+|$3}" "$s" && continue
           return 0
         done < <(tr '.;!?' '\n\n\n\n' <<<"$2")
         return 1
@@ -469,7 +471,7 @@ tasks:
       if [ -n "$why" ]; then
         fail=1
         echo "$why"
-      elif asserts "$helped" "$back"; then
+      elif asserts "$helped" "$back" '\b(would|should|meant to|supposed to|expected|hoped|intended|thought)\b'; then
         fail=1
         echo "not yet: rollback says taking the new code off helped. Do it: copy fleet/,"
         echo "         put fleet/previous/smars on every host, and run ./replay.sh against"

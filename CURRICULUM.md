@@ -860,7 +860,7 @@ peak · connection-pool sizing with pgbouncer · cache hit ratio, TTL, and the
 **stampede** · flame graphs and `pprof` · benchmarking traps: warm-up, cache
 effects, noisy neighbours · why `CPU > 80%` is a bad alert.
 
-### 21 — Failure Handling & Resilience Patterns · *partly shipped*
+### 21 — Failure Handling & Resilience Patterns · *shipped*
 `chaos-stack`
 
 The dependency is never at fault in this module. It stays up and correct; what
