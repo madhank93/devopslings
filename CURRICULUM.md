@@ -176,8 +176,15 @@ the hairpin that makes a service unreachable from itself · IPv6 answered but no
 routed, and the five-second stall on every connection · keepalive versus the
 middlebox idle timeout · **conntrack table full** on an idle box · **accept-queue
 overflow**, where the server logs nothing at all · reading a capture and telling
-a retransmission from a reset from a zero window · and a rubric-graded L4-versus-L7
-decision.
+a retransmission from a reset from a zero window · a rubric-graded L4-versus-L7
+decision · a **pinned ARP entry** that outlives a failover · a DHCP server
+handing out a dead gateway from a snippet nobody reads · an **OSPF adjacency**
+that never forms over a timer mismatch · and a **BGP session** that is
+`Established` and carries nothing until it has a policy that does not leak ·
+and firewalls as a subject of their own: the rule in INPUT on a router, the
+default-deny that drops its own replies, iptables-legacy and iptables-nft both
+enforcing, the published Docker port that never reaches INPUT, and tracing one
+packet through a ruleset too long to read.
 
 ### 05 — Networking II: Protocols & Services · *shipped*
 `netlab`
@@ -225,6 +232,17 @@ decision.
   receiving MX checks the message for real and says why: an SPF record naming a
   relay that was replaced, a DKIM signature with no published key, and no DMARC
   record to bind either of them to the address the human reads.
+
+- **udp-drops-nobody-logs** *(shipped)* — every send succeeded and most of the
+  burst never arrived. A receive buffer the kernel silently capped, and a drop
+  counter only the kernel keeps.
+
+- **http3-cannot-get-through** *(shipped)* — "allow 443" was a TCP rule. HTTP/3
+  is QUIC over UDP, and the blanket UDP drop below the rule catches it.
+
+- **wireguard-handshake-but-no-traffic** *(shipped)* — the tunnel is up and the
+  network behind it is not in `AllowedIPs`, which is WireGuard's routing table
+  as well as its access list.
 
 - **pattern-layered-triage** *(shipped)* — one symptom, and the fault is drawn
   at random from five: a permanent neighbour entry with a MAC nothing answers

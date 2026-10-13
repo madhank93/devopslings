@@ -99,7 +99,7 @@ that transfers.
 
 ## What it covers
 
-Twenty-eight modules from Linux triage to platform engineering, 274 exercises.
+Twenty-eight modules from Linux triage to platform engineering, 286 exercises.
 See [CURRICULUM.md](CURRICULUM.md) for the map and [EXERCISES.md](EXERCISES.md)
 for every exercise — what breaks, which obvious fix is wrong, and what the check
 measures.

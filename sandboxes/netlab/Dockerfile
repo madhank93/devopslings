@@ -19,7 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       tcpdump \
       socat netcat-openbsd \
       curl ca-certificates openssl \
-      bind9-dnsutils dnsmasq \
+      bind9-dnsutils dnsmasq dhcpcd-base \
+      frr wireguard-tools caddy \
       openssh-server openssh-client \
       python3-dkim python3-spf python3-dnspython \
       python3 \
@@ -38,10 +39,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Debian enables it on install; it is disabled here so that a box which is not
 # running a DNS lesson resolves through Docker's resolver exactly as before.
 #
+# frr and caddy are disabled for the same reason: each is one lesson's routing
+# daemon or HTTP/3 server, and a box running a different lesson should not have
+# its routes or listeners.
+#
 # sshd is installed for the key-based-login lesson and disabled for the same
 # reason dnsmasq is: a box that is not running that lesson should not have a
 # listener on 22 for the student to trip over.
-RUN systemctl disable dnsmasq.service ssh.service \
+RUN systemctl disable dnsmasq.service ssh.service frr.service caddy.service \
     && systemctl mask \
       systemd-udevd.service \
       systemd-udev-trigger.service \

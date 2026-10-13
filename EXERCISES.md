@@ -40,11 +40,11 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 275 exercises across 27 modules and 13 sandboxes. 128 shipped,
-147 specified. Modules 01–05 are complete: all 59 of their exercises pass the
-contract test. By tier: 29 intro · 156 core · 59 deep · 31 architect.
+**Counts**: 287 exercises across 27 modules and 13 sandboxes. 140 shipped,
+147 specified. Modules 01–05 are complete: all 71 of their exercises pass the
+contract test. By tier: 29 intro · 164 core · 63 deep · 31 architect.
 
-Per module: 01/18 · 02/9 · 03/10 · 04/10 · 05/12 · 06/10 · 07/12 · 08/8 · 09/12 ·
+Per module: 01/18 · 02/9 · 03/10 · 04/20 · 05/15 · 06/10 · 07/12 · 08/8 · 09/12 ·
 10/14 · 11/9 · 12/11 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
 20/15 · 21/13 · 22/11 · 23/10 · 24/13 · 25/7 · 26/9 · 27/4.
 
@@ -465,8 +465,8 @@ different things each.
 ---
 
 ## 04 — Networking I: Packets, Interfaces & the Kernel Path
-`netlab` (two boxes, dual-stack) · 11 exercises · all shipped ·
-1 intro · 5 core · 3 deep · 1 architect · 1 drill
+`netlab` (two boxes, dual-stack) · 20 exercises · all shipped ·
+1 intro · 11 core · 6 deep · 1 architect · 1 drill
 
 Module 05 debugs DNS, TLS and proxies. This one is underneath that: the routing
 table, the connection tracker, the accept queue, and the packets themselves.
@@ -554,6 +554,107 @@ table, the connection tracker, the accept queue, and the packets themselves.
   does not make a balancer L7. Rubric-graded.
   *Source:* own.
 
+- **stale-arp-after-failover** *(core · shipped)* — a floating IP failed over
+  cleanly an hour ago; the new holder serves on it, and this box on the same
+  segment times out while reaching the holder's own address fine. A
+  `PERMANENT` neighbour entry pins the VIP to the drained server's MAC, put
+  back at every boot by a unit reading `/etc/neighbours.conf`.
+  *First guess:* routing or a firewall — the route is on-link and nothing
+  filters; the frame is addressed to the wrong MAC.
+  *Check:* the VIP stays on the new holder, this box fetches the page from it,
+  the entry is learned rather than `PERMANENT`, and nothing re-pins it at boot.
+  Re-pinning to the new MAC, a host route via the holder's real address,
+  forwarding on the drained server and `ip neigh del` alone are each rejected.
+  *Source:* own; the focused version of one draw in module 05's layered drill.
+
+- **dhcp-hands-out-a-dead-gateway** *(core · shipped)* — a new server gets a
+  lease, reaches its router, and nothing past it. The DHCP server's lan2
+  snippet names the right router; a leftover migration snippet read after it
+  sets option 3 to a decommissioned address, and dnsmasq keeps the last value.
+  *First guess:* edit the snippet that looks like the lan2 config, which was
+  already right; or set the default route on the client by hand.
+  *Check:* a throwaway client asking for an offer (`dhcpcd -T`) is given the
+  right router, the existing client's default route is the right one and
+  `proto dhcp`, it reaches the lab peer, and the dead gateway's address is not
+  resurrected on the box. Fixing the file without restarting the server, and
+  restarting without renewing the client, each get their own message.
+  *Source:* own.
+
+- **ospf-neighbour-never-forms** *(core · shipped)* — the core router learns
+  branch 2 over OSPF and never learns branch 1, over an identical circuit.
+  Hellos cross the link both ways; the core's end carries a one-second hello
+  and four-second dead interval from a change ticket that never reached the
+  branch CPE, so each side discards the other's hellos.
+  *First guess:* a static route to the branch, or matching the branch
+  router's timers to the core.
+  *Check:* `edge1` is `Full`, `10.81.1.0/24` is in the kernel table
+  `proto ospf`, branch 2 is untouched, the branch router's timers are its own,
+  and `/etc/frr/frr.conf` carries timers that agree with it — a `vtysh` fix
+  without `write memory` is named.
+  *Source:* own. Branch routers are FRR instances in namespaces (`frr@NAME`).
+
+- **bgp-session-up-no-routes** *(deep · shipped)* — the transit session has been
+  `Established` all morning and carries nothing either way: `(Policy)` in both
+  prefix columns, RFC 8212's default for an eBGP session with no filter. The
+  box redistributes every connected network.
+  *First guess:* `no bgp ebgp-requires-policy`, or a permit-everything
+  route-map — both work, and both leak every internal prefix to the provider,
+  whose own filter is the only thing catching it.
+  *Check:* exactly `198.51.100.0/24` is advertised, `192.0.2.0/24` arrives
+  `proto bgp`, a user behind the provider fetches the page, the provider's
+  router is untouched, and the saved config has inbound and outbound policy
+  and does not disable the default.
+  *Source:* own; RFC 8212 and the route-leak family.
+
+- **rule-in-the-wrong-chain** *(core · shipped)* — a router's rule to block the
+  office from an admin console is in INPUT; the traffic is forwarded, the rule's
+  counter reads zero, and FORWARD's policy counter climbs with every request.
+  *First guess:* the rule is wrong, or filter on the server instead.
+  *Check:* the office cannot reach `:9000` and still reaches `:8080`, the
+  blocking rule is in fw1's FORWARD chain and in the boot file, the server has
+  no rules of its own, and the console still runs.
+  *Source:* own; the single-host habit carried onto a router.
+
+- **default-drop-eats-the-replies** *(core · shipped)* — a hardened host with
+  INPUT at DROP and holes for 22 and 80 serves fine and cannot fetch anything:
+  the replies to its own connections are inbound packets no rule accepts.
+  *First guess:* policy ACCEPT, accept the mirror's address, accept
+  `--sport 8081`, or open the ephemeral range.
+  *Check:* both outbound services work, INPUT stays DROP, a debug port and a
+  dev server in the ephemeral range stay shut — including to a probe sent from
+  source port 8081 — and the boot file carries an `ESTABLISHED` accept.
+  *Source:* own.
+
+- **two-firewalls-one-box** *(core · shipped)* — `iptables -L` shows the allow
+  rule and the port is blocked: a 2019 boot script still loads a DROP through
+  `iptables-legacy`, and both backends' hooks must pass the packet. The only
+  clue is the warning line above the output.
+  *First guess:* insert another ACCEPT into the visible (nft) ruleset.
+  *Check:* the API is reachable, the managed ruleset keeps INPUT at DROP and
+  the metrics port shut, the legacy tables are empty, and the legacy unit
+  replays nothing at boot.
+  *Source:* own; the iptables-nft migration family.
+
+- **published-port-ignores-the-firewall** *(deep · shipped)* — a Docker host's
+  INPUT admits SSH only, and a container's published admin UI answers the
+  internet: DNAT in PREROUTING sends it through FORWARD, which Docker owns.
+  dockerd's chain management is reproduced, rebuild-on-start included.
+  *First guess:* DROP 8080 in INPUT; then `--dport 8080` in DOCKER-USER, which
+  never matches after DNAT; appending to FORWARD below Docker's jumps.
+  *Check:* after a simulated reboot and dockerd start, the office address
+  reaches the UI and two outside addresses do not.
+  *Source:* own; the ufw-and-Docker family.
+
+- **trace-the-drop** *(deep · shipped)* — an accept rule for postgres exists and
+  is never reached: a shared baseline chain drops the "dev-server range"
+  5000-5999 first. Seven chains, three sets.
+  *First guess:* read the ruleset, or add another accept where it looks right.
+  *Check:* the answer names the dropping rule by chain and handle (as
+  `nft -a monitor trace` prints it), postgres and redis are reachable, `:5001`
+  stays shut — deleting the range rule opens it — and the boot file loads
+  exactly the running ruleset, with no trace rule left in.
+  *Source:* own.
+
 - **packet-path-drill** *(deep · drill)* — the storefront's order lookups miss
   their 750ms budget; the cause is one of five, drawn at random each run, each a
   different place on the kernel's packet path through one box: a stale `/28` in
@@ -578,7 +679,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 05 — Networking II: Protocols & Services
-`netlab` · 12 exercises · 12 shipped · 1 intro · 8 core · 2 deep · 1 architect
+`netlab` · 15 exercises · 15 shipped · 1 intro · 10 core · 3 deep · 1 architect
 
 - **resolve-connect-request** *(intro · shipped)* — one HTTP request, taken apart
   into its three separate steps: the name resolved, the TCP connection opened,
@@ -733,6 +834,42 @@ table, the connection tracker, the accept queue, and the packets themselves.
   rejected. Sender and MX are checksummed. The answer names the selector-derived
   DKIM record and that DMARC needs *one* aligned pass, not both.
   *Source:* roadmap.sh gap.
+
+- **udp-drops-nobody-logs** *(deep · shipped)* — 8000 counters sent over UDP
+  in a burst, zero send errors, a few hundred counted. The collector's config
+  asks for an 8 MB receive buffer; `net.core.rmem_max` silently caps it at
+  208 KB, and the overflow shows up only in `UdpRcvbufErrors`.
+  *First guess:* raise the buffer in the collector's config — the cap applies
+  to every request; or `rmem_default`, which an explicit request never uses.
+  *Check:* a replayed burst arrives whole by the collector's own count, the
+  collector's code is unchanged, and the raised ceiling is what
+  `systemd-sysctl` applies at boot. Raising the ceiling without restarting the
+  collector is named: a socket's buffer is sized at creation.
+  *Source:* own; the statsd/syslog loss family.
+
+- **http3-cannot-get-through** *(core · shipped)* — HTTP/2 through the edge
+  firewall works, an HTTP/3-only client times out, and the ruleset has said
+  `tcp dport { 80, 443 } accept` for years, followed by a blanket UDP drop
+  written for a reflection flood.
+  *First guess:* `nft add rule ... udp dport 443 accept`, which appends after
+  the drop and never matches; or deleting the UDP drop, which the final drop
+  still catches.
+  *Check:* HTTP/3 and HTTP/2 both reach the proxy, an internal UDP service on
+  the web tier stays unreachable from outside, and `/etc/edge-fw.nft` loaded
+  into an empty namespace produces exactly the running table.
+  *Source:* own.
+
+- **wireguard-handshake-but-no-traffic** *(core · shipped)* — site-to-site
+  tunnel, fresh handshake, the far end's tunnel address pings, the subnet
+  behind it does not. `AllowedIPs` names only the peer's `/32`.
+  *First guess:* add a route into `wg0` — the packet now dies with
+  `Required key not available`, because the route and cryptokey routing
+  disagree.
+  *Check:* the subnet routes via `wg0` and serves, the peer is not allowed
+  `0.0.0.0/0` and the lab network still leaves by `eth0`, routing around the
+  tunnel over the underlay is rejected as clear text, the far end is untouched,
+  and `wg0.conf` carries the subnet.
+  *Source:* own.
 
 - **pattern-layered-triage** *(architect · drill · shipped)* — the payments API
   health check fails, and that is the whole ticket. One fault is seeded per run,
