@@ -349,14 +349,15 @@ tasks:
       field() { awk -v k="$1:" 'index($0, k) == 1 { sub(/^[^:]*:[ \t]*/, ""); print; exit }' "$ans"; }
       has() { grep -Eqi "$1" <<<"$2"; }
 
-      # True when some sentence of $2 matches $1 and is not negated — so
-      # "it was not human error" does not count as blaming a human. $3, if
-      # given, is an extra pattern that also disqualifies a sentence.
+      # True when some sentence of $2 matches $1 with no negation in the three
+      # words before it — so "it was not human error" does not blame a human,
+      # while "it was human error; he didn't copy it" does. $3, if given, is an
+      # extra pattern that disqualifies the whole sentence.
       asserts() {
         local s
         while IFS= read -r s; do
           has "$1" "$s" || continue
-          has "\b(not|never|no|nor|neither|rather than|instead of)\b|n't\b${3:+|$3}" "$s" && continue
+          has "(\b(not|never|no|nor|neither|rather than|instead of)|n't)\W+(\w+\W+){0,3}($1)${3:+|$3}" "$s" && continue
           return 0
         done < <(tr '.;!?' '\n\n\n\n' <<<"$2")
         return 1
@@ -383,6 +384,10 @@ tasks:
       }
 
       host=$(field divergent_host | tr 'A-Z' 'a-z' | tr -d ' \t')
+      # "smars-8." or "smars-8 (the eighth)" still names one host.
+      if [ "$(grep -Eo 'smars-[0-9]+' <<<"$host" | sort -u | wc -l)" -eq 1 ]; then
+        host=$(grep -Eo 'smars-[0-9]+' <<<"$host" | head -1)
+      fi
       root=$(field root_cause)
       back=$(field rollback)
 
@@ -411,7 +416,8 @@ tasks:
       market='\bmarket data\b|\b(nyse|exchange|market) (glitch|bug|outage|error|fault|failure)\b|\bfat[- ]?finger\w*'
       capacity='\b(overload\w*|capacity|latency|network (failure|outage|problem|issue))\b'
       oldcode='\b(power ?peg|dead code|old code|unused code|legacy code|defunct|stale code|previous (build|code|version)|old (build|version|functionality|function|routine))\b'
-      reuse='\b(repurpos\w*|reus\w*|re-us\w*|recycl\w*|same flag|(formerly|previously|once) (used|meant|activated|triggered)|used to (activate|trigger|mean|turn on|switch on)|old meaning|meant something else|(other|different|second) meaning|two meanings|still (activated|triggered|meant|called))\b'
+      hedge='\b(maybe|perhaps|possibly|probably|might|unrelated|irrelevant)\b'
+      reuse='\b(repurpos\w*|reus\w*|re-us\w*|recycl\w*|same flag|(formerly|previously|once) (used|meant|activated|triggered|enabled|switched on|turned on)|used to (activate|trigger|mean|turn on|switch on|enable)|took over|taken over|old (power ?peg )?flag|power ?peg flag|old meaning|meant something else|(other|different|second) meaning|two meanings|still (activated|triggered|meant|called))\b'
 
       # ---- root_cause -------------------------------------------------------
       why=$(prose_problem root_cause "$root")
@@ -444,8 +450,8 @@ tasks:
         echo "         ./replay.sh and read the code it ran."
       else
         miss=""
-        has "$oldcode" "$root" || miss="old"
-        { has '\bflag\b' "$root" && has "$reuse" "$root"; } || miss="$miss flag"
+        asserts "$oldcode" "$root" "$hedge" || miss="old"
+        { asserts '\bflag\b' "$root" "$hedge" && asserts "$reuse" "$root" "$hedge"; } || miss="$miss flag"
         if [ -n "$miss" ]; then
           fail=1
           echo "not yet: root_cause does not yet explain the mechanism."
@@ -465,7 +471,7 @@ tasks:
       fi
 
       # ---- rollback ---------------------------------------------------------
-      helped='\b(fixed|stopped|contained|resolved|solved|halted|ended|limited)\b.{0,25}\b(it|problem|issue|incident|orders|trading|bleeding|damage)\b|\b(helped|was correct|right call|worked)\b'
+      helped='\b(fixed|stopped|contained|resolved|solved|halted|ended|limited)\b.{0,25}\b(it|problem|issue|incident|orders|trading|bleeding|damage)\b|\b(was correct|right call)\b|\b(helped|worked)\b( (to )?(stop|contain|limit|fix|end|halt|resolve)\w*)?[ \t]*([,:]|$)'
       spread='\b(all eight|all 8|eight servers|8 servers|every (server|host)|all (the |of the )?(servers|hosts)|all of them|everywhere|seven|7|other (servers|hosts)|remaining|worse\w*|spread\w*|more (servers|hosts))\b'
       why=$(prose_problem rollback "$back")
       if [ -n "$why" ]; then
@@ -478,9 +484,9 @@ tasks:
         echo "         the copy. The order says the action worsened the problem (¶27)."
       else
         miss=""
-        has "$oldcode" "$back" || miss="old"
-        has "$spread" "$back" || miss="$miss spread"
-        has '\b(flag|flagged|orders?)\b' "$back" || miss="$miss flag"
+        asserts "$oldcode" "$back" "$hedge" || miss="old"
+        asserts "$spread" "$back" "$hedge" || miss="$miss spread"
+        asserts '\b(flag|flagged|orders?)\b' "$back" "$hedge" || miss="$miss flag"
         if [ -n "$miss" ]; then
           fail=1
           echo "not yet: rollback does not yet explain what removing the new code did."

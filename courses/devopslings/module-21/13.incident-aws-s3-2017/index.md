@@ -414,16 +414,20 @@ tasks:
       field() { awk -v k="$1:" 'index($0, k) == 1 { sub(/^[^:]*:[ \t]*/, ""); print; exit }' "$ans"; }
       has() { grep -Eqi "$1" <<<"$2"; }
 
-      # True when some sentence of $2 matches $1 and is not negated or
-      # dismissed — so "it was not human error" and "being more careful only
-      # lowers the rate" do not count as blaming a human.
+      # True when some sentence of $2 makes the claim $1 without negating or
+      # dismissing it. A negation counts before the claim in the same clause
+      # ("it was not human error"); a dismissal counts just after it ("being
+      # more careful only lowers the rate"). "The only cause was human error"
+      # and "human error, not the tool" still assert it.
       asserts() {
         local s
+        local neg="\b(not|never|no|nor|neither|rather than|instead of)\b|n't\b"
+        local dismiss="\b(only|cannot|can't|won't|doesn't|does not|did not|would not|will not|is not|isn't|was not|wasn't|never|futile|inevitable|unavoidable|insufficient|useless|alone)\b"
         while IFS= read -r s; do
           has "$1" "$s" || continue
-          has "\b(not|never|no|nor|neither|rather than|instead of|only|cannot|futile|inevitable|unavoidable|insufficient|useless)\b|n't\b" "$s" && continue
-          return 0
-        done < <(tr '.;!?' '\n\n\n\n' <<<"$2")
+          has "($neg)[^,]*($1)" "$s" && continue
+          [ "$(grep -Eoi "$1" <<<"$s" | wc -l)" -gt "$(grep -Eoi "($1) ((is|are|was|were|would|will|can|could|does|do|may|might) )?($dismiss)" <<<"$s" | wc -l)" ] && return 0
+        done < <(tr '.;:!?' '\n\n\n\n\n' <<<"$2")
         return 1
       }
 
@@ -463,7 +467,9 @@ tasks:
       wider='\b(more (servers|capacity|than)|larger (set|number)|too (much|many)|wider|bigger|than (intended|meant|planned)|significant (portion|part)|most of)\b'
       subsys='\b(index|placement)\b'
       tool='\b(tool|command|playbook|script)\b'
-      unbounded='\b(allow\w*|let|lets|permit\w*|accept\w*|unbounded|no (check|limit|guard|safeguard|bound|minimum|floor|cap)\w*|nothing\b.{0,30}\b(stopped|prevented|checked|limited|blocked)|without (a |any )?(check|limit|bound|minimum|safeguard|floor|cap)\w*|did not (check|limit|stop|prevent|refuse)|didn.t (check|limit|stop|prevent|refuse))\b'
+      unbounded='\b(allow\w*|let|lets|permit\w*|accept\w*|unbounded|no (check|limit|guard|safeguard|bound|minimum|floor|cap)\w*|nothing\b.{0,30}\b(stopped|prevented|checked|limited|blocked)|without (a |any )?(check|limit|bound|minimum|safeguard|floor|cap)\w*|(did not|didn.t|never) (check|limit|stop|prevent|refus)\w*)\b'
+      # A denial that the tool allowed the input, or that the console depended on S3.
+      denied='\b(did|does|do|would|could|was|is|were)( not|n.t| never) (\w+ )?'
 
       fail=0
 
@@ -488,6 +494,10 @@ tasks:
         echo "not yet: root_cause describes load or a failure from outside. Nothing was"
         echo "         attacked or overloaded: capacity was removed, by a command, on"
         echo "         purpose. ./replay.sh shows how much."
+      elif has "$denied(allow|let|permit|accept)\w*" "$root"; then
+        fail=1
+        echo "not yet: root_cause says the tool did not allow the input. It did: ./replay.sh"
+        echo "         runs ./remove-capacity.sh 3 54, and the original tool removes all 52."
       else
         miss=""
         has "$wider" "$root" || miss="wider"
@@ -519,6 +529,11 @@ tasks:
         echo "not yet: status_dependency moves the console to another region. That moves"
         echo "         the problem with it: an outage there is the one it cannot report."
         echo "         What lets it work when any one region is down?"
+      elif has "$denied(depend\w*|rely|relied|reliant) on\b" "$dep"; then
+        fail=1
+        echo "not yet: status_dependency says the console did not depend on S3. Read"
+        echo "         status/console.conf and run ./replay.sh: it loads from S3, and fails"
+        echo "         to load when S3 in its region is down."
       else
         miss=""
         has '\b(status|dashboard|shd|console)\b' "$dep" || miss="status"
