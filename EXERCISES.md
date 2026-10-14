@@ -40,14 +40,15 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 294 exercises across 27 modules and 13 sandboxes. 146 shipped,
-148 specified. Modules 01–06, 08, 09, 10, 12 and 21 are complete: all 146 of their
-exercises pass the contract test. By tier: 29 intro · 167 core · 67 deep ·
-31 architect.
+**Counts**: 299 exercises across 27 modules and 13 sandboxes, drills included,
+capstone stages not. 170 shipped, 2 blocked, 127 specified. Modules 01–06, 08,
+09, 10, 12, 15 and 21 are complete: all 159 of their exercises pass the contract
+test; module 07 ships everything its sandbox kernel can produce. By tier:
+29 intro · 166 core · 74 deep · 30 architect.
 
-Per module: 01/18 · 02/9 · 03/10 · 04/20 · 05/15 · 06/11 · 07/12 · 08/8 · 09/12 ·
-10/17 · 11/9 · 12/12 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
-20/15 · 21/13 · 22/12 · 23/10 · 24/13 · 25/7 · 26/9 · 27/4.
+Per module: 01/19 · 02/10 · 03/11 · 04/20 · 05/15 · 06/12 · 07/13 · 08/9 · 09/13 ·
+10/18 · 11/9 · 12/12 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
+20/15 · 21/14 · 22/12 · 23/10 · 24/13 · 25/7 · 26/9.
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
 each have an `intro` rung. Modules 24, 26 and 27 do not, because they are built
@@ -1052,7 +1053,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 07 — Security Hardening & Access Control
-`linux-box` · 13 exercises · 10 shipped · 1 intro · 7 core · 4 deep · 1 architect · 1 drill
+`linux-box` · 13 exercises · 11 shipped · 2 blocked · 1 intro · 7 core · 4 deep · 1 architect · 1 drill
 
 AppArmor, not SELinux: every sandbox is Debian, and SELinux does not enforce
 meaningfully inside a container. The mechanism transfers; the tool differs, and
@@ -1115,17 +1116,21 @@ each lesson says so.
   instead.
   *Source:* own.
 
-- **apparmor-denial** *(deep)* — the service works in complain mode and fails in enforce.
+- **apparmor-denial** *(deep · blocked)* — the service works in complain mode and fails in enforce.
   *First guess:* set the profile back to complain, or disable AppArmor.
   *Check:* the profile is in enforce, the service works, and the specific denial
   from the audit log is quoted — a profile widened to `/** rwk` fails.
+  *Blocked:* the sandbox kernel loads no AppArmor LSM (`capability,landlock,yama,bpf`);
+  needs a host kernel booted with `apparmor` in `lsm=`.
   *Source:* own.
 
-- **auditd-who-changed-it** *(deep)* — a config file changed at 02:14 and nobody
+- **auditd-who-changed-it** *(deep · blocked)* — a config file changed at 02:14 and nobody
   admits to it.
   *First guess:* check the file's mtime and the shell history.
   *Check:* the answer names the user, the process, and the syscall from the audit
   trail, having first written the watch rule that would have caught it.
+  *Blocked:* the sandbox kernel is built without `CONFIG_AUDIT` ("audit support not in
+  kernel"); needs a host kernel with audit enabled.
   *Source:* own.
 
 - **file-integrity-baseline** *(deep · shipped)* — a baseline that cries wolf every deploy.
@@ -1144,7 +1149,7 @@ each lesson says so.
   audit — so the fix is a decision about each one, not a blanket deny.
   *Source:* own.
 
-- **threat-model-this-box** *(architect)* — one host, written up properly.
+- **threat-model-this-box** *(architect · shipped)* — one host, written up properly.
   *Check:* assets, entry points, trust boundaries and the missing control,
   graded against a rubric that requires a named attacker capability rather than
   "hackers", and rejects controls with no stated cost.
@@ -1765,31 +1770,33 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 15 — Config Management: Ansible
-`linux-box` · 6 exercises · 1 intro · 5 core
+`linux-box` · 6 exercises · 6 shipped · 1 intro · 5 core
 
-- **inventory-and-ad-hoc** *(intro)* — twelve boxes, one command.
+- **inventory-and-ad-hoc** *(intro · shipped)* — twelve boxes, one command.
   *Check:* the fact is gathered from every host in the group, none missed.
   *Source:* roadmap.sh.
 
-- **the-playbook** *(core)* — install and configure nginx from nothing.
+- **the-playbook** *(core · shipped)* — install and configure nginx from nothing.
   *Check:* service serving the expected page after a single run on a clean box.
   *Source:* own.
 
-- **idempotency** *(core)* — the second run reports six changes.
+- **idempotency** *(core · shipped)* — the second run reports six changes.
   *First guess:* it is fine, the result is the same.
   *Check:* `changed=0` on the second run, with the same end state.
   *Source:* roadmap.sh; the property that separates config management from scripts.
 
-- **handlers-that-never-fire** *(core)* — config changes, service keeps old settings.
+- **handlers-that-never-fire** *(core · shipped)* — config changes, service keeps old settings.
   *First guess:* always restart the service.
   *Check:* handler fires on change only, and the running config matches the file.
   *Source:* own.
 
-- **roles-and-molecule** *(core)* — the playbook nobody can reuse.
-  *Check:* role passes a molecule scenario from a clean container.
+- **roles-and-molecule** *(core · shipped)* — the playbook nobody can reuse.
+  *Check:* the role converges a fresh Debian rootfs from its defaults (molecule,
+  chroot target: the sandbox has no Docker inside), is idempotent, takes
+  inventory overrides, and its scenario fails against an emptied role.
   *Source:* own.
 
-- **vault-and-become** *(core)* — a password in `group_vars`.
+- **vault-and-become** *(core · shipped)* — a password in `group_vars`.
   *Check:* encrypted at rest, decryptable in the run, absent from plaintext in git.
   *Source:* own.
 

@@ -393,6 +393,11 @@ each lesson says so.
   intended exposure versus actual is the finding. Restrict the API to loopback
   without over-correcting and taking the portal — public by design — offline.
 
+Then the whole host, written up: a threat model of an invoicing box — assets,
+entry points, trust boundaries — that has to find the one real gap (a root
+cron job running a script the service user owns), name each attacker by what
+they can do rather than "hackers", and state what every proposed control costs.
+
 Still to build: an AppArmor denial in enforce mode and auditd answering who
 changed the file at 02:14 — both blocked by this sandbox's kernel (no AppArmor
 LSM, no audit subsystem), to be reframed or moved to a VM-backed sandbox.
@@ -776,13 +781,17 @@ One resource in a language with a compiler · the same infrastructure as module
 bucket goes public and before anything is created · when to pick Pulumi over
 OpenTofu, and when not to.
 
-### 15 — Config Management: Ansible
+### 15 — Config Management: Ansible · *shipped*
 `linux-box`
 
-Inventory and ad-hoc commands · a playbook that installs and configures nginx ·
-**idempotency: run it twice, assert `changed=0`** · jinja2 templates and
-handlers that fire on change only · roles · a molecule test · vault and
-`become` · OpenTofu provisions, Ansible configures.
+A twelve-box fleet of sshd units, two of which a group quietly misses ·
+a playbook that installs and configures nginx on a wiped box from a local
+mirror · **idempotency: a playbook that reports six changes on its second run,
+graded `changed=0` and then drifted five ways, so `changed_when: false` fails** ·
+handlers that a failed task skips and a `state: started` that never restarts ·
+a role with defaults and a molecule scenario against a fresh Debian rootfs ·
+vault and `become`, where the leaked password has to stop working, not just
+leave HEAD.
 
 ### 16 — Secrets
 `ci-stack`

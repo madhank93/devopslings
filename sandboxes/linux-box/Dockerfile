@@ -1,3 +1,12 @@
+# The clean target for module 15's molecule lesson: the stock image plus the
+# python3 that Ansible needs on a managed host. See the COPY below.
+# Its setuid bits are stripped: copied into the box, those binaries belong to no
+# package there, and module 07's setuid audits would rightly flag them.
+FROM debian:trixie-slim AS molecule-target
+RUN apt-get update && apt-get install -y --no-install-recommends python3 \
+    && rm -rf /var/lib/apt/lists/* \
+    && find / -xdev -type f -perm /6000 -exec chmod ug-s {} +
+
 # A small Debian box that runs real systemd as PID 1.
 #
 # Most "Linux in a container" teaching images run a shell as PID 1, which makes
@@ -25,6 +34,36 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 \
       openssh-server openssh-client \
       fail2ban \
+      ansible-core python3-apt \
+      git python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Module 15's role lesson tests a role with molecule from a clean target. There
+# is no docker in the box, so each molecule instance is a chroot holding a
+# fresh copy of a pristine debian:trixie-slim rootfs, reached through
+# community.general's chroot connection. molecule is not packaged in Debian.
+COPY --from=molecule-target / /opt/molecule-target/
+RUN python3 -m venv --system-site-packages /opt/molecule \
+    && /opt/molecule/bin/pip install --no-cache-dir molecule==26.9.0 \
+    && ln -s /opt/molecule/bin/molecule /usr/local/bin/molecule \
+    && ansible-galaxy collection install -p /usr/share/ansible/collections \
+         community.general:==13.4.0
+
+# Module 15 installs nginx "from nothing" with Ansible, and grading must work
+# without the internet. The packages wait, uninstalled, in a local apt archive
+# that is already a configured source; a lesson only has to `apt-get update`.
+# The index is written by hand because dpkg-dev is not in the image.
+RUN mkdir -p /srv/mirror && cd /srv/mirror \
+    && apt-get update \
+    && apt-get download nginx nginx-common \
+    && for f in *.deb; do \
+         dpkg-deb -f "$f" | sed '/^$/d'; \
+         echo "Filename: ./$f"; \
+         echo "Size: $(stat -c %s "$f")"; \
+         echo "SHA256: $(sha256sum "$f" | cut -d' ' -f1)"; \
+         echo; \
+       done > Packages \
+    && echo "deb [trusted=yes] copy:/srv/mirror ./" > /etc/apt/sources.list.d/mirror.list \
     && rm -rf /var/lib/apt/lists/*
 
 # systemd in a container should not try to manage hardware, the network, or
