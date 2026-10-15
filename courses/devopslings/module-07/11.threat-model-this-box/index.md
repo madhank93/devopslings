@@ -259,9 +259,12 @@ tasks:
       }
       count() { printf '%s' "$1" | grep -c . || true; }
       # First absolute path in a line; tcp/<port> is a port, not a path.
+      # Normalised, so /opt/invoice/bin/./backup.sh names the same file as the plain path.
       first_path() {
-        printf '%s\n' "$1" | sed -E 's#(tcp|udp)/[0-9]+##g' \
-          | grep -oE '/[A-Za-z0-9._/-]*[A-Za-z0-9_-]' | sed -n 1p || true
+        local x
+        x=$(printf '%s\n' "$1" | sed -E 's#(tcp|udp)/[0-9]+##g' \
+          | grep -oE '/[A-Za-z0-9._/-]*[A-Za-z0-9_-]' | sed -n 1p || true)
+        [ -z "$x" ] || realpath -ms -- "$x"
       }
       lc() { printf '%s' "$1" | tr 'A-Z' 'a-z'; }
       staged_ports="8180 22"
@@ -357,6 +360,13 @@ tasks:
              echo "         Write it as <principal> -> <principal> via <what crosses>."
              exit 1 ;;
         esac
+        if ! printf '%s' "${b#*->}" | grep -Eiq '\bvia[[:space:]]+[^[:space:]]'; then
+          echo "not yet: this boundary does not say what crosses it:"
+          echo "           boundary: $b"
+          echo "         Add 'via <what crosses>': the request, the key, the command or the"
+          echo "         file that carries control from one side to the other."
+          exit 1
+        fi
         from=$(lc "${b%%->*}" | awk '{print $1}')
         to=$(lc "${b#*->}" | awk '{print $1}')
         for side in "$from" "$to"; do
@@ -399,7 +409,7 @@ tasks:
         echo "not yet: no 'missing:' line. Name the file where a control is missing."
         exit 1
       fi
-      if printf '%s' "$ml" | grep -Eq '^(none|nothing|n/?a)([[:space:][:punct:]]|$)|\bnothing (is )?missing\b|\bno (controls? )?(is |are )?missing\b|\b(is|are) (fine|ok|okay|safe|secure|correct)\b|\bnot (a|the) (gap|problem|issue)\b'; then
+      if printf '%s' "$ml" | grep -Eq '^(none|nothing|n/?a)([[:space:][:punct:]]|$)|\bnothing (is )?missing\b|\bno (controls? )?(is |are )?missing\b|\b(is|are|looks?|seems?) (fine|ok|okay|safe|secure|correct|harmless)\b|\bnot (a|an|the|any)( real)? (gap|problem|issue|concern|risk|threat)\b|\bno (gap|problem|issue|concern|risk)\b|\bnothing wrong\b'; then
         echo "not yet: your 'missing:' line says nothing is missing. One control is:"
         echo "         look for something root runs that root does not control."
         exit 1
@@ -472,7 +482,7 @@ tasks:
       fi
       vague='\b(hackers?|bad (actors?|guys?)|malicious (actors?|users?|people|parties)|attackers?|adversar(y|ies)|threat actors?|cyber ?criminals?|criminals?|intruders?|someone|anyone|nation[- ]states?)\b'
       verbs='\b(send|sends|run|runs|execute|executes|read|reads|write|writes|modify|modifies|edit|edits|replace|replaces|reach|reaches|connect|connects|log in|logs in|login|steal|steals|stole|hold|holds|has|have|possess|possesses|upload|uploads|guess|guesses|intercept|intercepts|sniff|sniffs|inject|injects|control|controls)\b'
-      to_root=""
+      to_root="" root_from=""
       while IFS= read -r t; do
         tl=$(lc "$t")
         can=$(printf '%s' "$tl" | sed -n 's/.*can=//p' | sed 's/[[:space:]]*gets=.*//')
@@ -483,7 +493,9 @@ tasks:
           echo "           threat: $t"
           exit 1
         fi
-        if ! printf '%s' "$can" | grep -Eq "$verbs"; then
+        # Having a port is not an action; 'has tcp/8180' alone says nothing.
+        can_v=$(printf '%s' "$can" | sed -E 's#\b(has|have|holds?|possess(es)?)[[:space:]]+(access to[[:space:]]+)?(tcp/[0-9]+|port [0-9]+)##g')
+        if ! printf '%s' "$can_v" | grep -Eq "$verbs"; then
           who=$(printf '%s' "$can" | grep -oE "$vague" | sed -n 1p || true)
           if [ -n "$who" ]; then
             echo "not yet: this threat says who the attacker is ('$who'), not what they"
@@ -520,8 +532,34 @@ tasks:
           echo "         privilege."
           exit 1
         fi
-        if printf '%s' "$gets" | grep -Eq '\broot\b'; then to_root=yes; fi
+        # The escalation this box leaves open starts from invoice, or from the
+        # internet through it; a root threat that starts anywhere else is wrong here.
+        if printf '%s' "$gets" | grep -Eq '\broot\b'; then
+          if printf '%s' "$gets" | grep -Eq '\b(not|no|never|nothing|cannot|without)\b'; then
+            :
+          elif printf '%s' "$can" | grep -Eq '\binvoice\b|\btcp/8180\b|\bport 8180\b|backup'; then
+            to_root=yes
+          elif [ -z "$root_from" ]; then
+            root_from=$t
+          fi
+        fi
       done <<< "$threats"
+      if [ -z "$to_root" ] && [ -n "$root_from" ]; then
+        echo "not yet: this threat ends in root, but not by the path this box leaves open:"
+        echo "           threat: $root_from"
+        rl=$(lc "$root_from" | sed -n 's/.*can=//p' | sed 's/[[:space:]]*gets=.*//')
+        if printf '%s' "$rl" | grep -Eq '\broot\b'; then
+          echo "         Its can= already holds root, so it gains nothing. Start from what"
+          echo "         the attacker has before the escalation."
+        elif printf '%s' "$rl" | grep -Eq '\bdeployer\b|\btcp/22\b|\bport 22\b'; then
+          echo "         deployer's sudo grant is one restart of invoice-web, which runs as"
+          echo "         invoice. That is not a way to root."
+        else
+          echo "         The gap you named in 'missing:' is a path from the invoice user to"
+          echo "         root. Start the threat there."
+        fi
+        exit 1
+      fi
       if [ -z "$to_root" ]; then
         echo "not yet: none of your threats ends in gets=root. The gap you named in"
         echo "         'missing:' is a path from the invoice user to root. Write the"
@@ -536,7 +574,7 @@ tasks:
         echo "         '| cost: ...' on the same line."
         exit 1
       fi
-      closes=""
+      closes="" loose=""
       while IFS= read -r c; do
         what=$(printf '%s' "$c" | sed -E 's/[[:space:]]*\|?[[:space:]]*[Cc][Oo][Ss][Tt]:.*//')
         if ! printf '%s' "$c" | grep -iq 'cost:'; then
@@ -552,21 +590,41 @@ tasks:
           echo "           control: $c"
           exit 1
         fi
-        if printf '%s' "$cost" | grep -Eq '^(none|nothing|nil|zero|free|negligible|minimal|trivial|n/?a|-+)([[:punct:]]|$)|\bcosts? nothing\b|\bno (real |extra |additional )?(cost|downside|impact|overhead)\b|\bfor free\b|\bzero cost\b|\bwithout (any )?(cost|downside)\b'; then
+        if printf '%s' "$cost" | grep -Eq '^(none|nothing|nil|free|n/?a|-+)([[:space:][:punct:]]|$)|^(zero|negligible|minimal|trivial)([[:punct:]]|$)|\bcosts? nothing\b|\b(does not|doesn.t|won.t|will not) cost\b|\bno (real |extra |additional |actual )?(costs?|downsides?|drawbacks?|impact|overhead)\b|\b(for|is|completely|totally|entirely) free\b|\bzero cost\b|\bwithout (any )?(costs?|downsides?|drawbacks?)\b'; then
           echo "not yet: this control claims to cost nothing:"
           echo "           control: $c"
           echo "         Something always pays: who has to do more, what gets slower,"
           echo "         or what breaks if it is applied wrong."
           exit 1
         fi
-        if [ "$(printf '%s' "$cost" | tr -d '[:space:]' | wc -c)" -lt 15 ]; then
+        if [ "$(printf '%s' "$cost" | tr -d '[:space:]' | wc -c)" -lt 15 ] \
+           || [ "$(printf '%s' "$cost" | wc -w)" -lt 3 ]; then
           echo "not yet: this control's cost is too short to say anything:"
           echo "           control: $c"
           echo "         Say who pays it and how."
           exit 1
         fi
-        if printf '%s' "$what" | grep -Eq 'backup|/opt/invoice/bin|cron'; then closes=yes; fi
+        if printf '%s' "$what" | grep -Eq 'backup|/opt/invoice/bin|cron'; then
+          # Naming the script is not closing the gap: leaving it, widening its
+          # mode or handing it to invoice keeps root running what others can change.
+          wl=$(lc "$what")
+          if printf '%s' "$wl" | grep -Eq '\bchmod[[:space:]]+(-r[[:space:]]+)?([0-7]?[0-7]([2367][0-7]|[0-7][2367])\b|[ugoa]*[goa][ugoa]*\+[rx]*w)|\bchown[[:space:]]+(-r[[:space:]]+)?invoice\b' \
+             || { printf '%s' "$wl" | grep -Eq '\bas (it|they) (is|are)\b|\bleave\b.*\balone\b' \
+                  && ! printf '%s' "$wl" | grep -Eq '\b(chown|chmod|mv|move|install|root:root)\b|\bas invoice\b'; }; then
+            [ -n "$loose" ] || loose=$c
+          else
+            closes=yes
+          fi
+        fi
       done <<< "$controls"
+      if [ -z "$closes" ] && [ -n "$loose" ]; then
+        echo "not yet: this control names the backup script but does not take it away"
+        echo "         from invoice:"
+        echo "           control: $loose"
+        echo "         After it, root must run a file that only root can change: no"
+        echo "         group or world write, and not owned by invoice."
+        exit 1
+      fi
       if [ -z "$closes" ]; then
         echo "not yet: none of your controls closes the gap you named. Add one that"
         echo "         changes who can modify what root runs, and say what it costs."

@@ -104,8 +104,15 @@ tasks:
       rm -f /var/lib/apt/periodic/update-success-stamp /var/cache/apt/*.bin
       touch -d 2000-01-01 /var/lib/apt/lists
 
+      # A new box gets /root/site and nothing else from this one, so the run
+      # sees the rest of /root as empty.
       rc=0
-      run=$(ansible-playbook site.yml 2>&1) || rc=$?
+      run=$(unshare -m sh -c '
+        m=$(mktemp -d)
+        mount --bind /root/site "$m" && mount -t tmpfs tmpfs /root \
+          && mkdir /root/site && mount --move "$m" /root/site || exit 99
+        rmdir "$m"
+        cd /root/site && ansible-playbook site.yml' 2>&1) || rc=$?
       if grep -q 'no hosts matched' <<<"$run"; then
         echo "not yet: site.yml's hosts: line matches nothing in inventory.ini — the box is 'box', in group 'web'"
         exit 1
@@ -118,9 +125,22 @@ tasks:
           echo "         A new box has no apt package lists, so apt cannot see nginx until"
           echo "         something fetches the index from the mirror."
         fi
+        if grep -E '^(fatal|failed):' <<<"$run" | grep -E '/root/' | grep -vqE '/root/site(/|\b)'; then
+          echo "         The run sees only /root/site from this box; the rest of /root is"
+          echo "         empty, as it would be on a new machine."
+        fi
         exit 1
       fi
 
+      # The lesson is modules that describe state; a command that installs
+      # nginx cannot report whether it changed anything.
+      if ! grep -rqE '^[[:space:]]*(-[[:space:]]+)?(ansible\.(builtin|legacy)\.)?(apt|package):' \
+           --include='*.yml' --include='*.yaml' /root/site; then
+        echo "not yet: the run worked, but nothing in /root/site uses the apt (or package)"
+        echo "         module, so nginx is installed by a command. Describe the state with"
+        echo "         ansible.builtin.apt instead."
+        exit 1
+      fi
       if ! dpkg-query -W -f='${Status}' nginx 2>/dev/null | grep -q 'install ok installed'; then
         echo "not yet: the run succeeded, but nginx is not installed afterwards"
         exit 1
@@ -147,6 +167,11 @@ tasks:
       if [ "$code" = 000 ]; then
         ports=$(ss -ltnpH 2>/dev/null | grep nginx | awk '{print $4}' | tr '\n' ' ' || true)
         echo "not yet: nothing answers on port 80; nginx is listening on: ${ports:-nothing}"
+        exit 1
+      fi
+      who80=$(ss -ltnpH 'sport = :80' 2>/dev/null | grep -oE 'users:\(\("[^"]+"' | cut -d'"' -f2 | sort -u | paste -sd' ' || true)
+      if [ "$who80" != nginx ]; then
+        echo "not yet: port 80 answers, but the process listening there is '${who80:-unknown}', not nginx"
         exit 1
       fi
       if grep -q 'Welcome to nginx' "$page"; then
@@ -178,8 +203,23 @@ tasks:
         echo "         nginx's root directives: ${roots:-none}"
         exit 1
       fi
-      if ! tr ' ' '\n' <<<"$roots" | grep -qxE '/srv/www/?'; then
-        echo "not yet: the page is right, but nginx serves it from ${roots:-an unknown root}, not /srv/www"
+      # The same bytes can come from another copy of the page, so change the one
+      # in /srv/www and see whether port 80 follows. The page is put back after.
+      doc=/srv/www/index.html
+      if [ ! -f "$doc" ]; then
+        echo "not yet: the page is right, but $doc does not exist; nginx serves it from ${roots:-somewhere else}"
+        exit 1
+      fi
+      marker="devopslings-$(date +%s%N)"
+      cp -p "$doc" "$doc.devopslings"
+      printf '%s\n' "$marker" >> "$doc"
+      seen=$(curl -s --max-time 5 http://127.0.0.1/ || true)
+      cp -p "$doc.devopslings" "$doc"
+      rm -f "$doc.devopslings"
+      if ! grep -qF "$marker" <<<"$seen"; then
+        echo "not yet: the page is right, but it does not come from $doc: a line added"
+        echo "         there did not show up at http://127.0.0.1/"
+        echo "         nginx's root directives: ${roots:-none}"
         exit 1
       fi
 

@@ -161,7 +161,14 @@ tasks:
       # other box is caught, not just one that cannot connect.
       out=/var/lib/devopslings/fleet-seen
       rm -f "$out"
-      cat > /var/lib/devopslings/fleet-check.yml <<'YML'
+      # A fresh directory, so no host_vars/ or group_vars/ beside the check
+      # playbook can give the grader settings that /root/fleet does not have.
+      chk=$(mktemp -d)
+      trap 'rm -rf "$chk"' EXIT
+      # Nor can an ssh master left open by an earlier connection answer for a
+      # host whose own settings would not reach it.
+      export ANSIBLE_SSH_CONTROL_PATH_DIR="$chk/cp"
+      cat > "$chk/fleet-check.yml" <<'YML'
       - hosts: web
         gather_facts: false
         tasks:
@@ -180,13 +187,14 @@ tasks:
             connection: local
             run_once: true
       YML
-      run=$(ansible-playbook /var/lib/devopslings/fleet-check.yml -e "out=$out" 2>&1) || true
+      run=$(ansible-playbook "$chk/fleet-check.yml" -e "out=$out" 2>&1) || true
       if [ ! -s "$out" ]; then
         echo "not yet: could not run a play against group web from /root/fleet:"
         tail -n 8 <<<"$run" | sed 's/^/           /'
         exit 1
       fi
 
+      self=$(hostname)
       bad=0
       for h in $fleet; do
         line=$(grep "^$h " "$out" || true)
@@ -195,6 +203,10 @@ tasks:
           msg=$(cut -d' ' -f3- <<<"$line" | sed 's/Task failed: //' | cut -c1-160)
           [ "$bad" = 0 ] && echo "not yet: $h is in group web but did not answer"
           echo "         $h: ${msg:-no result}"
+          bad=1
+        elif [ "$name" = "$self" ]; then
+          [ "$bad" = 0 ] && echo "not yet: $h answered from this machine itself, not from a fleet box"
+          echo "         $h reached '$name', the control machine (ansible_connection=local runs here)"
           bad=1
         elif [ "$name" != "$h" ]; then
           [ "$bad" = 0 ] && echo "not yet: $h answered, but the machine that answered calls itself '$name'"

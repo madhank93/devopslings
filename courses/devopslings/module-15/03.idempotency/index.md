@@ -217,14 +217,20 @@ tasks:
       set -- \
         "usermod -s /bin/bash fleetagent|set fleetagent's shell to /bin/bash" \
         "printf '# local edit\n' >> /usr/local/bin/fleet-agent|appended a line to /usr/local/bin/fleet-agent" \
-        "sed -i 's/^max_conn.*/max_conn = 256/' /etc/fleet-agent/agent.conf|set max_conn back to 256 in agent.conf" \
-        "rm -f /etc/fleet-agent/agent.env|deleted /etc/fleet-agent/agent.env" \
-        "chmod 0600 /var/log/fleet-agent.log|changed /var/log/fleet-agent.log to mode 0600"
+        "sed -i 's/^max_conn.*/max_conn = 256/; s/^interval.*/interval = 60/' /etc/fleet-agent/agent.conf|set max_conn back to 256 and interval to 60 in agent.conf" \
+        "sed -i 's/^FLEET_ROLE=.*/FLEET_ROLE=db/' /etc/fleet-agent/agent.env|set FLEET_ROLE=db in /etc/fleet-agent/agent.env" \
+        "echo 'agent started' >> /var/log/fleet-agent.log; chmod 0600 /var/log/fleet-agent.log|changed /var/log/fleet-agent.log to mode 0600"
       for round in "$@"; do
         cmd=${round%%|*} what=${round#*|}
         bash -c "$cmd"
         play "after the check $what"
         bad=$(end_state)
+        # Managing the log file must never cost the log itself.
+        if [ -f /var/log/fleet-agent.log ] && ! grep -qx 'agent started' /var/log/fleet-agent.log \
+           && grep -q 'fleet-agent.log' <<<"$what"; then
+          nl=$'\n'
+          bad="${bad:+$bad$nl}/var/log/fleet-agent.log lost its contents: the run rewrote the log instead of only fixing its mode"
+        fi
         if [ -n "$bad" ]; then
           echo "not yet: the check $what, and the next run did not put it back:"
           sed 's/^/           /' <<<"$bad"
