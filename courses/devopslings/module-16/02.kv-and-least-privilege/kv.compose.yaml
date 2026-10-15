@@ -1,0 +1,34 @@
+# Lesson-local services, layered over sandboxes/ci-stack/compose.yaml.
+# Relative paths resolve against the sandbox directory, not this file's.
+x-reader: &reader
+  build: ./secrets-app
+  image: devopslings-ci-secrets-app
+  command: ["python3", "-u", "/lesson/reader.py"]
+  volumes:
+    - ../../courses/devopslings/module-16/02.kv-and-least-privilege:/lesson:ro
+  depends_on:
+    bao:
+      condition: service_healthy
+
+services:
+  billing:
+    <<: *reader
+    environment:
+      SERVICE: billing
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${BILLING_BAO_TOKEN:-}"
+    ports: ["18165:8080"]
+  orders:
+    <<: *reader
+    environment:
+      SERVICE: orders
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${ORDERS_BAO_TOKEN:-}"
+    ports: ["18166:8080"]
+  shipping:
+    <<: *reader
+    environment:
+      SERVICE: shipping
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${SHIPPING_BAO_TOKEN:-}"
+    ports: ["18167:8080"]

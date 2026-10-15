@@ -41,9 +41,9 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 **Counts**: 299 exercises across 27 modules and 13 sandboxes, drills included,
-capstone stages not. 170 shipped, 2 blocked, 127 specified. Modules 01–06, 08,
-09, 10, 12, 15 and 21 are complete: all 159 of their exercises pass the contract
-test; module 07 ships everything its sandbox kernel can produce. By tier:
+capstone stages not. 177 shipped, 2 blocked, 120 specified. Modules 01–06, 08,
+09, 10, 12, 15, 16 and 21 are complete: all 166 of their exercises pass the
+contract test; module 07 ships everything its sandbox kernel can produce. By tier:
 29 intro · 166 core · 74 deep · 30 architect.
 
 Per module: 01/19 · 02/10 · 03/11 · 04/20 · 05/15 · 06/12 · 07/13 · 08/9 · 09/13 ·
@@ -1803,38 +1803,38 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 16 — Secrets
-`ci-stack` (OpenBao) · 7 exercises · 1 intro · 4 core · 2 deep
+`ci-stack` (OpenBao) · 7 exercises · 7 shipped · 1 intro · 4 core · 2 deep
 
-- **store-and-read** *(intro)* — put a secret in, get it out of an application.
+- **store-and-read** *(intro · shipped)* — put a secret in, get it out of an application.
   *Check:* the app reads the value from OpenBao at runtime, and the value appears
   in no file, no image layer and no environment dump collected by the check.
   *Source:* own.
 
-- **kv-and-least-privilege** *(core)* — one token that can read everything.
+- **kv-and-least-privilege** *(core · shipped)* — one token that can read everything.
   *Check:* per-service policy; the wrong path is denied and proven denied.
   *Source:* own.
 
-- **dynamic-database-credentials** *(deep)* — a shared password in four services.
+- **dynamic-database-credentials** *(deep · shipped)* — a shared password in four services.
   *First guess:* rotate it manually every quarter.
   *Check:* each service gets a leased credential; revoking a lease kills exactly
   one service's access.
   *Source:* own.
 
-- **sops-and-age** *(core)* — encrypted files in git that CI can still read.
+- **sops-and-age** *(core · shipped)* — encrypted files in git that CI can still read.
   *Check:* ciphertext in the repo, plaintext never; CI decrypts with its own key.
   *Source:* own.
 
-- **secret-sprawl-audit** *(core)* — find every secret in a small estate.
+- **secret-sprawl-audit** *(core · shipped)* — find every secret in a small estate.
   *Check:* the answer file enumerates the planted secrets, including the two that
   are not in obvious places, with no false positives.
   *Source:* own.
 
-- **rotation-without-downtime** *(deep)* — rotating the credential drops requests.
+- **rotation-without-downtime** *(deep · shipped)* — rotating the credential drops requests.
   *First guess:* rotate at 3 a.m. and hope.
   *Check:* dual-read window; a rotation during load causes zero failed requests.
   *Source:* own.
 
-- **what-a-leak-costs** *(core)* — the token from module 12, replayed.
+- **what-a-leak-costs** *(core · shipped)* — the token from module 12, replayed.
   *Check:* revocation is verified from the attacker's side, not just rotated.
   *Source:* own.
 

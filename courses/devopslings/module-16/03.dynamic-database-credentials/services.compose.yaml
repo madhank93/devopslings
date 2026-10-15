@@ -1,0 +1,47 @@
+# Lesson-local services, layered over sandboxes/ci-stack/compose.yaml.
+# Relative paths resolve against the sandbox directory, not this file's.
+x-svc: &svc
+  build: ./secrets-app
+  image: devopslings-ci-secrets-app
+  command: ["python3", "-u", "/lesson/svc.py"]
+  volumes:
+    - ../../courses/devopslings/module-16/03.dynamic-database-credentials:/lesson:ro
+  depends_on:
+    bao:
+      condition: service_healthy
+    db:
+      condition: service_healthy
+
+services:
+  billing:
+    <<: *svc
+    environment:
+      SERVICE: billing
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${BILLING_BAO_TOKEN:-}"
+      DB_CREDS: "${BILLING_DB_CREDS:-}"
+    ports: ["18161:8080"]
+  orders:
+    <<: *svc
+    environment:
+      SERVICE: orders
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${ORDERS_BAO_TOKEN:-}"
+      DB_CREDS: "${ORDERS_DB_CREDS:-}"
+    ports: ["18162:8080"]
+  shipping:
+    <<: *svc
+    environment:
+      SERVICE: shipping
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${SHIPPING_BAO_TOKEN:-}"
+      DB_CREDS: "${SHIPPING_DB_CREDS:-}"
+    ports: ["18163:8080"]
+  reports:
+    <<: *svc
+    environment:
+      SERVICE: reports
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${REPORTS_BAO_TOKEN:-}"
+      DB_CREDS: "${REPORTS_DB_CREDS:-}"
+    ports: ["18164:8080"]

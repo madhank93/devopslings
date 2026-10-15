@@ -1,0 +1,29 @@
+# Lesson-local services, layered over sandboxes/ci-stack/compose.yaml.
+# Relative paths resolve against the sandbox directory, not this file's.
+services:
+  orders:
+    build: ./secrets-app
+    image: devopslings-ci-secrets-app
+    command: ["python3", "-u", "/lesson/orders.py"]
+    environment:
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${ORDERS_BAO_TOKEN:-}"
+    volumes:
+      - ../../courses/devopslings/module-16/06.rotation-without-downtime:/lesson:ro
+    ports: ["18168:8080"]
+    depends_on:
+      bao:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+
+  # Drives traffic at orders during the check. Idles otherwise.
+  loadgen:
+    image: devopslings-ci-secrets-app
+    command: ["sleep", "infinity"]
+    init: true
+    volumes:
+      - ../../courses/devopslings/module-16/06.rotation-without-downtime:/lesson:ro
+      - ../../scratch/rotation-without-downtime:/work
+    depends_on:
+      - orders

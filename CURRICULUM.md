@@ -793,7 +793,7 @@ a role with defaults and a molecule scenario against a fresh Debian rootfs ·
 vault and `become`, where the leaked password has to stop working, not just
 leave HEAD.
 
-### 16 — Secrets
+### 16 — Secrets · *shipped*
 `ci-stack`
 
 Store a secret and read it from an application, with the value in no file, no

@@ -96,10 +96,56 @@ services:
       timeout: 5s
       retries: 20
 
+  # sops, age and git, on the forge's network. Two uses: a workflow's
+  # `container: image:` names this tag and the runner uses it without pulling,
+  # and a student without the tools installed works inside this container.
+  # It idles rather than exiting, because `up --wait` fails on an exited one.
+  sops:
+    build: ./sops
+    image: devopslings-ci-sops:3.10.2
+    command: ["tail", "-f", "/dev/null"]
+    init: true
+    working_dir: /work
+
+  # OpenBao, the MPL-2.0 fork of Vault, for module 16. A real server, not dev
+  # mode: raft storage on a volume, initialised once and unsealed on every start
+  # by init/openbao.sh, so what a student stores survives a restart. Root token:
+  # devopslings-root. UI at http://localhost:8200/ui.
+  bao:
+    image: openbao/openbao:2.6.4
+    entrypoint: ["dumb-init", "/bin/sh", "/init/openbao.sh"]
+    environment:
+      BAO_ADDR: "http://127.0.0.1:8200"
+    volumes:
+      - bao-data:/openbao/file
+      - ./init:/init:ro
+    ports:
+      - "8200:8200"
+    healthcheck:
+      # 200 only once initialised, unsealed and active.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8200/v1/sys/health || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The database module 16's services use, and that OpenBao issues leased
+  # credentials for. Not published: reach it as `db` on the compose network.
+  db:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_PASSWORD: devopslings
+      POSTGRES_DB: app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
 volumes:
   forge-data:
   runner-data:
   shared:
+  bao-data:
 
 # Named explicitly so the runner can put job containers on it. act_runner
 # creates a fresh per-job network by default, and a job on that network cannot

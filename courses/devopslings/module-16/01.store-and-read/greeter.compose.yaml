@@ -1,0 +1,13 @@
+# Lesson-local service, layered over sandboxes/ci-stack/compose.yaml.
+# Relative paths resolve against the sandbox directory, not this file's.
+services:
+  greeter:
+    build: ../../scratch/store-and-read
+    environment:
+      BAO_ADDR: "http://bao:8200"
+      BAO_TOKEN: "${GREETER_BAO_TOKEN:-}"
+    ports:
+      - "18160:8080"
+    depends_on:
+      bao:
+        condition: service_healthy
