@@ -19,6 +19,9 @@ tasks:
     init: true
     timeout_seconds: 180
     run: |
+      # docker exec can hand out umask 0000; a world-writable repo makes
+      # ansible ignore its ansible.cfg.
+      umask 022
       userdel -r deploy 2>/dev/null || true
       rm -rf /home/deploy /etc/billing /etc/sudoers.d/deploy
 
@@ -90,8 +93,9 @@ tasks:
         exit 1
       fi
 
-      if sudo -l -U deploy 2>/dev/null | grep -q NOPASSWD; then
-        echo "not yet: deploy can sudo without a password (NOPASSWD)"
+      if sudo -l -U deploy 2>/dev/null | grep -q NOPASSWD \
+         || printf 'not-the-password\n' | runuser -u deploy -- sudo -S -k -p '' true >/dev/null 2>&1; then
+        echo "not yet: deploy can sudo without a password (NOPASSWD or !authenticate)"
         echo "         that removes the secret instead of protecting it, and hands root"
         echo "         to anything that runs as deploy. Keep the password; vault it."
         exit 1
@@ -117,8 +121,10 @@ tasks:
         echo "         vault_password_file (ansible.cfg) or ANSIBLE_VAULT_PASSWORD_FILE at it."
         exit 1
       fi
+      dgit cat-file --batch-all-objects --batch > "$work/objects" 2>/dev/null || true
       for f in $pwfiles; do
-        real=$(realpath -m "$f")
+        case "$f" in "~/"*) f="/home/deploy/${f#\~/}" ;; esac
+        real=$(cd "$repo" && realpath -m "$f")
         case "$real" in
           "$repo"|"$repo"/*)
             echo "not yet: the vault password file $f is inside the repository"
@@ -134,6 +140,19 @@ tasks:
         if [ -f "$real" ] && [ -n "$(find "$real" -perm /077 2>/dev/null || true)" ]; then
           echo "not yet: the vault password file $f is readable by other users ($(stat -c %A "$real"))"
           echo "         it unlocks every secret in the repo: chmod 600."
+          exit 1
+        fi
+        # The key itself, as ansible will read it: an executable file is run.
+        if [ -x "$real" ]; then
+          key=$(runuser -l deploy -c "$(printf '%q' "$real")" 2>/dev/null || true)
+        else
+          key=$(cat "$real" 2>/dev/null || true)
+        fi
+        if [ -n "$key" ] && { grep -rqF -- "$key" "$repo" 2>/dev/null || grep -qF -- "$key" "$work/objects"; }; then
+          echo "not yet: the vault key from $f is still in $repo, in a file or in git history"
+          echo "         anyone with a clone can decrypt whatever it encrypted, history included."
+          echo "         Change deploy's password again and vault it with a new key that"
+          echo "         never enters the repo."
           exit 1
         fi
       done
@@ -190,21 +209,20 @@ tasks:
       fi
 
       # 6. The current password: in no file, and in no git object, reachable or not.
-      hits=$(grep -rlF --exclude-dir=.git -- "$pw" "$repo" 2>/dev/null || true)
+      hits=$(grep -rlF -- "$pw" "$repo" 2>/dev/null || true)
       if [ -n "$hits" ]; then
         echo "not yet: deploy's current sudo password is in plaintext in:"
         printf '%s\n' "$hits" | sed "s|^$repo/|           |"
         exit 1
       fi
-      dgit cat-file --batch-all-objects --batch > "$work/objects" 2>/dev/null || true
       if grep -qF -- "$pw" "$work/objects"; then
         commits=$(dgit log --all -S"$pw" --format='%h %s' 2>/dev/null || true)
         echo "not yet: deploy's current sudo password is in plaintext in a git object"
         if [ -n "$commits" ]; then
           printf '%s\n' "$commits" | sed 's/^/           added or removed in /'
         else
-          echo "           no branch reaches it any more; it survives as an unreachable"
-          echo "           object (an amended or reset commit, kept by the reflog)."
+          echo "           no branch reaches it; it survives in a stash ('git stash list'),"
+          echo "           or as an amended or reset commit kept by the reflog."
         fi
         exit 1
       fi

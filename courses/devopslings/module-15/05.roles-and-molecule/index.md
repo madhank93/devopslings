@@ -158,6 +158,21 @@ tasks:
       printf '%s\n' '- hosts: all' '  gather_facts: false' '  roles:' "    - role: $role" > "$work/converge.yml"
       printf '%s\n' '[t]' "verify-target ansible_connection=community.general.chroot ansible_host=$target ansible_python_interpreter=/usr/bin/python3" > "$work/inventory"
 
+      # Every target, the check's and molecule's, is a copy of this tree, so it
+      # must still be stock Debian for "clean" to mean anything.
+      seeded=""
+      [ -n "$(chroot /opt/molecule-target getent passwd nodeagent 2>/dev/null || true)" ] && seeded="$seeded user"
+      [ -n "$(chroot /opt/molecule-target getent group nodeagent 2>/dev/null || true)" ] && seeded="$seeded group"
+      [ -e /opt/molecule-target/etc/nodeagent ] && seeded="$seeded /etc/nodeagent"
+      [ -e /opt/molecule-target/srv/nodeagent ] && seeded="$seeded /srv/nodeagent"
+      if [ -n "$seeded" ]; then
+        echo "not yet: /opt/molecule-target, the clean filesystem every test copies, has nodeagent's:$seeded"
+        echo "         a role tested against it is not tested on a clean host. Take them out"
+        echo "         (chroot /opt/molecule-target userdel nodeagent; groupdel nodeagent;"
+        echo "         rm -rf the directories) and have the role create them."
+        exit 1
+      fi
+
       # 1. The role alone, defaults only, on a stock Debian filesystem.
       fresh_target
       converge "$work/run1.out"
@@ -181,6 +196,11 @@ tasks:
         echo "not yet: on a clean target the role did not create the nodeagent user"
         exit 1
       fi
+      got=$(in_target stat -c '%U:%G %a' /etc/nodeagent)
+      if [ "$got" != "root:nodeagent 750" ]; then
+        echo "not yet: /etc/nodeagent on a clean target is '${got:-missing}', expected 'root:nodeagent 750'"
+        exit 1
+      fi
       got=$(in_target stat -c '%U:%G %a' /etc/nodeagent/agent.conf)
       if [ "$got" != "root:nodeagent 640" ]; then
         echo "not yet: agent.conf on a clean target is '${got:-missing}', expected 'root:nodeagent 640'"
@@ -193,12 +213,26 @@ tasks:
       fi
 
       # 2. Converged twice, the second run must change nothing.
+      touch "$work/mark"
       converge "$work/run2.out"
       changed=$(changed_of "$work/run2.out")
       if [ "$rc" -ne 0 ] || [ "${changed:-x}" != 0 ]; then
         echo "not yet: a second run of the role on the same target reported changed=${changed:-?} (rc=$rc)"
         grep -E '^changed:' "$work/run2.out" -B2 | grep '^TASK' | head -5 | sed 's/^/           /' || true
         echo "         a role that changes something on every run cannot tell you it converged."
+        exit 1
+      fi
+      # changed_when can hide a write; the filesystem cannot. The chroot has no
+      # devtmpfs, so /dev/null there is a plain file every task writes to.
+      written=$(find "$target" -xdev -type f -newer "$work/mark" \
+        -not -path "$target/root/.ansible/*" -not -path "$target/tmp/*" \
+        -not -path "$target/dev/*" 2>/dev/null \
+        | sed "s|^$target||" | head -5 || true)
+      if [ -n "$written" ]; then
+        echo "not yet: a second run reported changed=0 but still wrote to:"
+        printf '%s\n' "$written" | sed 's/^/           /'
+        echo "         a task that modifies the host on every run is not idempotent, whatever"
+        echo "         changed_when says. Drop it, or make it a module that checks first."
         exit 1
       fi
 
@@ -268,6 +302,24 @@ tasks:
         echo "         converge and idempotence pass trivially on a role that does"
         echo "         nothing. The verify step has to check what the role is for: the"
         echo "         config file and its contents, the user, the directories."
+        exit 1
+      fi
+
+      # 6. A role that builds everything except the right config must fail too,
+      # or the verify step only checks that files exist.
+      printf '%s\n' \
+        '- ansible.builtin.group: {name: nodeagent, system: true}' \
+        '- ansible.builtin.user: {name: nodeagent, group: nodeagent, system: true, create_home: false, shell: /usr/sbin/nologin}' \
+        '- ansible.builtin.file: {path: /etc/nodeagent, state: directory, owner: root, group: nodeagent, mode: "0750"}' \
+        '- ansible.builtin.copy: {dest: /etc/nodeagent/agent.conf, owner: root, group: nodeagent, mode: "0640", content: "port=1\ncollector=https://wrong.invalid:1\n"}' \
+        '- ansible.builtin.file: {path: /srv/nodeagent, state: directory, owner: nodeagent, group: nodeagent, mode: "0750"}' \
+        > "$work/wrongconf.yml"
+      molecule_run "$work/wrongconf.yml" "$work/wrong.out"
+      if [ ! -e "$work/wrong.out.rc" ]; then
+        echo "not yet: 'molecule test' passes on a role whose agent.conf says port=1 and a"
+        echo "         made-up collector, with the user and directories all correct"
+        echo "         your verify step checks that things exist, not what the config says."
+        echo "         Assert on the port= and collector= lines."
         exit 1
       fi
 

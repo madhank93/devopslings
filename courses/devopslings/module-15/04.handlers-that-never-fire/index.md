@@ -231,7 +231,25 @@ tasks:
       n=$((1000 + RANDOM % 9000))
       while [ "$n" = "$vars_rps" ] || [ "$n" = "$cur_rps" ]; do n=$((n + 1)); done
 
+      # A hand edit of the file must not restart anything: the restart has to
+      # come from the playbook, not from a watcher on the file.
+      before=$(loads)
+      cp "$conf" "$out.conf"
+      sed -i "s/^\([[:space:]]*requests_per_second[[:space:]]*=\).*/\1 $n/" "$conf"
+      sleep 2
+      after=$(loads)
+      cat "$out.conf" > "$conf"
+      if [ "$after" -ne "$before" ]; then
+        echo "not yet: editing $conf by hand restarted the service"
+        echo "         something outside Ansible (a systemd .path unit, an inotify watcher)"
+        echo "         restarts on any write to the file. Remove it: the restart belongs"
+        echo "         in a handler that the playbook's config task notifies."
+        exit 1
+      fi
+
       # 2. A real change: exactly one restart or reload, and the new value live.
+      # The logrotate policy is removed first, so only a run that installs it passes.
+      rm -f /etc/logrotate.d/ratelimiter
       before=$(loads)
       play -e "ratelimiter_rps=$n"
       after=$(loads)
@@ -241,6 +259,17 @@ tasks:
         if ! grep -q '^RUNNING HANDLER' "$out"; then
           echo "         a failed play skips its handlers, so the change is on disk and"
           echo "         the service never hears about it."
+        fi
+        exit 1
+      fi
+      if [ ! -s /etc/logrotate.d/ratelimiter ]; then
+        echo "not yet: the playbook succeeded but did not install /etc/logrotate.d/ratelimiter"
+        if grep -q '^\.\.\.ignoring' "$out"; then
+          echo "         a failing task is being ignored (ignore_errors). Fix what it"
+          echo "         copies instead, so the run both succeeds and installs the policy."
+        else
+          echo "         the logrotate task is gone or no longer fails visibly. It is part"
+          echo "         of the deploy: fix the file it copies rather than removing it."
         fi
         exit 1
       fi
