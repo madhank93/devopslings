@@ -52,7 +52,11 @@ const DefaultTimeout = 240 * time.Second
 const upTimeout = 15 * time.Minute
 
 // shellPrelude is prepended to every task script.
-const shellPrelude = "set -euo pipefail\n"
+//
+// The umask is pinned because `docker exec` inherits it from the daemon, not
+// the container, and some hosts hand out 0000: files a task creates would be
+// world-writable, and tools that refuse such files (ansible.cfg, sshd) break.
+const shellPrelude = "set -euo pipefail\numask 022\n"
 
 // Runner executes tasks for lessons rooted at Root.
 type Runner struct {

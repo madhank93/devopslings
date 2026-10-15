@@ -98,6 +98,9 @@ solution() { printf '%s\n' "$DEVOPSLINGS_SOLUTION"; }
 `)
 
 	if cfg.InContainer {
+		// Same pin as the runner's task prelude: exec'd shells inherit the
+		// daemon's umask, which can be 0000.
+		b.WriteString("umask 022\n")
 		// The check runs in this same container, so running it here is exactly
 		// what the grader does — but nothing records the result, because the
 		// thing that writes progress is on the other side of the container
