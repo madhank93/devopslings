@@ -20,6 +20,7 @@ jobs:
       - run: go vet ./...
       - run: gofmt -l . | tee /dev/stderr | (! read)
       - run: go test -short ./...
+      - run: go run ./cmd/counts -check
 
   # The one that matters: every lesson is put through the full
   # broken -> solved -> still-solved cycle against a live daemon.

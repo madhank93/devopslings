@@ -99,7 +99,7 @@ that transfers.
 
 ## What it covers
 
-Twenty-eight modules from Linux triage to platform engineering, 299 exercises.
+Twenty-eight modules from Linux triage to platform engineering.
 See [CURRICULUM.md](CURRICULUM.md) for the map and [EXERCISES.md](EXERCISES.md)
 for every exercise — what breaks, which obvious fix is wrong, and what the check
 measures.
@@ -107,12 +107,22 @@ measures.
 Every exercise carries a difficulty tier, so you can enter where you actually
 are rather than at exercise one:
 
-| Tier | What it asks | Count |
-|---|---|---|
-| **intro** | One concept, guided. Fluency with a tool, not diagnosis. | 29 |
-| **core** | Already broken, the obvious first guess is wrong, the check measures the cause. | 154 |
-| **deep** | A mechanism below the tool's surface — a profile, a packet capture, a kernel counter. | 60 |
-| **architect** | A written decision or design, graded against a rubric. | 31 |
+| Tier | What it asks |
+|---|---|
+| **intro** | One concept, guided. Fluency with a tool, not diagnosis. |
+| **core** | Already broken, the obvious first guess is wrong, the check measures the cause. |
+| **deep** | A mechanism below the tool's surface — a profile, a packet capture, a kernel counter. |
+| **architect** | A written decision or design, graded against a rubric. |
+
+<!-- counts -->
+**299 exercises** across 26 modules, drills included, capstone stages not: 177 shipped, 2 blocked, 120 specified.
+
+By tier: 29 intro · 166 core · 74 deep · 30 architect.
+
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 15, 16, 21.
+
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 0/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
+<!-- /counts -->
 
 If you arrive from a job title rather than from the top, `CURRICULUM.md` maps
 nine of them — system administrator, network engineer, DBA, systems engineer,

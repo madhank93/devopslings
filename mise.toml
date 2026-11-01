@@ -79,6 +79,10 @@ run = [
 description = "Fast tests — no Docker required"
 run = "go test -short ./..."
 
+[tasks.counts]
+description = "Regenerate exercise counts in the docs from EXERCISES.md"
+run = "go run ./cmd/counts"
+
 [tasks.contract]
 description = "Prove every lesson is actually broken and actually solvable (slow, needs Docker)"
 run = "go test ./internal/runner/ -run TestLessonContract -v -timeout 60m"
