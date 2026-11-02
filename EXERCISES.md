@@ -40,15 +40,15 @@ current wave · *(blocked)* specified, and the sandbox cannot currently produce
 the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
-**Counts**: 299 exercises across 27 modules and 13 sandboxes, drills included,
-capstone stages not. 177 shipped, 2 blocked, 120 specified. Modules 01–06, 08,
-09, 10, 12, 15, 16 and 21 are complete: all 166 of their exercises pass the
-contract test; module 07 ships everything its sandbox kernel can produce. By tier:
-29 intro · 166 core · 74 deep · 30 architect.
+<!-- counts -->
+**299 exercises** across 26 modules, drills included, capstone stages not: 177 shipped, 2 blocked, 120 specified.
 
-Per module: 01/19 · 02/10 · 03/11 · 04/20 · 05/15 · 06/12 · 07/13 · 08/9 · 09/13 ·
-10/18 · 11/9 · 12/12 · 13/10 · 14/6 · 15/6 · 16/7 · 17/10 · 18/10 · 19/9 ·
-20/15 · 21/14 · 22/12 · 23/10 · 24/13 · 25/7 · 26/9.
+By tier: 29 intro · 166 core · 74 deep · 30 architect.
+
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 15, 16, 21.
+
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 0/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
+<!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
 each have an `intro` rung. Modules 24, 26 and 27 do not, because they are built
@@ -57,7 +57,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 01 — Linux & Terminal Triage
-`linux-box` · 19 exercises · 19 shipped · 4 intro · 12 core · 3 deep · 1 drill
+`linux-box`
 
 - **find-the-evidence** *(intro · shipped)* — a service misbehaved an hour ago and its own
   log file is empty. Four places hold evidence: the unit's journal, `dmesg`, the
@@ -183,7 +183,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
   inside the box would move the clock for every container on the machine. The
   lesson says so.
 
-- **box-triage-drill** *(deep · drill)* — `POST /orders` fails on box; the cause
+- **box-triage-drill** *(deep · drill · shipped)* — `POST /orders` fails on box; the cause
   is one of five, drawn at random each run: a deleted file held open filling the
   disk, inodes exhausted by empty part files, a config typo that leaves the unit
   failed, a hardening drop-in's LimitNOFILE, a spool directory restored root-owned.
@@ -199,7 +199,7 @@ entirely on earlier modules — starting there is the mistake, not the on-ramp.
 ---
 
 ## 02 — Scripting & Automation
-`linux-box` · 10 exercises · 10 shipped · 2 intro · 5 core · 2 deep · 1 architect · 1 drill
+`linux-box`
 
 The roadmap says "learn a programming language" and stops. This module is the
 part that actually bites: a script that works on your machine, on your files,
@@ -269,7 +269,7 @@ once, and then runs at 03:00 against input you did not imagine.
   "it felt cleaner".
   *Source:* own.
 
-- **nightly-job-drill** *(deep · drill)* — settle-nightly logged "done" and exited
+- **nightly-job-drill** *(deep · drill · shipped)* — settle-nightly logged "done" and exited
   0, and last night's settlement report is wrong; the cause is one of five, drawn
   at random each run: `$(ls)` splitting a batch named with a space, `pipefail`
   removed under a failing paginated service, `local x=$(cmd)` hiding a failed
@@ -288,8 +288,7 @@ once, and then runs at 03:00 against input you did not imagine.
 ---
 
 ## 03 — Storage, Filesystems & the Kernel
-`linux-box` (loop devices, LVM, cgroup v2) · 11 exercises · all shipped ·
-1 intro · 4 core · 5 deep · 1 architect · 1 drill
+`linux-box` (loop devices, LVM, cgroup v2)
 
 Where "the disk is slow" and "we are out of memory" turn out to be four
 different things each.
@@ -446,7 +445,7 @@ different things each.
   disappears.
   *Source:* own.
 
-- **storage-triage-drill** *(deep · drill)* — ingest's p99 has degraded and some
+- **storage-triage-drill** *(deep · drill · shipped)* — ingest's p99 has degraded and some
   of its writes fail; the cause is one of five, drawn at random each run, each a
   different layer under one service: a platform drop-in setting `CPUQuota=2%`, a
   `MemoryMax` that pages it into swap, an LV extended without its filesystem, an
@@ -467,8 +466,7 @@ different things each.
 ---
 
 ## 04 — Networking I: Packets, Interfaces & the Kernel Path
-`netlab` (two boxes, dual-stack) · 20 exercises · all shipped ·
-1 intro · 11 core · 6 deep · 1 architect · 1 drill
+`netlab` (two boxes, dual-stack)
 
 Module 05 debugs DNS, TLS and proxies. This one is underneath that: the routing
 table, the connection tracker, the accept queue, and the packets themselves.
@@ -657,7 +655,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
   exactly the running ruleset, with no trace rule left in.
   *Source:* own.
 
-- **packet-path-drill** *(deep · drill)* — the storefront's order lookups miss
+- **packet-path-drill** *(deep · drill · shipped)* — the storefront's order lookups miss
   their 750ms budget; the cause is one of five, drawn at random each run, each a
   different place on the kernel's packet path through one box: a stale `/28` in
   the static routes outranking the bridge's `/24`, a CIS sysctl file setting
@@ -681,7 +679,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 05 — Networking II: Protocols & Services
-`netlab` · 15 exercises · 15 shipped · 1 intro · 10 core · 3 deep · 1 architect
+`netlab`
 
 - **resolve-connect-request** *(intro · shipped)* — one HTTP request, taken apart
   into its three separate steps: the name resolved, the TCP connection opened,
@@ -893,7 +891,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 06 — Web Servers & Proxies
-`web-stack` · 12 exercises · 12 shipped · 1 intro · 8 core · 2 deep · 1 architect · 1 drill
+`web-stack`
 
 - **serve-a-static-site** *(intro · shipped)* — nginx is running, `nginx -t` is
   happy, the file is 0644 and root can read it, and every request is 403. One
@@ -1034,7 +1032,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
   headers.
   *Source:* own.
 
-- **web-triage-drill** *(deep · drill)* — since last night's deploy some requests
+- **web-triage-drill** *(deep · drill · shipped)* — since last night's deploy some requests
   to the shop fail or hang; the cause is one of five, drawn at random each run:
   `/api/` lost proxy_pass's trailing slash, `/reports/` lost its own read timeout,
   the asset cache key uses `$uri`, `/upload` lost its body limit, `/ws` stopped
@@ -1053,7 +1051,7 @@ table, the connection tracker, the accept queue, and the packets themselves.
 ---
 
 ## 07 — Security Hardening & Access Control
-`linux-box` · 13 exercises · 11 shipped · 2 blocked · 1 intro · 7 core · 4 deep · 1 architect · 1 drill
+`linux-box`
 
 AppArmor, not SELinux: every sandbox is Debian, and SELinux does not enforce
 meaningfully inside a container. The mechanism transfers; the tool differs, and
@@ -1155,7 +1153,7 @@ each lesson says so.
   "hackers", and rejects controls with no stated cost.
   *Source:* own.
 
-- **hardening-audit-drill** *(deep · drill)* — the pre-audit compliance scan
+- **hardening-audit-drill** *(deep · drill · shipped)* — the pre-audit compliance scan
   reports one finding against the reports host; the finding is one of five,
   drawn at random each run, against a written baseline: a sudo grant wider than
   the runbook's one command, a stray setuid bit on a non-system binary, a
@@ -1175,7 +1173,7 @@ each lesson says so.
 ---
 
 ## 08 — Version Control
-no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core · 2 deep · 1 architect · 1 drill
+no sandbox (scratch git repos)
 
 - **branch-commit-merge** *(intro · shipped)* — the loop, done properly once.
   *Check:* a feature branch is merged with its history intact, and the answer
@@ -1225,7 +1223,7 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
   happens when someone uses `--no-verify`.
   *Source:* own.
 
-- **git-recovery-drill** *(deep · drill)* — the release check fails on a fresh
+- **git-recovery-drill** *(deep · drill · shipped)* — the release check fails on a fresh
   clone of main; the cause is one of five, drawn at random each run: commits
   reset away and force-pushed, a regression deep in history, a merge that kept
   one side, a submodule pinned backwards, a live token in an old commit.
@@ -1239,7 +1237,7 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
 ---
 
 ## 09 — Containers
-`none` (scratch workspace) · 13 exercises · 13 shipped · 1 intro · 8 core · 4 deep · 1 drill
+`none` (scratch workspace)
 
 - **build-run-inspect** *(intro · shipped)* — the container printed
   `wrote /out/report.txt` and the host has no such file.
@@ -1323,7 +1321,7 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
   `CAP_NET_ADMIN`, and mounting a tmpfs inside it is refused.
   *Source:* roadmap.sh security basics.
 
-- **container-triage-drill** *(deep · drill)* — `./deploy.sh` ends in "container
+- **container-triage-drill** *(deep · drill · shipped)* — `./deploy.sh` ends in "container
   api is unhealthy", and that is the whole ticket. One fault is seeded per run,
   drawn from five: a memory limit under the 160MB cache (exit 137, silent logs),
   a health check with no `start_period` against a 12s warm-up, `QUOTES_URL`
@@ -1341,7 +1339,7 @@ no sandbox (scratch git repos) · 9 exercises · 9 shipped · 1 intro · 5 core 
 ---
 
 ## 10 — Databases & Data Stores
-`db-stack` · 18 exercises · 18 shipped · 2 intro · 6 core · 9 deep · 1 architect · 1 drill
+`db-stack`
 
 The gap this course had. Postgres appeared in modules 22 and 23 only as
 something to fail over and restore — never as something to *operate*. A DevOps
@@ -1494,7 +1492,7 @@ engine (`db_bench`) for the write-stall exercise.
   cardinality — graded against a rubric that rejects "it scales better".
   *Source:* own.
 
-- **database-triage-drill** *(deep · drill)* — checkout is slow and some
+- **database-triage-drill** *(deep · drill · shipped)* — checkout is slow and some
   requests time out; the cause is one of five, drawn at random each run: a
   migration queued behind a session idle in transaction, an orphaned prepared
   transaction holding a row lock, replica replay paused, the lookup's index
@@ -1511,7 +1509,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 11 — Artifacts & Supply Chain
-`ci-stack` (Harbor) · 9 exercises · 1 intro · 5 core · 2 deep · 1 architect
+`ci-stack` (Harbor)
 
 - **push-your-first-image** *(intro)* — tag it, push it, pull it back on another host.
   *Check:* the image is pullable from Harbor by a second client, and the answer
@@ -1564,7 +1562,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 12 — CI/CD
-`ci-stack` + `jenkins-stack` · 12 exercises · 12 shipped · 1 intro · 8 core · 2 deep · 1 architect · 1 drill
+`ci-stack` + `jenkins-stack`
 
 - **run-it-on-every-push** *(intro · shipped)* — a reviewed, merged ci.yml that
   has never produced a red build or a green one.
@@ -1677,7 +1675,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 13 — IaC: OpenTofu
-`iac-stack` (new) · 10 exercises · 1 intro · 7 core · 1 deep · 1 architect
+`iac-stack` (new)
 
 - **first-resource** *(intro)* — a container managed by code instead of by hand.
   *First guess:* `docker run` and write the HCL afterwards.
@@ -1737,7 +1735,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 14 — IaC: Pulumi (Go)
-`iac-stack` · 6 exercises · 1 intro · 3 core · 1 deep · 1 architect
+`iac-stack`
 
 - **first-program-in-go** *(intro)* — one resource, in a language with a compiler.
   *Check:* `pulumi up` creates it and `pulumi destroy` removes it, and the answer
@@ -1770,7 +1768,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 15 — Config Management: Ansible
-`linux-box` · 6 exercises · 6 shipped · 1 intro · 5 core
+`linux-box`
 
 - **inventory-and-ad-hoc** *(intro · shipped)* — twelve boxes, one command.
   *Check:* the fact is gathered from every host in the group, none missed.
@@ -1803,7 +1801,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 16 — Secrets
-`ci-stack` (OpenBao) · 7 exercises · 7 shipped · 1 intro · 4 core · 2 deep
+`ci-stack` (OpenBao)
 
 - **store-and-read** *(intro · shipped)* — put a secret in, get it out of an application.
   *Check:* the app reads the value from OpenBao at runtime, and the value appears
@@ -1841,7 +1839,7 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 17 — Cloud Fundamentals & IAM
-`iac-stack` (floci) · 10 exercises · 1 intro · 7 core · 1 deep · 1 architect
+`iac-stack` (floci)
 
 floci emulates the AWS API locally, so identity, network and storage
 misconfiguration — the three that cause the breaches — are reachable without an
@@ -1913,7 +1911,7 @@ failures transfer to any provider.
 ---
 
 ## 18 — Metrics
-`obs-stack` (new) · 10 exercises · 1 intro · 7 core · 2 deep
+`obs-stack` (new)
 
 - **target-down** *(intro)* — a scrape target that is up but not scraped.
   *First guess:* restart Prometheus.
@@ -1968,7 +1966,7 @@ failures transfer to any provider.
 ---
 
 ## 19 — Logs & Traces
-`obs-stack` · 9 exercises · 1 intro · 5 core · 3 deep
+`obs-stack`
 
 - **ship-one-log-line** *(intro)* — get a single application log line into Loki
   and find it again by query.
@@ -2017,7 +2015,7 @@ failures transfer to any provider.
 ---
 
 ## 20 — Performance, Percentiles & Scalability
-`obs-stack` + `chaos-stack` · 15 exercises · 1 intro · 6 core · 6 deep · 2 architect
+`obs-stack` + `chaos-stack`
 
 - **read-a-percentile** *(intro)* — 1,000 request durations, computed by hand,
   then by query.
@@ -2099,7 +2097,7 @@ failures transfer to any provider.
 ---
 
 ## 21 — Failure Handling & Resilience Patterns
-`chaos-stack` · 14 exercises · 14 shipped · 1 intro · 8 core · 3 deep · 2 architect · 1 drill
+`chaos-stack`
 
 - **set-a-timeout** *(intro · shipped)* — the one-line change, before any of the patterns.
   *Check:* the client gives up within the stated budget instead of waiting
@@ -2168,7 +2166,7 @@ failures transfer to any provider.
   bounded so a single command cannot exceed the blast radius.
   *Source:* published AWS postmortem, simplified.
 
-- **resilience-triage-drill** *(deep · drill)* — checkout fails its game day, a
+- **resilience-triage-drill** *(deep · drill · shipped)* — checkout fails its game day, a
   replayed pricing incident (resets, a rush with pricing slow, then pricing
   hung); the cause is one of five settings, drawn at random each run, each a
   pattern from this module set to a plausible wrong value: a 30s timeout that
@@ -2189,7 +2187,7 @@ failures transfer to any provider.
 ---
 
 ## 22 — High Availability
-`ha-stack` (new) · 12 exercises · 1 intro · 7 core · 2 deep · 2 architect
+`ha-stack` (new)
 
 - **two-nodes-one-name** *(intro)* — put a load balancer in front of two servers.
   *Check:* both backends receive traffic under a spread of requests, and stopping
@@ -2263,7 +2261,7 @@ failures transfer to any provider.
 ---
 
 ## 23 — Backup & Disaster Recovery
-`ha-stack` · 10 exercises · 1 intro · 4 core · 2 deep · 3 architect
+`ha-stack`
 
 - **take-a-backup** *(intro)* — run the dump, then open it.
   *Check:* the backup file exists and the answer states which of the three named
@@ -2319,7 +2317,7 @@ failures transfer to any provider.
 ---
 
 ## 24 — SRE Practice & Progressive Delivery
-`ha-stack` + `obs-stack` · 13 exercises · 6 core · 2 deep · 5 architect
+`ha-stack` + `obs-stack`
 
 - **pick-an-sli** *(core)* — three candidate indicators, one correlates with pain.
   *Check:* the chosen SLI moves during the seeded incident and stays flat during
@@ -2388,7 +2386,7 @@ failures transfer to any provider.
 ---
 
 ## 25 — DORA & Delivery Measurement
-`ci-stack` + `obs-stack` · 7 exercises · 1 intro · 3 core · 1 deep · 2 architect
+`ci-stack` + `obs-stack`
 
 - **count-your-deploys** *(intro)* — how often does this repository actually ship?
   *Check:* the deployment count over the seeded history is correct, and the answer
@@ -2425,7 +2423,7 @@ failures transfer to any provider.
 ---
 
 ## 26 — Platform Engineering
-`ci-stack` + `obs-stack` · 9 exercises · 5 core · 3 deep · 1 architect
+`ci-stack` + `obs-stack`
 
 The discipline the roadmap names and no exercise set teaches: making the right
 thing the easy thing for teams who do not report to you, and measuring whether
