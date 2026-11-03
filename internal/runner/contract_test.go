@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"cmp"
 	"context"
 	"os"
 	"path/filepath"
@@ -107,6 +108,8 @@ func TestLessonContract(t *testing.T) {
 	r := New(root)
 
 	only := os.Getenv("DEVOPSLINGS_CONTRACT_LESSON")
+	// CI shards the suite one job per stack; "none" selects stackless lessons.
+	onlyStack := os.Getenv("DEVOPSLINGS_CONTRACT_STACK")
 
 	// Lessons that share a sandbox must not run concurrently: Contract tears the
 	// stack down before it starts, so two lessons on linux-box would destroy
@@ -125,6 +128,9 @@ func TestLessonContract(t *testing.T) {
 
 	for _, l := range course.All(mods) {
 		if only != "" && l.Name != only {
+			continue
+		}
+		if stack := cmp.Or(l.Sandbox.Stack, "none"); onlyStack != "" && stack != onlyStack {
 			continue
 		}
 		t.Run(l.Name, func(t *testing.T) {
