@@ -50,11 +50,11 @@ That account is the forge admin. `deploy-bot`'s password is
 The check replays the red team's kit against the forge. The token must not log
 in, with either header form. It must not be exchangeable for a registry
 credential. And `registry-bearer` must not be able to open an image upload as
-`deploy-bot`.
+`deploy-bot`. No token in the repo's history may log in.
 
 Then it starts a run of the deploy workflow itself, so it grades the
 `DEPLOY_TOKEN` secret as it is now, not as it was at your last push. The run has
-to go green, authenticated as an account that is not `devops`. Keep
+to go green, authenticated as an account that is not a forge administrator. Keep
 `workflow_dispatch` in the workflow's `on:` list, because that is how the check
 starts the run.
 

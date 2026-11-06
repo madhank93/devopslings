@@ -51,9 +51,11 @@ That none of the three plaintext values, and no age private key, appears in any
 commit reachable from any ref. That `deploy/secrets.enc.env` on `main` is a
 sops file whose values are all encrypted. Then the check starts a deploy run
 itself. `scripts/deploy.sh` prints the public key of the identity CI decrypted
-with, and a fingerprint of each value. The check requires that key to be one of
-the file's recipients, that the file has at least one other recipient, and that
-the fingerprints match the values in `secrets.env`.
+with, how many identities `SOPS_AGE_KEY` holds, and a fingerprint of each
+value. The check requires that key to be one of the file's recipients, that the
+file has at least one other recipient, that CI holds only its own identity, and
+that the fingerprints match the values in `secrets.env`. The age key goes in a
+repository secret, not an Actions variable.
 
 Leave `scripts/deploy.sh` alone; its output is what the check reads.
 

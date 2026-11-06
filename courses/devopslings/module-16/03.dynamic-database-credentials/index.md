@@ -225,6 +225,66 @@ tasks:
         fi
       done
 
+      # A pooled connection opened before the revocation must not outlive it,
+      # and a neighbour's must: the check holds a session on an orders and a
+      # billing credential of its own, and revokes the orders one.
+      hold() {
+        local cred u p
+        cred=$(bao read -format=json "database/creds/$1" 2>/dev/null | tr -d ' \r\n' || true)
+        u=$(printf '%s' "$cred" | sed -n 's/.*"username":"\([^"]*\)".*/\1/p')
+        p=$(printf '%s' "$cred" | sed -n 's/.*"password":"\([^"]*\)".*/\1/p')
+        printf -v "lease_held_$1" '%s' "$(printf '%s' "$cred" | sed -n 's/.*"lease_id":"\([^"]*\)".*/\1/p')"
+        printf -v "user_held_$1" '%s' "$u"
+        dc exec -T -e PGPASSWORD="$p" db psql -h 127.0.0.1 -U "$u" -d app -qAt \
+          -c 'SELECT pg_sleep(60)' >/dev/null 2>&1 &
+        printf -v "job_held_$1" '%s' "$!"
+      }
+      # By pid: once the role is dropped, its sessions show usename NULL.
+      pid_of() {
+        local p=""
+        for _ in $(seq 20); do
+          p=$(psql -c "SELECT pid FROM pg_stat_activity WHERE usename = '$1' LIMIT 1" 2>/dev/null | tr -d '\r' || true)
+          [ -n "$p" ] && break
+          sleep 0.5
+        done
+        printf '%s' "$p"
+      }
+      alive() { psql -c "SELECT count(*) FROM pg_stat_activity WHERE pid = $1" 2>/dev/null | tr -d '\r' || true; }
+      release() {
+        for x in "$pid_orders" "$pid_billing"; do
+          [ -n "$x" ] && psql -c "SELECT pg_terminate_backend($x)" >/dev/null 2>&1 || true
+        done
+        kill "$job_held_orders" "$job_held_billing" 2>/dev/null || true
+        bao lease revoke -sync "$lease_held_orders" >/dev/null 2>&1 || true
+        bao lease revoke -sync "$lease_held_billing" >/dev/null 2>&1 || true
+      }
+      hold orders; hold billing
+      pid_orders=$(pid_of "$user_held_orders"); pid_billing=$(pid_of "$user_held_billing")
+      if [ -z "$pid_orders" ] || [ -z "$pid_billing" ]; then
+        release
+        echo "not yet: the check took credentials from database/creds/orders and database/creds/billing"
+        echo "         and could not log in with both to hold a session (${user_held_orders:-none}, ${user_held_billing:-none})."
+        exit 1
+      fi
+      bao lease revoke -sync "$lease_held_orders" >/dev/null 2>&1 || true
+      sleep 1
+      left=$(alive "$pid_orders"); bystander=$(alive "$pid_billing")
+      release
+      if [ "${left:-0}" != 0 ]; then
+        echo "not yet: a session opened with an orders credential is still connected after its"
+        echo "         lease was revoked. Dropping or locking a role stops new logins only; a pooled"
+        echo "         connection keeps working. revocation_statements must end its sessions first."
+        dc up -d --force-recreate --no-deps orders >/dev/null 2>&1 || true
+        exit 1
+      fi
+      if [ "${bystander:-0}" = 0 ]; then
+        echo "not yet: revoking an orders lease also ended a billing session. Its"
+        echo "         revocation_statements end more sessions than the lease's own user's:"
+        echo "         match usename = '{{name}}', and nothing wider."
+        dc up -d --force-recreate --no-deps $services >/dev/null 2>&1 || true
+        exit 1
+      fi
+
       # Give orders a fresh credential, as a restart would in real life.
       dc up -d --force-recreate --no-deps orders >/dev/null 2>&1
       wait_health orders >/dev/null

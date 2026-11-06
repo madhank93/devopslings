@@ -88,13 +88,6 @@ tasks:
         printf '%s' "$fp"
       }
 
-      ctr=$(dc ps -q --status running greeter 2>/dev/null || true)
-      if [ -z "$ctr" ]; then
-        echo "not yet: greeter is not running. From sandboxes/ci-stack:"
-        echo "         docker compose up -d --build greeter"
-        exit 1
-      fi
-
       # 1. The key has to be in OpenBao, where the app will look for it.
       stored=$(bao kv get -field=key secret/greeter/partner-api 2>/dev/null | tr -d '\r' || true)
       if [ -z "$stored" ]; then
@@ -105,6 +98,13 @@ tasks:
       if [ "$stored" != "$key" ]; then
         echo "not yet: secret/greeter/partner-api holds a different value from the key"
         echo "         in the Dockerfile. The partner only accepts that one: store it as it is."
+        exit 1
+      fi
+
+      ctr=$(dc ps -q --status running greeter 2>/dev/null || true)
+      if [ -z "$ctr" ]; then
+        echo "not yet: greeter is not running. From sandboxes/ci-stack:"
+        echo "         docker compose up -d --build greeter"
         exit 1
       fi
 
@@ -130,6 +130,12 @@ tasks:
       if [ -n "$inside" ]; then
         echo "not yet: $inside inside the greeter container holds the key. A file the app"
         echo "         reads is a file anyone with docker exec, or a backup, also reads."
+        exit 1
+      fi
+
+      if docker logs "$ctr" 2>&1 | grep -F -- "$key" >/dev/null; then
+        echo "not yet: greeter writes the key to its log (docker logs shows it). Logs are"
+        echo "         files on the host, shipped and kept far longer than the process."
         exit 1
       fi
 
@@ -192,6 +198,16 @@ tasks:
       if [ -n "$tok" ] && printf ',%s,' "$policies" | grep -q ',root,'; then
         echo "not yet: greeter logs in to OpenBao with a root token. Whoever can read its"
         echo "         environment can read every secret in OpenBao. Use the token .env gave it."
+        exit 1
+      fi
+      if docker inspect -f '{{json .Config.Env}}' "$ctr" 2>/dev/null | grep -F devopslings-root >/dev/null \
+         || docker image inspect -f '{{json .Config.Env}}' "$img" 2>/dev/null | grep -F devopslings-root >/dev/null \
+         || docker history --no-trunc --format '{{.CreatedBy}}' "$img" 2>/dev/null | grep -F devopslings-root >/dev/null \
+         || docker exec "$ctr" grep -rqF --exclude-dir=proc --exclude-dir=sys --exclude-dir=dev \
+              devopslings-root / 2>/dev/null; then
+        echo "not yet: greeter's environment, image or files hold the root token, devopslings-root."
+        echo "         Whoever can pull the image or read its environment can read every secret"
+        echo "         in OpenBao. Use the token .env gave it, from BAO_TOKEN."
         exit 1
       fi
 
