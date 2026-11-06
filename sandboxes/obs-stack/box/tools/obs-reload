@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# obs-reload — make Prometheus and Alertmanager re-read their config. Prints
+# the reason when either one rejects it, and exits non-zero.
+set -euo pipefail
+. /usr/local/lib/obs.sh
+obs_reload

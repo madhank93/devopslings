@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Seed the shared /obs volume from the image on first start, then idle as the
+# workbench. A volume that is already seeded is left alone: it holds the
+# student's work, and only `compose down -v` or obs-reset replaces it.
+set -eu
+if [ ! -e /obs/.seeded ]; then
+  cp -a /opt/obs-baseline/. /obs/
+  mkdir -p /obs/run /obs/logs
+  chmod -R a+rX /obs
+  touch /obs/.seeded
+fi
+exec sleep infinity
