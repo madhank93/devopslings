@@ -1,0 +1,231 @@
+# ha-stack — the substrate for modules 22 (High Availability), 23 (Backup &
+# Disaster Recovery) and 24 (Progressive Delivery).
+#
+#                    www = VIP 172.29.22.100 (keepalived)
+#                         │
+#              ┌──────────┴──────────┐            front 172.29.22.0/24
+#             lb1                   lb2           HAProxy + keepalived
+#              └──────┬───────┬──────┘
+#                   web1     web2                 the app, twice
+#              ┌──────┴───┬───┴──────┐            back 172.29.23.0/24
+#             pg1  ──▶   pg2      etcd1 etcd2 etcd3
+#           primary   streaming     three-member cluster
+#                      replica
+#
+# Every node is a container on a pinned subnet with a fixed address, so a
+# lesson can name the addresses it talks about and a stopped node does not take
+# its DNS name with it. Failure is produced from outside the node: `docker
+# kill` (crash), `docker pause` (hung, still holding its addresses) and
+# `docker network disconnect` (partition). The student does that from `ops`,
+# which holds the docker socket; see ops/node.
+#
+# Configuration the student edits lives in one named volume, ha-conf, mounted
+# at /ha everywhere. Each node watches its own files there and reloads when
+# they change, so no lesson needs a container recreated. defaults/ is copied
+# into it once, on first start.
+#
+# Nothing is published to the host. The VIP only exists on the bridge, so the
+# whole module is driven from inside ops.
+x-node: &node
+  restart: "no"
+  volumes:
+    - ha-conf:/ha
+
+services:
+  ops:
+    <<: *node
+    build: ./ops
+    container_name: devopslings-ha-ops
+    hostname: ops
+    volumes:
+      - ha-conf:/ha
+      - ./defaults:/defaults:ro
+      # The student's lever for crashing, freezing and partitioning nodes.
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "www:172.29.22.100"
+    networks:
+      front: { ipv4_address: 172.29.22.5 }
+      back: { ipv4_address: 172.29.23.5 }
+    healthcheck:
+      test: ["CMD", "test", "-f", "/ha/.seeded"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  lb1: &lb
+    <<: *node
+    build: ./lb
+    container_name: devopslings-ha-lb1
+    hostname: lb1
+    # keepalived adds and removes the VIP on eth0 and sends gratuitous ARP.
+    cap_add: [NET_ADMIN, NET_BROADCAST, NET_RAW]
+    networks:
+      front: { ipv4_address: 172.29.22.11 }
+    depends_on:
+      ops: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "pidof", "haproxy"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  lb2:
+    <<: *lb
+    container_name: devopslings-ha-lb2
+    hostname: lb2
+    networks:
+      front: { ipv4_address: 172.29.22.12 }
+
+  web1: &web
+    <<: *node
+    build: ./app
+    container_name: devopslings-ha-web1
+    hostname: web1
+    networks:
+      front: { ipv4_address: 172.29.22.21 }
+      back: { ipv4_address: 172.29.23.21 }
+    depends_on:
+      ops: { condition: service_healthy }
+      pg1: { condition: service_healthy }
+    healthcheck:
+      # /ping is the stack's own liveness probe. /health belongs to the lessons.
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ping', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  web2:
+    <<: *web
+    container_name: devopslings-ha-web2
+    hostname: web2
+    networks:
+      front: { ipv4_address: 172.29.22.22 }
+      back: { ipv4_address: 172.29.23.22 }
+
+  pg1:
+    image: postgres:17.6-bookworm
+    container_name: devopslings-ha-pg1
+    hostname: pg1
+    restart: "no"
+    environment:
+      POSTGRES_PASSWORD: devopslings
+      POSTGRES_DB: shop
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=6
+      - -c
+      - max_replication_slots=6
+      - -c
+      - hot_standby=on
+      - -c
+      - shared_buffers=64MB
+      # Module 22 works with a few thousand rows; this keeps two Postgres
+      # instances inside a laptop's budget next to everything else here.
+      - -c
+      - max_connections=60
+    volumes:
+      - ha-conf:/ha
+      - pg1-data:/var/lib/postgresql/data
+      - ./pg/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      back: { ipv4_address: 172.29.23.31 }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  # A streaming hot standby of pg1, cloned on first start. See
+  # pg/replica-entrypoint.sh.
+  pg2:
+    image: postgres:17.6-bookworm
+    container_name: devopslings-ha-pg2
+    hostname: pg2
+    restart: "no"
+    entrypoint: ["/bin/bash", "/replica-entrypoint.sh"]
+    environment:
+      PGPASSWORD: replicate
+    volumes:
+      - ha-conf:/ha
+      - pg2-data:/var/lib/postgresql/data
+      - ./pg/replica-entrypoint.sh:/replica-entrypoint.sh:ro
+    networks:
+      back: { ipv4_address: 172.29.23.32 }
+    depends_on:
+      pg1: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  etcd1: &etcd
+    <<: *node
+    build: ./etcd
+    container_name: devopslings-ha-etcd1
+    hostname: etcd1
+    environment:
+      ETCD_NAME: etcd1
+    volumes:
+      - ha-conf:/ha
+      - etcd1-data:/var/lib/etcd
+    networks:
+      back: { ipv4_address: 172.29.23.41 }
+    depends_on:
+      ops: { condition: service_healthy }
+    healthcheck:
+      # Serializable: answers from this member alone, so the healthcheck says
+      # "the process is serving" and not "the cluster has quorum". Lessons
+      # break quorum on purpose and the stack must still come up.
+      test: ["CMD", "etcdctl", "--endpoints=http://127.0.0.1:2379", "get", "--consistency=s", "health-probe"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  etcd2:
+    <<: *etcd
+    container_name: devopslings-ha-etcd2
+    hostname: etcd2
+    environment:
+      ETCD_NAME: etcd2
+    volumes:
+      - ha-conf:/ha
+      - etcd2-data:/var/lib/etcd
+    networks:
+      back: { ipv4_address: 172.29.23.42 }
+
+  etcd3:
+    <<: *etcd
+    container_name: devopslings-ha-etcd3
+    hostname: etcd3
+    environment:
+      ETCD_NAME: etcd3
+    volumes:
+      - ha-conf:/ha
+      - etcd3-data:/var/lib/etcd
+    networks:
+      back: { ipv4_address: 172.29.23.43 }
+
+volumes:
+  ha-conf:
+  pg1-data:
+  pg2-data:
+  etcd1-data:
+  etcd2-data:
+  etcd3-data:
+
+networks:
+  front:
+    ipam:
+      config:
+        - subnet: 172.29.22.0/24
+  back:
+    ipam:
+      config:
+        - subnet: 172.29.23.0/24

@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 177 shipped, 2 blocked, 120 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 189 shipped, 2 blocked, 108 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 15, 16, 21.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 15, 16, 21, 22.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 0/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 0/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -2189,58 +2189,58 @@ failures transfer to any provider.
 ## 22 — High Availability
 `ha-stack` (new)
 
-- **two-nodes-one-name** *(intro)* — put a load balancer in front of two servers.
+- **two-nodes-one-name** *(intro · shipped)* — put a load balancer in front of two servers.
   *Check:* both backends receive traffic under a spread of requests, and stopping
   either one leaves the service answering — the baseline every later exercise in
   this module breaks.
   *Source:* own.
 
-- **hunt-the-spof** *(core)* — draw the topology, then break each box.
+- **hunt-the-spof** *(core · shipped)* — draw the topology, then break each box.
   *Check:* the answer file lists every single point of failure; the grader kills
   each one and compares.
   *Source:* own.
 
-- **vip-failover** *(core)* — keepalived, and the four seconds nobody measured.
+- **vip-failover** *(core · shipped)* — keepalived, and the four seconds nobody measured.
   *Check:* failover completes within the stated budget with no split VIP.
   *Source:* own.
 
-- **active-active** *(core)* — two nodes, one session store.
+- **active-active** *(core · shipped)* — two nodes, one session store.
   *First guess:* sticky sessions solve it.
   *Check:* a request served by either node sees the same session; killing one
   node loses no session.
   *Source:* own.
 
-- **the-lying-health-check** *(core · callback)* — 200 while the database is down.
+- **the-lying-health-check** *(core · callback · shipped)* — 200 while the database is down.
   *Check:* the node leaves rotation on dependency failure and rejoins on recovery.
   *Source:* own; callback to module 06.
 
-- **replica-promotion** *(core)* — the primary is gone; the replica is read-only.
+- **replica-promotion** *(core · shipped)* — the primary is gone; the replica is read-only.
   *Check:* promoted replica accepts writes, the application follows, and no
   committed transaction is lost.
   *Source:* own; builds on module 10's replication-lag-stale-read.
 
-- **split-brain** *(deep)* — three-node etcd, kill two.
+- **split-brain** *(deep · shipped)* — three-node etcd, kill two.
   *First guess:* force the survivor to accept writes.
   *Check:* the cluster refuses to lose quorum, and recovery restores consistency
   without data divergence.
   *Source:* own.
 
-- **leader-election** *(core)* — two schedulers both think they lead.
+- **leader-election** *(core · shipped)* — two schedulers both think they lead.
   *Check:* exactly one leader across a partition and a restart.
   *Source:* own.
 
-- **serve-stale** *(deep)* — degrade instead of 500.
+- **serve-stale** *(deep · shipped)* — degrade instead of 500.
   *Check:* with the backend down, users get stale-but-labelled content and the
   error budget is spent slowly rather than instantly.
   *Source:* own.
 
-- **incident-github-2018** *(architect · replay)* — 43 seconds of partition,
+- **incident-github-2018** *(architect · replay · shipped)* — 43 seconds of partition,
   24 hours of reconciliation.
   *Check:* the reconstruction demonstrates why failing back was harder than
   failing over; the runbook produced is graded against required steps.
   *Source:* published GitHub postmortem, simplified.
 
-- **cert-rotation-behind-a-vip** *(core)* — the certificate was renewed, and
+- **cert-rotation-behind-a-vip** *(core · shipped)* — the certificate was renewed, and
   half the handshakes still present the old one.
   *First guess:* restart the node holding the VIP; that is the node with the new
   certificate, and the stale one is behind the same address.
@@ -2250,7 +2250,7 @@ failures transfer to any provider.
   rotates on its own — which is nothing.
   *Source:* own.
 
-- **incident-facebook-bgp-2021** *(architect · replay)* — a routing withdrawal
+- **incident-facebook-bgp-2021** *(architect · replay · shipped)* — a routing withdrawal
   that removes the network the operators needed to reach the network.
   *First guess:* roll back the change — the path to roll it back is gone.
   *Check:* the reconstruction identifies every dependency that had to survive

@@ -1,0 +1,97 @@
+#!/bin/bash
+# ha-reset — put ha-stack back to its starting topology without a rebuild.
+#
+# Every node running, unpaused and on its networks; /ha config back to
+# defaults/ (logs are kept); pg1 the primary and pg2 streaming from it; all
+# three etcd members serving. Lessons call this first and then lay down their
+# own scenario. Prints what it had to repair.
+set -u
+c() { echo "devopslings-ha-$1"; }
+nodes="lb1 lb2 web1 web2 pg1 pg2 etcd1 etcd2 etcd3"
+
+for n in $nodes; do
+  st=$(docker inspect -f '{{.State.Status}}' "$(c "$n")" 2>/dev/null || echo missing)
+  case "$st" in
+    paused) docker unpause "$(c "$n")" >/dev/null && echo "ha-reset: resumed $n" ;;
+    exited|created) docker start "$(c "$n")" >/dev/null && echo "ha-reset: started $n" ;;
+  esac
+done
+for n in $nodes; do
+  case $n in lb*) want=front ;; web*) want="front back" ;; *) want=back ;; esac
+  have=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(c "$n")")
+  for net in $want; do
+    case " $have " in *" devopslings-ha-stack_$net "*) ;; *)
+      node heal "$n" "$net" >/dev/null && echo "ha-reset: reconnected $n to $net" ;;
+    esac
+  done
+  # A network a lesson added, such as a management path, goes again.
+  for net in $have; do
+    case " $want " in *" ${net#devopslings-ha-stack_} "*) continue ;; esac
+    docker network disconnect "$net" "$(c "$n")" && echo "ha-reset: disconnected $n from $net"
+    docker network rm "$net" >/dev/null 2>&1 || true
+  done
+done
+
+# A member started with overrides from /ha/etcd may hold a membership its
+# default flags cannot rejoin, so removing them means rebuilding the cluster.
+etcd_overridden=$(ls /ha/etcd/*.env 2>/dev/null || true)
+rm -rf /ha/lb2/keepalived.conf /ha/answers /ha/etcd /ha/failover.sh /ha/app/scheduler.sh \
+  /ha/app/routes /ha/certs /ha/scheduler /ha/oob
+mkdir -p /ha/answers
+cp -r /defaults/. /ha/
+
+# Start HAProxy where a lesson stopped it, and reload it everywhere else so
+# nothing changed through the runtime API outlives the lesson.
+for n in lb1 lb2; do
+  docker exec "$(c "$n")" lbctl start
+done
+
+wait_for() {  # wait_for <seconds> <description> <command...>
+  local secs=$1 what=$2; shift 2
+  for _ in $(seq $((secs * 2))); do "$@" >/dev/null 2>&1 && return 0; sleep 0.5; done
+  echo "ha-reset: $what did not come back within ${secs}s"
+  return 1
+}
+
+wait_for 60 "pg1" pg_isready -h pg1 -U postgres -d shop
+if [ "$(psql -h pg1 -tAXc 'select pg_is_in_recovery()' 2>/dev/null)" != "f" ]; then
+  echo "ha-reset: pg1 is not a writable primary; run 'devopslings reset' for a clean stack"
+fi
+psql -h pg1 -qtAXc "ALTER SYSTEM RESET synchronous_standby_names" -c "ALTER SYSTEM RESET synchronous_commit" -c "ALTER SYSTEM RESET default_transaction_read_only" -c "SELECT pg_reload_conf()" >/dev/null 2>&1
+streaming=$(psql -h pg1 -tAXc "select count(*) from pg_stat_replication where application_name = 'pg2' and state = 'streaming'" 2>/dev/null)
+if [ "${streaming:-0}" != "1" ]; then
+  mkdir -p /ha/pg2 && touch /ha/pg2/reclone
+  docker restart "$(c pg2)" >/dev/null
+  echo "ha-reset: pg2 was not streaming from pg1; recloned it"
+  wait_for 90 "pg2 streaming" bash -c \
+    "[ \"\$(psql -h pg1 -tAXc \"select count(*) from pg_stat_replication where application_name = 'pg2' and state = 'streaming'\")\" = 1 ]"
+fi
+psql -h pg2 -qtAXc "ALTER SYSTEM RESET recovery_min_apply_delay" -c "ALTER SYSTEM RESET synchronous_standby_names" -c "SELECT pg_reload_conf()" -c "SELECT pg_wal_replay_resume() WHERE pg_is_wal_replay_paused()" >/dev/null 2>&1
+
+# One cluster of three started members, as every member sees it; anything else
+# (a forced single-member cluster, a replaced member) is rebuilt from empty.
+etcd_ok() {
+  local ids="" n
+  for n in etcd1 etcd2 etcd3; do
+    etcdctl --endpoints="http://$n:2379" --command-timeout=2s endpoint health >/dev/null 2>&1 || return 1
+    [ "$(etcdctl --endpoints="http://$n:2379" --command-timeout=2s member list 2>/dev/null \
+      | grep -cE ', started, etcd[123], http://etcd[123]:2380,')" = 3 ] || return 1
+    ids="$ids $(etcdctl --endpoints="http://$n:2379" --command-timeout=2s endpoint status -w json \
+      | jq -r '.[0].Status.header.cluster_id')"
+  done
+  [ "$(echo $ids | tr ' ' '\n' | sort -u | wc -l)" = 1 ]
+}
+if [ -n "$etcd_overridden" ] || ! wait_for 15 "the etcd cluster" etcd_ok; then
+  # All three stop before any starts empty: an old member still running would
+  # talk to the new cluster under the same member id and be refused by it.
+  docker stop -t 2 "$(c etcd1)" "$(c etcd2)" "$(c etcd3)" >/dev/null
+  mkdir -p /ha/etcd-wipe
+  for n in etcd1 etcd2 etcd3; do touch "/ha/etcd-wipe/$n"; done
+  docker start "$(c etcd1)" "$(c etcd2)" "$(c etcd3)" >/dev/null
+  echo "ha-reset: rebuilt the etcd cluster from empty"
+  wait_for 60 "the etcd cluster" etcd_ok
+fi
+for n in web1 web2; do
+  wait_for 30 "$n" curl -fsS --max-time 2 "http://$n:8080/ping"
+done
+exit 0
