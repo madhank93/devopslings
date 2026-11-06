@@ -1,0 +1,10 @@
+# Every JSON file in /obs/grafana/dashboards is a dashboard. Grafana rereads
+# the directory every 5 seconds.
+apiVersion: 1
+providers:
+  - name: obs
+    type: file
+    updateIntervalSeconds: 5
+    allowUiUpdates: false
+    options:
+      path: /obs/grafana/dashboards

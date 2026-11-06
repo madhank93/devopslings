@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 177 shipped, 2 blocked, 120 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 187 shipped, 2 blocked, 110 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 15, 16, 21.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 15, 16, 18, 21.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 0/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 0/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1913,52 +1913,52 @@ failures transfer to any provider.
 ## 18 — Metrics
 `obs-stack` (new)
 
-- **target-down** *(intro)* — a scrape target that is up but not scraped.
+- **target-down** *(intro · shipped)* — a scrape target that is up but not scraped.
   *First guess:* restart Prometheus.
   *Check:* the target reports `up == 1` for the right reason (network/relabel/port).
   *Source:* own.
 
-- **instrument-red** *(core)* — a service with no metrics of its own.
+- **instrument-red** *(core · shipped)* — a service with no metrics of its own.
   *Check:* rate, errors and duration exposed and queryable, histogram buckets sane.
   *Source:* own.
 
-- **exporter-you-write** *(core)* — the thing you need to measure has no exporter.
+- **exporter-you-write** *(core · shipped)* — the thing you need to measure has no exporter.
   *First guess:* scrape the log file.
   *Check:* the exporter serves valid metrics with correct types and help text,
   survives the scrape interval under load, and reports zero rather than
   disappearing when the source is unavailable.
   *Source:* own.
 
-- **use-for-a-node** *(core)* — saturation that no CPU graph shows.
+- **use-for-a-node** *(core · shipped)* — saturation that no CPU graph shows.
   *Check:* the saturating resource is identified from utilisation/saturation/errors.
   *Source:* Brendan Gregg's USE method.
 
-- **alert-that-pages-correctly** *(core)* — an alert that fires and reaches nobody.
+- **alert-that-pages-correctly** *(core · shipped)* — an alert that fires and reaches nobody.
   *Check:* route, grouping and inhibition deliver exactly one notification for a
   correlated outage.
   *Source:* own.
 
-- **dashboard-that-answers-a-question** *(core)* — a wall of 40 panels nobody reads.
+- **dashboard-that-answers-a-question** *(core · shipped)* — a wall of 40 panels nobody reads.
   *First guess:* add more panels.
   *Check:* the dashboard answers the three stated questions within the deadline,
   with templated variables working across environments — and a panel that answers
   none of the three must be gone.
   *Source:* own.
 
-- **cardinality-explosion** *(deep)* — Prometheus memory triples after a deploy.
+- **cardinality-explosion** *(deep · shipped)* — Prometheus memory triples after a deploy.
   *First guess:* give it more memory.
   *Check:* series count back under budget with the same question still answerable.
   *Source:* own; the most common self-inflicted observability wound.
 
-- **rate-versus-increase** *(core)* — a counter reset makes a graph lie.
+- **rate-versus-increase** *(core · shipped)* — a counter reset makes a graph lie.
   *Check:* the query survives a restart of the exporter and still reports truth.
   *Source:* own.
 
-- **recording-rules** *(core)* — a dashboard that times out.
+- **recording-rules** *(core · shipped)* — a dashboard that times out.
   *Check:* panel loads under the deadline; the rule's output matches the raw query.
   *Source:* own.
 
-- **absent-and-staleness** *(deep)* — the alert that did not fire because the data stopped.
+- **absent-and-staleness** *(deep · shipped)* — the alert that did not fire because the data stopped.
   *First guess:* thresholds only.
   *Check:* missing data pages; a normal deploy gap does not.
   *Source:* own.
