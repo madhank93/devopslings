@@ -162,6 +162,7 @@ tasks:
       a638994be15f6afbfdcdc757f7874630|it is a sha256 of the signing key; a hash does not give you the key
       23f7dd08e78ac89fee2169e5ebc99f264394f93f|it is BUILD_SHA, a commit id, public by design
       eu-west-1|it is a region name
+      DEPLOY_SSH_KEY|it is the name of a repository secret, and the audit wants values; a secret is write-only, so nothing in this estate can read that one back
       devopslings|it is the sandbox's login, from the lesson text, not the inventory service's
       dpl_9f3c1a7e5b2d4086af11c7e390bb42d1|it belongs to devops/checkout, which is outside this audit"
 
@@ -182,6 +183,13 @@ tasks:
         if [ -n "$part" ]; then
           echo "not yet: the line '${line}' contains a secret, and is more than it."
           echo "         Write the value alone on its line, exactly as you found it: ${part%"${part#????}"}…"
+          bad=1
+          continue
+        fi
+        whole=$(printf '%s\n' "$planted" | sed 's/^[[:space:]]*//' | awk -F'|' -v v="$line" 'length(v) >= 6 && index($1,v){print $1}' | head -1)
+        if [ -n "$whole" ]; then
+          echo "not yet: '${line}' is part of a secret, not all of it. Copy the whole value,"
+          echo "         exactly as you found it: ${whole%"${whole#????}"}…"
           bad=1
           continue
         fi
