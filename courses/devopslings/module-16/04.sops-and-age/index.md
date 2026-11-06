@@ -32,6 +32,12 @@ tasks:
         curl -fsS $auth -X DELETE "${api}/repos/${repo}/branch_protections/${rule}" >/dev/null 2>&1 || true
       done
       curl -fsS $auth -X DELETE "${api}/repos/${repo}/actions/secrets/SOPS_AGE_KEY" >/dev/null 2>&1 || true
+      for scope in "repos/${repo}" user; do
+        for v in $(curl -fsS $auth "${api}/${scope}/actions/variables" 2>/dev/null \
+                     | tr ',' '\n' | sed -n 's/.*"name":"\([^"]*\)".*/\1/p' || true); do
+          curl -fsS $auth -X DELETE "${api}/${scope}/actions/variables/${v}" >/dev/null 2>&1 || true
+        done
+      done
 
       # ---- the plaintext, on "the laptop" -----------------------------------------
       rm -rf "$here"
@@ -73,6 +79,7 @@ tasks:
         exit 1
       fi
       echo "ci identity: $(printf '%s\n' "$SOPS_AGE_KEY" | age-keygen -y | head -1)"
+      echo "ci identities held: $(printf '%s\n' "$SOPS_AGE_KEY" | grep -c '^AGE-SECRET-KEY-')"
 
       if [ ! -f "$f" ]; then
         echo "FATAL: $f is not in the repo"
@@ -196,6 +203,19 @@ tasks:
         exit 1
       fi
 
+      # An Actions variable is plaintext to everyone who can read the repo's
+      # settings, unlike a secret, which no API returns.
+      for scope in "repos/${repo}" user; do
+        for v in $(curl -fsS $auth "${api}/${scope}/actions/variables" 2>/dev/null \
+                     | tr ',' '\n' | sed -n 's/.*"name":"\([^"]*\)".*/\1/p' || true); do
+          if curl -fsS $auth "${api}/${scope}/actions/variables/${v}" 2>/dev/null | grep -F AGE-SECRET-KEY-1 >/dev/null; then
+            echo "not yet: the Actions variable ${v} holds an age private key. Variables are"
+            echo "         plaintext to anyone who can read the settings; store it as a secret."
+            exit 1
+          fi
+        done
+      done
+
       # ---- 3. CI decrypts it ------------------------------------------------------
       # The check starts its own run, so it grades the SOPS_AGE_KEY secret as it
       # is now, not as it was at the last push.
@@ -247,6 +267,12 @@ tasks:
       if [ "$(printf '%s\n' "$recips" | wc -l | tr -d ' ')" -lt 2 ]; then
         echo "not yet: ${f} is encrypted to one key, and CI holds it — so whoever edits the file holds CI's key too."
         echo "         Give CI an identity of its own and encrypt to both: then a leaked runner costs one key, not every key."
+        exit 1
+      fi
+      held=$(printf '%s\n' "$logs" | sed -n 's/.*ci identities held: \([0-9]*\).*/\1/p' | head -1)
+      if [ "${held:-1}" -gt 1 ]; then
+        echo "not yet: SOPS_AGE_KEY holds ${held} age identities; CI should hold exactly one, its own."
+        echo "         Every extra identity in it leaks with the runner. Upload CI's key, and only that."
         exit 1
       fi
       if [ "$state" != success ]; then

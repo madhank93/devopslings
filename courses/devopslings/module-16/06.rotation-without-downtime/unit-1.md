@@ -48,12 +48,15 @@ while :; do curl -s localhost:18168/order; sleep 0.1; done
 
 ## What you're being graded on
 
-The check puts four streams of requests on orders, runs your `rotate.sh` three
-seconds in, and keeps the load on for three seconds after it finishes. Then:
+The check restarts orders, puts four streams of requests on it, runs your
+`rotate.sh` just after orders' second fetch from OpenBao, and keeps the load on
+for three seconds after it finishes. Then:
 
 - `rotate.sh` exited 0, within two minutes
 - the credential now in OpenBao logs in to Postgres
 - **zero requests failed**, including requests that got no answer at all
+- the old credential kept logging in for at least 10 seconds after `rotate.sh`
+  first changed the secret, so no request could fail whenever orders fetched
 - the credential from before the rotation no longer logs in
 
 `orders` must keep serving. Stopping it, or pausing it, during the rotation

@@ -261,6 +261,21 @@ tasks:
         exit 1
       fi
 
+      # ---- 3b. and the replacement did not leak the same way ----------------------
+      # Any 40-hex string in the public repo's history that logs in is a live token.
+      work=$(mktemp -d)
+      trap 'rm -rf "$work"' EXIT
+      git clone -q "http://devops:devopslings@127.0.0.1:3000/${repo}.git" "$work/c" 2>/dev/null || true
+      for t in $(git -C "$work/c" log --all -p --format= 2>/dev/null | grep '^[+-]' \
+                   | grep -oE '\b[0-9a-f]{40}\b' | sort -u || true); do
+        if [ "$(status -H "Authorization: token ${t}" "${api}/user")" = 200 ]; then
+          echo "not yet: devops/checkout is public, and its history holds a token that logs in"
+          echo "         today (${t:0:8}…). That is the leak this lesson started from: keep the"
+          echo "         replacement in the DEPLOY_TOKEN secret, and delete the committed one."
+          exit 1
+        fi
+      done
+
       # ---- 4. and the deploy still works ------------------------------------------
       # The check starts its own run, so it grades the secret as it is now,
       # not as it was at the last push.
@@ -315,6 +330,11 @@ tasks:
       if [ "$who" = devops ]; then
         echo "not yet: the deploy now runs as devops, the forge's administrator."
         echo "         The next leak of DEPLOY_TOKEN would cost the whole forge. Give it a service account."
+        exit 1
+      fi
+      if [ -n "$who" ] && curl -fsS $auth "${api}/users/${who}" 2>/dev/null | grep -F '"is_admin":true' >/dev/null; then
+        echo "not yet: the deploy runs as ${who}, a forge administrator. The next leak of"
+        echo "         DEPLOY_TOKEN would cost the whole forge. The service account needs no admin rights."
         exit 1
       fi
 

@@ -162,6 +162,44 @@ tasks:
         done
       done
 
+      # Denied reads are not enough: deleting, destroying or rewriting another
+      # service's secret, or rewriting a policy, is as bad as reading it.
+      for s in $services; do
+        for o in $services; do
+          [ "$s" = "$o" ] && continue
+          for verb in data metadata delete destroy undelete; do
+            extra=$(caps "$(tok "$s")" "secret/$verb/$o/config" | tr ',' '\n' | tr -d ' ' \
+                      | grep -vxE 'deny|list|read' | tr '\n' ' ' || true)
+            if [ -n "$extra" ]; then
+              echo "not yet: $s's token has ${extra% } on secret/$verb/$o/config. It cannot read"
+              echo "         $o's config, and it can still wipe or overwrite it. KV v2 has a path per"
+              echo "         action (data, metadata, delete, destroy, undelete): grant none of them here."
+              exit 1
+            fi
+          done
+        done
+        for p in "sys/policy/$s" "sys/policies/acl/$s"; do
+          extra=$(caps "$(tok "$s")" "$p" | tr ',' '\n' | tr -d ' ' \
+                    | grep -xE 'create|update|sudo' | tr '\n' ' ' || true)
+          if [ -n "$extra" ]; then
+            echo "not yet: $s's token has ${extra% } on $p: it can rewrite its own policy, and so"
+            echo "         grant itself any path in OpenBao."
+            exit 1
+          fi
+        done
+      done
+
+      # Least privilege is an allow-list: a policy that grants secret/* and
+      # denies today's neighbours still reads every service added tomorrow.
+      for s in $services; do
+        if caps "$(tok "$s")" "secret/data/payroll/config" | grep -qw read; then
+          echo "not yet: $s's token can read secret/data/payroll/config, a service that does not"
+          echo "         exist yet. Denying the other services by name leaves every new one readable."
+          echo "         Grant $s its own path, and nothing else."
+          exit 1
+        fi
+      done
+
       # And on its own path, read is all it gets.
       for s in $services; do
         extra=$(caps "$(tok "$s")" "secret/data/$s/config" | tr ',' '\n' | tr -d ' ' \

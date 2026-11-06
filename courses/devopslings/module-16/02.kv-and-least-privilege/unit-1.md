@@ -61,6 +61,10 @@ token.
 - Each service's token is tried against the other two services' secrets, and
   OpenBao must refuse every one with `permission denied`. These secrets exist,
   so a refusal is the policy at work and not a missing path.
+- No token may write, delete or destroy another service's secret, or rewrite
+  its own policy.
+- No token may read a path that belongs to no service yet: least privilege is
+  a list of what is allowed, not of what is denied.
 - On its own secret, each token may read and nothing more.
 
 <details>
