@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 177 shipped, 2 blocked, 120 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 187 shipped, 2 blocked, 110 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 15, 16, 21.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 15, 16, 21.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 0/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1677,56 +1677,56 @@ engine (`db_bench`) for the write-stall exercise.
 ## 13 — IaC: OpenTofu
 `iac-stack` (new)
 
-- **first-resource** *(intro)* — a container managed by code instead of by hand.
+- **first-resource** *(intro · shipped)* — a container managed by code instead of by hand.
   *First guess:* `docker run` and write the HCL afterwards.
   *Check:* plan/apply/destroy cycle is clean and repeatable from an empty state.
   *Source:* roadmap.sh.
 
-- **what-is-in-state** *(core)* — the file everyone is afraid of.
+- **what-is-in-state** *(core · shipped)* — the file everyone is afraid of.
   *First guess:* edit state by hand.
   *Check:* the resource is corrected through `state mv`/`rm`/`import`, not an editor,
   and a subsequent plan is empty.
   *Source:* own.
 
-- **two-applies-one-lock** *(core)* — a colleague applies while you do.
+- **two-applies-one-lock** *(core · shipped)* — a colleague applies while you do.
   *First guess:* retry until it works.
   *Check:* locking enabled and demonstrated; the second apply waits rather than
   corrupting state.
   *Source:* own.
 
-- **drift** *(core)* — someone deleted a resource in the console.
+- **drift** *(core · shipped)* — someone deleted a resource in the console.
   *First guess:* re-run apply and hope.
   *Check:* drift detected in plan, reconciled, and a detection step added to CI.
   *Source:* roadmap.sh.
 
-- **modules-and-outputs** *(core)* — the same three resources copy-pasted four times.
+- **modules-and-outputs** *(core · shipped)* — the same three resources copy-pasted four times.
   *First guess:* copy it a fifth time.
   *Check:* one module, four instances, no duplicated resource blocks, plan stable.
   *Source:* own.
 
-- **import-what-exists** *(core)* — infrastructure that predates the code.
+- **import-what-exists** *(core · shipped)* — infrastructure that predates the code.
   *First guess:* destroy and recreate in production.
   *Check:* imported with an empty plan afterwards.
   *Source:* own.
 
-- **count-versus-for-each** *(core)* — removing the second item destroys the third.
+- **count-versus-for-each** *(core · shipped)* — removing the second item destroys the third.
   *First guess:* it is a provider bug.
   *Check:* keyed addressing; removing an item touches only that item in the plan.
   *Source:* own.
 
-- **remote-backend-on-minio** *(core)* — state on a laptop.
+- **remote-backend-on-minio** *(core · shipped)* — state on a laptop.
   *First guess:* commit the state file.
   *Check:* remote backend with locking, migrated without losing resources, and the
   state file is gitignored.
   *Source:* own.
 
-- **prevent-destroy** *(architect)* — a plan that would delete the database.
+- **prevent-destroy** *(architect · shipped)* — a plan that would delete the database.
   *First guess:* read the plan carefully every time.
   *Check:* the destructive plan is blocked by policy, and the legitimate change
   still applies.
   *Source:* own.
 
-- **serverless-cold-start** *(deep)* — a function that times out only on the first call.
+- **serverless-cold-start** *(deep · shipped)* — a function that times out only on the first call.
   *First guess:* raise the timeout to 30 seconds.
   *Check:* cold-start latency measured, timeout justified against it, and the
   initialisation moved out of the request path.

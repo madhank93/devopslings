@@ -1,0 +1,87 @@
+# iac-stack — the substrate for module 13 (and later 14 and 17).
+#
+# ws is the student's workstation: OpenTofu, a docker CLI and curl. What tofu
+# manages lives in dind, a Docker daemon of its own, so `tofu destroy` can only
+# ever wipe the sandbox, never the host's containers. minio holds remote state.
+#
+# Everything works offline once built: providers come from a filesystem mirror
+# baked into ws, and ws loads busybox into dind at start (and the Lambda
+# runtime, for the lessons that need it), so nothing is pulled at grade time.
+# floci is the AWS API.
+services:
+  dind:
+    image: docker:29.8.1-dind
+    container_name: devopslings-iac-stack-dind
+    hostname: dind
+    # dockerd cannot run unprivileged.
+    privileged: true
+    environment:
+      # Plain TCP on the compose network only; the port is not published.
+      DOCKER_TLS_CERTDIR: ""
+    command: ["--host=tcp://0.0.0.0:2375", "--tls=false"]
+    healthcheck:
+      test: ["CMD", "docker", "-H", "tcp://127.0.0.1:2375", "info"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  minio:
+    build:
+      context: .
+      dockerfile: minio.Dockerfile
+    container_name: devopslings-iac-stack-minio
+    hostname: minio
+    environment:
+      MINIO_ROOT_USER: devopslings
+      MINIO_ROOT_PASSWORD: devopslings-minio
+    command: ["server", "/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # floci emulates the AWS API. Its Lambda functions run as containers in
+  # dind, from a runtime image ws loads there, so nothing is pulled.
+  floci:
+    image: floci/floci:2.1.0
+    container_name: devopslings-iac-stack-floci
+    hostname: floci
+    environment:
+      FLOCI_DOCKER_DOCKER_HOST: tcp://dind:2375
+      # A user-defined network in dind, so functions reach other containers
+      # there by name. ws creates it at start.
+      FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK: lambda
+    depends_on:
+      dind:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/4566"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  ws:
+    build: .
+    container_name: devopslings-iac-stack-ws
+    hostname: ws
+    working_dir: /root
+    environment:
+      DOCKER_HOST: tcp://dind:2375
+      # The s3 backend reads these, so no credential ever has to be written
+      # into a .tf file.
+      AWS_ACCESS_KEY_ID: devopslings
+      AWS_SECRET_ACCESS_KEY: devopslings-minio
+      AWS_REGION: us-east-1
+    depends_on:
+      dind:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      floci:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "docker image inspect busybox:1.37.0 >/dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 60

@@ -1,0 +1,11 @@
+# Providers install from the mirror baked into the image, never the registry,
+# so `tofu init` works offline.
+provider_installation {
+  filesystem_mirror {
+    path    = "/usr/local/share/tofu/providers"
+    include = ["*/*/*"]
+  }
+  direct {
+    exclude = ["*/*/*"]
+  }
+}
