@@ -1,0 +1,35 @@
+#!/bin/bash
+# node — break and repair the other machines in ha-stack.
+#
+#   node ls                     every node and its state
+#   node kill  <name>           crash it: the process is gone, its address too
+#   node pause <name>           hang it: frozen, still holding its addresses
+#   node resume <name>          unfreeze a paused node
+#   node start <name>           boot a killed or stopped node
+#   node cut   <name> <net>     partition it from front or back
+#   node heal  <name> <net>     reconnect it, at its old address
+#
+# Names: lb1 lb2 web1 web2 pg1 pg2 etcd1 etcd2 etcd3.
+set -eu
+c() { echo "devopslings-ha-$1"; }
+net() { echo "devopslings-ha-stack_$1"; }
+addr() {
+  case "$1:$2" in
+    lb1:front) echo 172.29.22.11 ;; lb2:front) echo 172.29.22.12 ;;
+    web1:front) echo 172.29.22.21 ;; web2:front) echo 172.29.22.22 ;;
+    web1:back) echo 172.29.23.21 ;; web2:back) echo 172.29.23.22 ;;
+    pg1:back) echo 172.29.23.31 ;; pg2:back) echo 172.29.23.32 ;;
+    etcd1:back) echo 172.29.23.41 ;; etcd2:back) echo 172.29.23.42 ;; etcd3:back) echo 172.29.23.43 ;;
+    *) echo "node: $1 is not on $2" >&2; exit 2 ;;
+  esac
+}
+case "${1:-}" in
+  ls) docker ps -a --filter name=devopslings-ha- --format '{{.Names}}\t{{.Status}}' | sed 's/^devopslings-ha-//' | sort ;;
+  kill) docker kill "$(c "$2")" >/dev/null && echo "$2 killed" ;;
+  pause) docker pause "$(c "$2")" >/dev/null && echo "$2 paused" ;;
+  resume) docker unpause "$(c "$2")" >/dev/null && echo "$2 resumed" ;;
+  start) docker start "$(c "$2")" >/dev/null && echo "$2 started" ;;
+  cut) addr "$2" "$3" >/dev/null; docker network disconnect "$(net "$3")" "$(c "$2")" && echo "$2 cut from $3" ;;
+  heal) docker network connect --alias "$2" --ip "$(addr "$2" "$3")" "$(net "$3")" "$(c "$2")" && echo "$2 back on $3" ;;
+  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
