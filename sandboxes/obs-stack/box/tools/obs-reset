@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# obs-reset — put every editable file back to the baseline and bring the stack
+# to a known state: apps running, no silences, empty sink, configs loaded.
+# Every lesson's init_scenario starts here, so one lesson's leftovers never
+# leak into the next.
+set -euo pipefail
+. /usr/local/lib/obs.sh
+
+for d in prometheus alertmanager grafana apps queries; do
+  rm -rf "/obs/$d"
+  [ -e "/opt/obs-baseline/$d" ] && cp -a "/opt/obs-baseline/$d" "/obs/$d"
+done
+rm -f /obs/run/*.down /obs/run/*.restart /obs/run/*.fault /obs/run/*.slow
+chmod -R a+rX /obs
+
+obs_reload >/dev/null
+obs_expire_silences
+sink_reset

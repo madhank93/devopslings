@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# promq 'EXPR' — run an instant query and print one line per series.
+set -euo pipefail
+. /usr/local/lib/obs.sh
+[ $# -ge 1 ] || { echo "usage: promq 'EXPR'" >&2; exit 2; }
+prom_query "$1" | jq -r '
+  if .status != "success" then "error: \(.error)"
+  elif .data.resultType == "vector" or .data.resultType == "matrix" then
+    (.data.result[] | "\(.metric | to_entries | map("\(.key)=\"\(.value)\"") | join(",") | "{" + . + "}")  \(.value[1] // (.values | map(.[1]) | join(" ")))"),
+    (if (.data.result | length) == 0 then "(no data)" else empty end)
+  else (.data.result[1] | tostring) end'

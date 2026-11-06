@@ -1,0 +1,13 @@
+# Timers are short so a check waits seconds. Production defaults are
+# group_wait 30s, group_interval 5m, repeat_interval 4h.
+route:
+  receiver: pager
+  group_by: [alertname]
+  group_wait: 2s
+  group_interval: 5s
+  repeat_interval: 1h
+
+receivers:
+  - name: pager
+    webhook_configs:
+      - url: http://sink:8080/pager
