@@ -2,12 +2,10 @@
 # Reference solution — used by the contract test, not by students.
 set -euo pipefail
 
-# SO_RCVBUF is silently capped at net.core.rmem_max, so the collector's 8 MB
-# request became 208 KB. Raise the ceiling persistently and at runtime, then
-# restart the collector: the buffer is sized when its socket is created.
-
-printf 'net.core.rmem_max = 8388608\n' > /etc/sysctl.d/60-udp-collector.conf
-sysctl -q --load /etc/sysctl.d/60-udp-collector.conf
+# The collector pauses ~20 ms per 1000 counters while ~8000/s keep arriving:
+# ~160 datagrams at ~1.2 KB of kernel accounting each, ~200 KB. Ask for 512 KB
+# so there is headroom; even a host ceiling of 212992 still yields 425984.
+sed -i 's/^rcvbuf_bytes = .*/rcvbuf_bytes = 524288/' /etc/collector/collector.conf
 systemctl restart metrics-collector.service
 
 for _ in $(seq 1 20); do
