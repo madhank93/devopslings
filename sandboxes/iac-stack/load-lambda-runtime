@@ -1,0 +1,17 @@
+#!/bin/sh
+# Loads the Lambda python runtime into dind from the copy baked into this
+# image, so floci never pulls. docker import drops image config, so the
+# runtime's own entrypoint and environment are restored here.
+set -e
+img=public.ecr.aws/lambda/python:3.12
+docker image inspect "$img" >/dev/null 2>&1 && exit 0
+docker import \
+  --change 'ENTRYPOINT ["/lambda-entrypoint.sh"]' \
+  --change 'WORKDIR /var/task' \
+  --change 'ENV LANG=en_US.UTF-8' \
+  --change 'ENV TZ=:/etc/localtime' \
+  --change 'ENV PATH=/var/lang/bin:/usr/local/bin:/usr/bin/:/bin:/opt/bin' \
+  --change 'ENV LD_LIBRARY_PATH=/var/lang/lib:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/var/task/lib:/opt/lib' \
+  --change 'ENV LAMBDA_TASK_ROOT=/var/task' \
+  --change 'ENV LAMBDA_RUNTIME_DIR=/var/runtime' \
+  /opt/seed/lambda-python.tar "$img" >/dev/null
