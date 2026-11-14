@@ -1551,10 +1551,11 @@ engine (`db_bench`) for the write-stall exercise.
   upstream tag and the build still runs on the base it was tested with.
   *Source:* own.
 
-- **dependency-confusion** *(deep)* — an internal package name resolves to a public one.
-  *First guess:* rename the package.
-  *Check:* the resolver prefers the internal mirror and a planted public
-  impostor is never installed.
+- **dependency-confusion** *(deep · shipped)* — an internal package name resolves to a public one.
+  *First guess:* rename the package; or pin the version, or swap index and extra-index.
+  *Check:* CI's install, in a clean checkout, takes both internal packages from
+  the internal index while the public one offers higher versions and
+  build-tagged same-version impostors of each, including the transitive one.
   *Source:* the left-pad and event-stream incidents, generalised.
 
 - **registry-auth** *(core)* — CI can pull, the runtime cannot.
