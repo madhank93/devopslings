@@ -28,7 +28,7 @@ P -c "ALTER TABLE payments ADD COLUMN IF NOT EXISTS amount numeric(14,2)" >/dev/
 # each batch only touches rows that are still null.
 lo=$(P -c "SELECT min(id) FROM payments")
 hi=$(P -c "SELECT max(id) FROM payments")
-step=${BATCH:-100000}
+step=${BATCH:-20000}
 while [ "$lo" -le "$hi" ]; do
   P -c "UPDATE payments SET amount = amount_cents / 100.0
          WHERE id >= $lo AND id < $lo + $step AND amount IS NULL" >/dev/null
