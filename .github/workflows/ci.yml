@@ -27,9 +27,29 @@ jobs:
   #
   # It is slow and it is the reason this repo can claim its exercises work, so
   # it runs on every PR rather than nightly.
+  #
+  # One shard per stack, read from sandboxes/ so a new stack is never skipped.
+  stacks:
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.ls.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: ls
+        run: |
+          echo "list=$( (ls sandboxes; echo none) | jq -Rnc '[inputs]')" >> "$GITHUB_OUTPUT"
+
   contract:
+    needs: stacks
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJSON(needs.stacks.outputs.list) }}
+    name: contract (${{ matrix.stack }})
+    env:
+      DEVOPSLINGS_CONTRACT_STACK: ${{ matrix.stack }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

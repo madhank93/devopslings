@@ -28,6 +28,10 @@ tasks:
       git config user.email dev@example.com
       git config user.name 'Dev'
       git config advice.detachedHead false
+      # 200 quick commits trigger a detached auto-repack that can race the
+      # first git command run after setup.
+      git config maintenance.auto false
+      git config gc.auto 0
 
       mkdir lib
       cat > total.sh <<'S'
@@ -162,10 +166,11 @@ tasks:
 
       # landed <cmd...>: the commit `git bisect run <cmd>` names as first bad
       # between the root and main, or nothing if it did not narrow to one.
+      # Newer git quotes the term ("is the first 'bad' commit").
       landed() {
         git bisect start main "$root" >/dev/null 2>&1
         if EXPECTED="$expected" git bisect run "$@" > "$tmp/run.log" 2>&1 \
-           && grep -q 'is the first bad commit' "$tmp/run.log"; then
+           && grep -Eq "is the first '?bad'? commit" "$tmp/run.log"; then
           git rev-parse refs/bisect/bad
         fi
         git bisect reset >/dev/null 2>&1

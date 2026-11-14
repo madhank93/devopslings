@@ -1,12 +1,11 @@
 ---
 kind: lesson
-title: "every metric was sent, and the dashboard counts one in twenty"
+title: "every metric was sent, and the dashboard comes up a sixth short"
 description: |
   The application sends a counter per request over UDP. The send never fails.
-  The collector is up, its config asks for an 8 MB receive buffer, and its
-  dashboard shows a small fraction of the traffic the load balancer logged.
-  Nobody logged a drop, because UDP has nobody whose job that is — except a
-  kernel counter almost nobody reads.
+  The collector is up, logs nothing, and its dashboard shows less than the
+  traffic the load balancer logged. Nobody logged a drop, because UDP has
+  nobody whose job that is, except a kernel counter almost nobody reads.
 name: udp-drops-nobody-logs
 slug: udp-drops-nobody-logs
 createdAt: "2026-10-13"
@@ -28,21 +27,14 @@ tasks:
       systemctl reset-failed metrics-collector.service 2>/dev/null || true
       rm -rf /opt/collector /etc/collector "$L"
       rm -f /etc/systemd/system/metrics-collector.service /usr/local/bin/send-burst
-      # Any earlier attempt's persisted buffer size goes, so the box boots
-      # with the Debian default again.
-      for f in /etc/sysctl.conf /etc/sysctl.d/*.conf; do
-        if [ -f "$f" ]; then sed -i '/net\.core\.rmem_\(max\|default\)/d' "$f"; fi
-      done
-      sysctl -qw net.core.rmem_max=212992
-      sysctl -qw net.core.rmem_default=212992
       install -d /opt/collector /etc/collector "$L"
 
       # ---- the collector -----------------------------------------------
       #
       # A statsd-style receiver. It asks for the buffer its config names and
-      # takes what the kernel gives it without checking — which is what most
-      # real ones do. Parsing is deliberately not instant: a real collector
-      # aggregates, tags and forwards, and none of that is free.
+      # takes what the kernel gives it without checking, which is what most
+      # real ones do. Every 1000 counters it stops reading for ~20 ms to flush
+      # its aggregates; the receive queue has to hold what arrives meanwhile.
       cat > /opt/collector/collector.py <<'PY'
       import configparser
       import http.server
@@ -70,6 +62,10 @@ tasks:
               pass
 
 
+      def flush_to_backend():
+          time.sleep(0.02)
+
+
       threading.Thread(
           target=http.server.HTTPServer(("127.0.0.1", 9102), Metrics).serve_forever,
           daemon=True,
@@ -83,26 +79,30 @@ tasks:
       while True:
           sock.recv(2048)
           received += 1
-          if received % 50 == 0:
-              time.sleep(0.01)
+          if received % 1000 == 0:
+              flush_to_backend()
       PY
-      sha256sum /opt/collector/collector.py | cut -d' ' -f1 > "$L/collector.sha256"
 
       cat > /etc/collector/collector.conf <<'CONF'
       [listen]
       port = 8125
-      # Sized for peak: the 9am batch fires ~8k counters in well under a second.
-      rcvbuf_bytes = 8388608
+      # Trimmed in the memory diet (OPS-2231): the collector keeps up with
+      # traffic, so the queue only ever holds a handful of packets.
+      rcvbuf_bytes = 16384
       CONF
 
       printf '[Unit]\nDescription=metrics collector (udp/8125)\nAfter=network.target\n\n[Service]\nExecStart=/usr/bin/python3 /opt/collector/collector.py\nRestart=always\n\n[Install]\nWantedBy=multi-user.target\n' \
         > /etc/systemd/system/metrics-collector.service
 
       # ---- the sender --------------------------------------------------
+      #
+      # Paced at ~8000/s, so the only overflow is the one the flush pauses
+      # cause; a bigger queue absorbs it on any host ceiling down to 212992.
       cat > /usr/local/bin/send-burst <<'PY'
       #!/usr/bin/env python3
-      """Replay the 9am batch: 8000 request counters, as fast as the app sends them."""
+      """Replay the 9am batch: 8000 request counters over about a second."""
       import socket
+      import time
 
       s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
       failed = 0
@@ -112,9 +112,12 @@ tasks:
                        ("172.31.0.10", 8125))
           except OSError:
               failed += 1
+          if i % 40 == 39:
+              time.sleep(0.005)
       print("sent 8000 counters, %d send errors" % failed)
       PY
       chmod 755 /usr/local/bin/send-burst
+      sha256sum /opt/collector/collector.py /usr/local/bin/send-burst > "$L/code.sha256"
 
       systemctl daemon-reload
       systemctl enable --now metrics-collector.service >/dev/null 2>&1
@@ -126,8 +129,8 @@ tasks:
       cat > /root/questions.txt <<'Q'
       The checkout service sends one counter per request to the metrics
       collector on this box, over UDP port 8125. At 9am a batch job fires
-      about 8000 requests in under a second, and the dashboard shows a small
-      fraction of them. The load balancer's logs have all 8000.
+      about 8000 requests in a second, and the dashboard shows a fraction of
+      them. The load balancer's logs have all 8000.
 
       Replay the batch and read the collector's own count:
 
@@ -136,30 +139,32 @@ tasks:
         sleep 3; curl -s http://127.0.0.1:9102/
 
       send-burst reports zero send errors, and it is telling the truth. The
-      collector is running, logs nothing, and its config already asks for an
-      8 MB receive buffer (/etc/collector/collector.conf).
+      collector is running and logs nothing. Its config is in
+      /etc/collector/collector.conf.
 
       Make the collector receive all 8000 counters of a burst, and keep it that
-      way after the box reboots.
+      way after the collector or the box restarts.
 
       The collector's code (/opt/collector/collector.py) is a vendored binary
-      in all but name: do not edit it. Switching the app to TCP is a project,
+      in all but name: do not edit it, and do not slow down send-burst; it
+      replays what the app really does. Switching the app to TCP is a project,
       not a fix.
       Q
 
-      echo "scenario ready — every send succeeds, most never arrive"
+      echo "scenario ready — every send succeeds, not all of them arrive"
 
   verify_done:
     needs: [init_scenario]
     timeout_seconds: 180
     run: |
       L=/var/lib/udp-lesson
-      WANT=16000000
+      conf=/etc/collector/collector.conf
 
-      if [ "$(sha256sum /opt/collector/collector.py 2>/dev/null | cut -d' ' -f1)" != "$(cat "$L/collector.sha256" 2>/dev/null)" ]; then
-        echo "not yet: /opt/collector/collector.py has been changed."
-        echo "         It is the vendor's code, and you will lose the edit at the next"
-        echo "         upgrade. Put it back; the fix is in what the kernel lets it have."
+      if ! sha256sum -c --quiet "$L/code.sha256" >/dev/null 2>&1; then
+        echo "not yet: /opt/collector/collector.py or /usr/local/bin/send-burst has"
+        echo "         been changed. One is the vendor's code and the other replays"
+        echo "         what the app sends. Put them back; the fix is in the collector's"
+        echo "         config."
         exit 1
       fi
 
@@ -196,43 +201,37 @@ tasks:
       got=$((c1 - c0))
       lost=$((e1 - e0))
 
+      if [ "$got" -ge 8000 ] && [ "$lost" -eq 0 ]; then
+        rb=$(ss -ulmn 'sport = :8125' 2>/dev/null | grep -o 'rb[0-9]*' | head -1 | tr -d rb)
+        echo "PASS — 8000 of 8000 counters arrived and the kernel dropped none. The"
+        echo "       socket queues ${rb:-?} bytes, set by the collector's own config."
+        exit 0
+      fi
+
+      # What the socket has, against what the config would give a new one: the
+      # kernel caps a request at net.core.rmem_max and doubles it.
       rb=$(ss -ulmn 'sport = :8125' 2>/dev/null | grep -o 'rb[0-9]*' | head -1 | tr -d rb)
       : "${rb:=0}"
+      want=$(sed -n 's/^[[:space:]]*rcvbuf_bytes[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$conf" 2>/dev/null | tail -1)
+      : "${want:=0}"
+      cap=$(cat /proc/sys/net/core/rmem_max 2>/dev/null)
+      : "${cap:=$want}"
+      fresh=$(( 2 * (want < cap ? want : cap) ))
 
-      if [ "$got" -lt 8000 ]; then
-        echo "not yet: the collector counted $got of 8000 counters from one burst."
-        echo "         The kernel discarded $lost datagrams in the same window because the"
-        echo "         socket's receive queue was full (UdpRcvbufErrors)."
-        if [ "$rb" -lt "$WANT" ]; then
-          echo "         The collector's socket can queue $rb bytes:"
-          echo "           ss -ulmn 'sport = :8125'"
-          if [ "$(sysctl -n net.core.rmem_max)" -ge 8388608 ]; then
-            echo "         The ceiling is high enough now. The buffer size is settled when"
-            echo "         the socket is created — and this one was created before."
-          else
-            echo "         The config asked for 8388608. Something decided it gets less."
-          fi
-        fi
-        exit 1
+      echo "not yet: the collector counted $got of 8000 counters from one burst."
+      echo "         The kernel discarded $lost datagrams in the same window because the"
+      echo "         socket's receive queue was full (UdpRcvbufErrors)."
+      echo "         The collector's socket can queue $rb bytes:"
+      echo "           ss -ulmn 'sport = :8125'"
+      if [ "$rb" -lt "$fresh" ]; then
+        echo "         The config now asks for $want, which would get a new socket $fresh."
+        echo "         This socket is older than that: its buffer was sized when it was"
+        echo "         created."
+      elif [ "$want" -gt "$cap" ]; then
+        echo "         The config asks for $want; the kernel capped it at net.core.rmem_max"
+        echo "         ($cap). Inside a container that ceiling may belong to the host."
+      else
+        echo "         That is what the config's rcvbuf_bytes = $want gets. How long does the"
+        echo "         collector stop reading, and how much arrives meanwhile?"
       fi
-
-      # ---- and after a reboot ------------------------------------------
-      #
-      # What systemd-sysctl applies at boot, in the order it applies it; the
-      # last assignment wins.
-      boot=$(/usr/lib/systemd/systemd-sysctl --cat-config 2>/dev/null \
-               | sed -n 's/^[[:space:]]*-\{0,1\}net\.core\.rmem_max[[:space:]]*=[[:space:]]*\([0-9]*\).*/\1/p' | tail -1)
-      : "${boot:=0}"
-      if [ "$boot" -lt 8388608 ]; then
-        echo "not yet: the burst arrives whole now — and at boot, net.core.rmem_max goes"
-        if [ "$boot" -eq 0 ]; then
-          echo "         back to the kernel default. Nothing under /etc/sysctl.d sets it."
-        else
-          echo "         back to $boot. That is what /etc/sysctl.d says."
-        fi
-        echo "         sysctl -w changes the running kernel and nothing else."
-        exit 1
-      fi
-
-      echo "PASS — 8000 of 8000 counters arrived, the socket queues $rb bytes, and the"
-      echo "       ceiling that allows it is set at boot."
+      exit 1

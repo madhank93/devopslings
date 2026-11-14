@@ -836,15 +836,18 @@ table, the connection tracker, the accept queue, and the packets themselves.
   *Source:* roadmap.sh gap.
 
 - **udp-drops-nobody-logs** *(deep · shipped)* — 8000 counters sent over UDP
-  in a burst, zero send errors, a few hundred counted. The collector's config
-  asks for an 8 MB receive buffer; `net.core.rmem_max` silently caps it at
-  208 KB, and the overflow shows up only in `UdpRcvbufErrors`.
-  *First guess:* raise the buffer in the collector's config — the cap applies
-  to every request; or `rmem_default`, which an explicit request never uses.
-  *Check:* a replayed burst arrives whole by the collector's own count, the
-  collector's code is unchanged, and the raised ceiling is what
-  `systemd-sysctl` applies at boot. Raising the ceiling without restarting the
-  collector is named: a socket's buffer is sized at creation.
+  over a second, zero send errors, a sixth never counted. The collector pauses
+  ~20 ms per 1000 counters to flush, and its config asks for a 16 KB receive
+  buffer, so each pause overflows the queue; the loss shows up only in
+  `UdpRcvbufErrors` and `ss -um`.
+  *First guess:* raise `net.core.rmem_max` — the request is already under the
+  ceiling, and in a container the ceiling is the host's, read-only, with
+  `sysctl -w` exiting 0 anyway; or `rmem_default`, which an explicit request
+  never uses.
+  *Check:* a replayed burst arrives whole by the collector's own count with
+  `UdpRcvbufErrors` unchanged, and the collector's code and the sender are
+  unchanged. Raising the config without restarting the collector is named: a
+  socket's buffer is sized at creation.
   *Source:* own; the statsd/syslog loss family.
 
 - **http3-cannot-get-through** *(core · shipped)* — HTTP/2 through the edge

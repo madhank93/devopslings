@@ -158,7 +158,9 @@ tasks:
       done
 
       host=$(docker version -f '{{.Server.Arch}}' 2>/dev/null || echo amd64)
-      got=$(docker run --rm --platform "linux/$host" "$ref" 2>&1 || true)
+      # -q: the tag now points at the last platform pulled above, so this may
+      # re-pull, and pull progress on stderr would end up in $got.
+      got=$(docker run --rm -q --platform "linux/$host" "$ref" 2>&1 || true)
       if [ "$got" != "$expected" ]; then
         echo "not yet: the linux/$host image does not run. It said:"
         printf '%s\n' "$got" | tail -6 | sed 's/^/    /'
