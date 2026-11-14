@@ -25,13 +25,13 @@ than at exercise one.
 | **architect** | A written decision or design, graded against a rubric. |
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 225 shipped, 2 blocked, 72 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 234 shipped, 2 blocked, 63 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 14, 15, 16, 18, 21, 22, 23.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 21, 22, 23.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Modules 01–23 and 25 each open with an `intro` exercise. Modules 24, 26 and 27
@@ -638,7 +638,7 @@ read its own write.
 
 ## Delivery
 
-### 11 — Artifacts & Supply Chain · *partly shipped*
+### 11 — Artifacts & Supply Chain · *shipped*
 `registry-stack`
 
 zot, not Harbor: Harbor ships amd64-only images across about nine containers,
@@ -675,11 +675,32 @@ referrers API signatures attach to. Each lesson names the Harbor equivalent.
   refused. zot logs every keep/delete decision with the rule behind it, which is
   how the student diagnoses it.
 
-Still to build: `cosign` sign and verify ·
-`syft` SBOM + `trivy` scan, with an exception that expires · pinning the base
-image by digest · **dependency confusion**, where an internal name resolves to a
-public package · scoped robot accounts · the left-pad and event-stream
-postmortems, and why you mirror.
+- **cosign-sign-and-verify** *(shipped)* — sign the release by digest and
+  make the runtime's `policy.json` require the key; an unsigned image, and one
+  wearing the release's tag, are refused.
+- **sbom-and-the-cve-gate** *(shipped)* — a trivy gate over a CycloneDX SBOM
+  blocks on an unfixable `ecdsa` CVE in the test requirements. The exception
+  must be justified, scoped by path to the tests and expire within 90 days;
+  the grader re-runs the gate with the CVE in the runtime requirements, a new
+  test HIGH, a fixable runtime HIGH, and the expiry moved to yesterday. The
+  sandbox's advisory database is cut at a fixed date so findings do not drift.
+- **base-image-by-digest** *(shipped)* — upstream moved `runtime:2` to a
+  release that breaks the build; CI logs show both digests. Graded by pushing
+  a new release to every upstream tag, version tags included, and rebuilding.
+- **dependency-confusion** *(shipped)* — `--extra-index-url` let a public
+  `acme-billing` 99.0.0 win. The grader adds build-tagged same-version
+  impostors of it and of its internal dependency, so version pins and
+  index-order swaps fail; one internal index that mirrors the public packages
+  passes.
+- **registry-auth** *(shipped)* — production lost anonymous pulls. A
+  dedicated read-only account, checked both ways: push, overwrite, delete,
+  another team's repository and an unclaimed one refused; anonymous pulls and
+  other accounts' reads stay refused; CI still pushes.
+- **incident-eventstream-2018** *(shipped)* — the replay in pip: an exact pin
+  on `ps-tree` and a sync-everything mirror still delivered `flatmap-stream`.
+  Each control is graded with the others broken: a hash lockfile against a
+  poisoned mirror, a sync gate with an approvals file that never mirrors an
+  unpublish (left-pad), and a write-up of the transitive range.
 
 ### 12 — CI/CD · *shipped*
 `ci-stack`

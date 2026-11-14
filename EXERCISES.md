@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 225 shipped, 2 blocked, 72 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 234 shipped, 2 blocked, 63 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 14, 15, 16, 18, 21, 22, 23.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 21, 22, 23.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1565,9 +1565,12 @@ engine (`db_bench`) for the write-stall exercise.
   and other teams' accounts stay refused; CI still pushes.
   *Source:* own.
 
-- **incident-eventstream-2018** *(architect · replay)* — a maintainer handoff ships malware.
+- **incident-eventstream-2018** *(architect · replay · shipped)* — a maintainer handoff ships malware.
   *First guess:* pin versions, which this incident defeats.
-  *Check:* lockfile plus mirror plus review gate stops the malicious version.
+  *Check:* each control alone stops it — a hash lockfile against a poisoned
+  mirror (with a same-version rebuild) and the public index offline; a sync gate
+  that refuses unapproved releases, admits approved ones and never mirrors an
+  unpublish; and the write-up names the transitive range the pin did not cover.
   *Source:* published write-ups, simplified.
 
 ---
