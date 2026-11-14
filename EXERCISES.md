@@ -1537,15 +1537,18 @@ engine (`db_bench`) for the write-stall exercise.
   *Check:* signed images deploy, an unsigned or re-tagged one is rejected.
   *Source:* roadmap.sh supply chain.
 
-- **sbom-and-the-cve-gate** *(deep)* — the scanner blocks the build on a CVE in a test dep.
-  *First guess:* turn the gate off.
-  *Check:* gate passes with a justified, expiring exception and still fails on a
-  genuinely exploitable runtime CVE.
+- **sbom-and-the-cve-gate** *(deep · shipped)* — the scanner blocks the build on a CVE in a test dep.
+  *First guess:* turn the gate off; or gate on CRITICAL only, or `--ignore-unfixed`.
+  *Check:* gate passes with a justified exception, scoped to the test
+  requirements and expiring within 90 days; still fails on the same CVE in the
+  runtime requirements, a new HIGH in the tests, a fixable runtime HIGH, and
+  once the exception's date has passed.
   *Source:* own.
 
-- **base-image-by-digest** *(core)* — the build broke and nothing in the repo changed.
-  *First guess:* clear the cache.
-  *Check:* pinned base by digest; a moved upstream tag no longer changes the build.
+- **base-image-by-digest** *(core · shipped)* — the build broke and nothing in the repo changed.
+  *First guess:* clear the cache; or pin the version tag, which upstream also rebuilds.
+  *Check:* pinned base by digest; the grader pushes a new release to every
+  upstream tag and the build still runs on the base it was tested with.
   *Source:* own.
 
 - **dependency-confusion** *(deep)* — an internal package name resolves to a public one.
