@@ -1558,9 +1558,11 @@ engine (`db_bench`) for the write-stall exercise.
   build-tagged same-version impostors of each, including the transitive one.
   *Source:* the left-pad and event-stream incidents, generalised.
 
-- **registry-auth** *(core)* — CI can pull, the runtime cannot.
-  *First guess:* make the repository public.
-  *Check:* a scoped robot account with pull-only rights, verified both ways.
+- **registry-auth** *(core · shipped)* — CI can pull, the runtime cannot.
+  *First guess:* make the repository public; or copy CI's credentials to production.
+  *Check:* a dedicated account pulls shop/web and shop/cart, and cannot push,
+  overwrite, delete, read finance/ or an unclaimed repository; anonymous pulls
+  and other teams' accounts stay refused; CI still pushes.
   *Source:* own.
 
 - **incident-eventstream-2018** *(architect · replay)* — a maintainer handoff ships malware.
