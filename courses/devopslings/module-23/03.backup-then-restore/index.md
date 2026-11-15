@@ -106,6 +106,19 @@ tasks:
         fi
         exit 1
       fi
+      # A complete dump is also reachable by running the job as a superuser; the job must stay read-only.
+      unread=$(psql -tAX -c "select string_agg(t, ' ') from unnest(array['customers','orders','refunds']) t where not has_table_privilege('backup', t, 'SELECT')")
+      super=$(psql -tAX -c "select rolsuper from pg_roles where rolname = 'backup'")
+      if [ -n "$unread" ] || [ "$super" != f ]; then
+        echo "not yet: the restore matches, but not because the backup role was fixed:"
+        if [ "$super" = t ]; then
+          echo "         backup is now a superuser, which can write, drop and change everything."
+        else
+          echo "         backup still cannot read $unread, so backup.sh is dumping as some other, more powerful role."
+        fi
+        echo "         Keep the job on the read-only backup role and give that role read access instead."
+        exit 1
+      fi
       echo "round 1: backup.sh exited 0, and the restore matches pg1 row for row"
 
       # Round 2: the same job while the database refuses connections.

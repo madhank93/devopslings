@@ -110,5 +110,13 @@ tasks:
         echo "         Other systems refer to orders by id. Copy the rows back whole, id included."
         exit 1
       fi
+      # Every deleted order was placed before the first order after the DELETE.
+      late=$(psql -tAX -c "SELECT count(*) FROM orders WHERE reference ~ '^(SEED|MORNING)-'
+                           AND placed_at >= (SELECT min(placed_at) FROM orders WHERE reference ~ '^AFTER-')")
+      if [ "$late" -gt 0 ]; then
+        echo "not yet: $late of the restored orders have a placed_at later than the DELETE, so they were"
+        echo "         inserted with a new timestamp. Copy the rows back whole, placed_at included."
+        exit 1
+      fi
       echo "PASS — the $pre deleted orders are back as they were, and the $after placed since are untouched."
 ---

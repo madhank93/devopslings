@@ -79,6 +79,12 @@ tasks:
         echo "not yet: the backup job on pg1 has been changed or removed. Reset the lesson to put it back."
         exit 1
       fi
+      # The answers are graded against the job's dump, so a hand-run full dump has to be replaced first.
+      if grep -q "^COPY public\.$skip " "$f"; then
+        echo "not yet: $f holds rows for every table, so it was not written by the nightly job."
+        echo "         The question is about the job's backup: run /ha/backups/nightly.sh and open what it writes."
+        exit 1
+      fi
       a=/ha/answers/take-a-backup.txt
       ans() { sed -n "s/^[[:space:]]*$1[[:space:]]*:[[:space:]]*//p" "$a" 2>/dev/null | head -1 | tr -d ' \t' | tr '[:upper:]' '[:lower:]' || true; }
       for t in customers orders refunds; do

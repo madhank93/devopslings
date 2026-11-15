@@ -158,8 +158,11 @@ tasks:
         grep -E '^(Plan:|Error:)|will be (created|updated|destroyed|replaced)|must be replaced' /tmp/plan.out | head -6 | sed 's/^/         | /' || true
         if [ -n "$missing" ]; then
           echo "         Every one of them exists on pg1 already: creating it fails, and dropping it loses what is in it."
+        elif grep -qE 'must be replaced|will be destroyed' /tmp/plan.out; then
+          echo "         Everything is in the state, but the plan would replace or destroy an object that is in use."
+          echo "         Change main.tf to match what is on pg1 rather than applying that."
         else
-          echo "         Everything is in the state, but the plan still has changes: apply them, then plan again."
+          echo "         Everything is in the state, but the plan still has in-place changes: apply them, then plan again."
         fi
         exit 1
       fi

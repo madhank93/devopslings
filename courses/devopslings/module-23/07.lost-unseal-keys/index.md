@@ -158,7 +158,8 @@ tasks:
       if [ "$(status)" != 0 ]; then
         bao operator unseal -reset >/dev/null 2>&1 || true
         echo "not yet: the grader restarted OpenBao, and the keys in /ha/bao/escrow/ did not unseal it."
-        echo "         It is sealed again now. Escrow this cluster's keys, one per line, and test them."
+        echo "         It is sealed again now. Escrow at least a threshold of this cluster's keys — base64, one per"
+        echo "         line with nothing else on it — and test them."
         exit 1
       fi
       if [ -z "$(read_db)" ]; then

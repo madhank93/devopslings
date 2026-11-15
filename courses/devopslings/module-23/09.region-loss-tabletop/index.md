@@ -135,7 +135,7 @@ tasks:
             exit 1
           fi
           if [ "$reg" = eu-1 ]; then
-            echo "not yet: step $n ($(xargs <<<"$what")) uses $r, which is in eu-1. eu-1 is down: $r does not exist today."
+            echo "not yet: step $n ($(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<<"$what")) uses $r, which is in eu-1. eu-1 is down: $r does not exist today."
             case $r in
               pg-replica) echo "         The replica is a copy in the same region. It protects against losing a server, not a region." ;;
               runbooks-wiki) echo "         The runbook is in the region it tells you how to leave. runbooks-git has a copy." ;;

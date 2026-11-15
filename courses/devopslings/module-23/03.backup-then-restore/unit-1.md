@@ -25,7 +25,8 @@ Two runs of your `backup.sh`:
 
 - with everything up, it must exit 0, and its file, restored into a fresh
   empty Postgres, must match pg1 row for row in `customers`, `orders` and
-  `refunds`;
+  `refunds`, with the `backup` role still read-only and able to read all
+  three;
 - with the `shop` database refusing connections, it must exit non-zero.
 
 The grader puts the last good backup back afterwards.
@@ -104,8 +105,9 @@ tells you the backup is a backup. Schedule it: a restore test that runs
 every night and pages on mismatch catches this class of failure the day it
 starts, not the day you need the data.
 
-Using the `postgres` superuser for backups also makes this go away, and it is
-why so many backup jobs run as superuser. A dedicated role with
+Switching the job to the `postgres` superuser also makes the dump complete,
+and it is why so many backup jobs run as superuser. The grader does not
+accept it. A dedicated role with
 `pg_read_all_data` cannot write, drop or change anything, which matters when
 the backup host's credentials leak — see lesson 8.
 

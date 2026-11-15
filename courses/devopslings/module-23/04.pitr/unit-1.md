@@ -26,8 +26,8 @@ time of the `DELETE`.
 The grader reads pg1's `orders`:
 
 - every order placed after the `DELETE` is present;
-- every order deleted by it is back, exactly once, with its old `id` —
-  including the ones placed after the base backup was taken.
+- every order deleted by it is back, exactly once, with its old `id` and
+  `placed_at` — including the ones placed after the base backup was taken.
 
 ## Try it yourself
 

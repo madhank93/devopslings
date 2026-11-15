@@ -136,10 +136,10 @@ tasks:
       fi
 
       promise=$(get "$r" restore_seconds)
-      rows=$(get "$r" measured_rows)
+      rows=$(get "$r" measured_rows | tr -d ",_")
       now_rows=$(psql -tAX -c "SELECT count(*) FROM events")
       if ! [[ $promise =~ ^[0-9]+(\.[0-9]+)?$ ]] || awk -v p="$promise" -v g="$gt" 'BEGIN { exit !(p < g * 0.8) }'; then
-        echo "not yet: the runbook still promises restore_seconds: ${promise:-missing}. The restore takes about ${gt}s."
+        echo "not yet: the runbook promises restore_seconds: ${promise:-missing}. The restore takes about ${gt}s."
         echo "         The business plans around that number; make it one you measured."
         exit 1
       fi
