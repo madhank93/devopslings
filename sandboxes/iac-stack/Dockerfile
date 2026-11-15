@@ -47,6 +47,29 @@ RUN cd /opt/seed/rootfs \
     && tar -C /opt/seed/rootfs -cf /opt/seed/busybox.tar . \
     && rm -rf /opt/seed/rootfs
 
+# Pulumi with its Go language host, for module 14. Only the two binaries a Go
+# program needs are kept from the release tarball.
+ARG GO_VERSION=1.26.11
+ARG PULUMI_VERSION=3.272.0
+ARG PULUMI_DOCKER_VERSION=5.2.0
+ARG PULUMI_MINIO_VERSION=0.17.1
+RUN arch=$(dpkg --print-architecture) \
+    && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${arch}.tar.gz" | tar -xz -C /usr/local \
+    && case "$arch" in amd64) p=x64 ;; *) p=$arch ;; esac \
+    && curl -fsSL "https://github.com/pulumi/pulumi/releases/download/v${PULUMI_VERSION}/pulumi-v${PULUMI_VERSION}-linux-${p}.tar.gz" \
+       | tar -xz -C /usr/local/bin --strip-components=1 pulumi/pulumi pulumi/pulumi-language-go
+ENV PATH=/usr/local/go/bin:/root/go/bin:$PATH \
+    PULUMI_SKIP_UPDATE_CHECK=true \
+    PULUMI_DIY_BACKEND_NO_LEGACY_WARNING=true \
+    PULUMI_CONFIG_PASSPHRASE=devopslings
+RUN pulumi plugin install resource docker ${PULUMI_DOCKER_VERSION} \
+    && pulumi plugin install resource minio ${PULUMI_MINIO_VERSION}
+# Fill the module and build caches from the template, then shut the network
+# out of the go command, so lessons compile offline and in seconds.
+COPY pulumi /opt/pulumi-template
+RUN cd /opt/pulumi-template && GOTOOLCHAIN=local go mod tidy && go list -m all >/dev/null && go build ./... && go test ./... && rm -f program
+ENV GOPROXY=off GOFLAGS=-mod=mod GOTOOLCHAIN=local GOTELEMETRY=off
+
 COPY --from=lambda-seed /lambda-python.tar /opt/seed/lambda-python.tar
 COPY load-lambda-runtime /usr/local/bin/load-lambda-runtime
 
