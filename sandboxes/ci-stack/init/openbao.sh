@@ -23,6 +23,9 @@ if [ ! -s "$d/unseal-key" ]; then
   printf '%s\n' "$out" | sed -n 's/^Unseal Key 1: //p' > "$d/unseal-key"
   root=$(printf '%s\n' "$out" | sed -n 's/^Initial Root Token: //p')
   bao operator unseal "$(cat "$d/unseal-key")" >/dev/null
+  # Unsealed is not active: raft elects a leader first, and until then every
+  # write fails. sys/health answers 200 only once the node is active.
+  until wget -q -O /dev/null "$BAO_ADDR/v1/sys/health"; do sleep 0.3; done
   BAO_TOKEN=$root bao token create -id=devopslings-root -policy=root -orphan >/dev/null
   BAO_TOKEN=$root bao secrets enable -path=secret kv-v2 >/dev/null
   BAO_TOKEN=$root bao token revoke -self >/dev/null

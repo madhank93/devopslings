@@ -109,7 +109,7 @@ instant. A `NOT NULL` here would put the table scan straight back.
 
 ```sql
 UPDATE payments SET amount = amount_cents / 100.0
- WHERE id >= $lo AND id < $lo + 100000 AND amount IS NULL;
+ WHERE id >= $lo AND id < $lo + 20000 AND amount IS NULL;
 ```
 
 Each statement takes row locks, which readers do not wait on, and commits
@@ -140,8 +140,8 @@ lo=$(psql -tAc "SELECT min(id) FROM payments")
 hi=$(psql -tAc "SELECT max(id) FROM payments")
 while [ "$lo" -le "$hi" ]; do
   psql -c "UPDATE payments SET amount = amount_cents / 100.0
-            WHERE id >= $lo AND id < $lo + 100000 AND amount IS NULL"
-  lo=$(( lo + 100000 ))
+            WHERE id >= $lo AND id < $lo + 20000 AND amount IS NULL"
+  lo=$(( lo + 20000 ))
 done
 
 # contract — catalogue only
