@@ -160,16 +160,17 @@ tasks:
       newp=$(paths 10 | grep -c new || true)
       sample=$(body www | cut -c1-160)
       restore
+      if [ "$newp" -gt 0 ]; then
+        echo "not yet: with ff.flags unreachable, $newp of 10 requests took the new ranker (answers:$codes)."
+        echo "         The safe value of a kill switch, when nobody can tell you its state, is off: the"
+        echo "         old path."
+        exit 1
+      fi
       if [ "$codes" != " 10 200 " ]; then
         echo "not yet: with ff.flags unreachable, /recommend answered:$codes"
         echo "         | $sample"
         echo "         When the flag store cannot answer, every flag needs a value it falls back to. A lookup"
         echo "         that raises takes the whole page down with it."
-        exit 1
-      fi
-      if [ "$newp" -gt 0 ]; then
-        echo "not yet: with ff.flags unreachable, $newp of 10 requests took the new ranker. The safe value of"
-        echo "         a kill switch, when nobody can tell you its state, is off: the old path."
         exit 1
       fi
       echo "flag store unreachable: pages still served, on the old ranker"
@@ -189,14 +190,16 @@ tasks:
         case $out in *stale:*)
           echo "         A flag that has been the same for over a year is a constant with a database"
           echo "         round-trip. Keep the behaviour it has had, delete the branch, delete the row." ;; esac
+        case $out in *undeclared:*)
+          echo "         The code still asks for a flag whose row is gone, so it reads whatever the lookup"
+          echo "         falls back to. Removing a flag means removing the branch that reads it, too." ;; esac
         exit 1
       fi
       b=$(body www)
       case $b in *'"theme": "dark"'*) ;; *)
         echo "not yet: the review is clean, but recommendations now say: $(printf '%s' "$b" | cut -c1-160)"
         echo "         dark_mode had been on for every customer for over a year. Removing the flag should"
-        echo "         keep the theme it gave everyone. A flag the code still asks for after its row is"
-        echo "         gone reads as off." ;
+        echo "         keep the theme it gave everyone."
         exit 1 ;;
       esac
       case $b in *banner*)

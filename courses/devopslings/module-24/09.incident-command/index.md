@@ -73,8 +73,8 @@ tasks:
               fail(f"{role} is '{who}'; the people on the incident are alice, bob and carol.")
       if len(set(roles.values())) < 3:
           dup = [w for w in PEOPLE if list(roles.values()).count(w) > 1][0]
-          fail(f"{dup} holds two roles. With three people and three roles, each holds one: the moment the",
-               "commander is also fixing something, nobody is watching the whole incident.")
+          fail(f"{dup} holds two roles. With three people and three roles, each holds one: whoever holds",
+               "two drops one of them the moment things get busy.")
       ic, ops, comms = roles["commander"], roles["ops_lead"], roles["comms_lead"]
 
       declared = minute(fields["declared"], "declared")
@@ -108,10 +108,10 @@ tasks:
                "criteria make 1-25% of checkouts failing SEV2.")
       prev = 2
       for t, s in calls[1:]:
+          # SEV1 is the most severe: a smaller number is a raise.
+          if s < prev and t < FACT_SEV1:
+              fail(f"severity is raised to SEV{s} at 10:{t:02d}, before any fact that meets SEV1.")
           if s > prev:
-              if t < FACT_SEV1:
-                  fail(f"severity is raised to SEV{s} at 10:{t:02d}, before any fact that meets SEV1.")
-          if s < prev:
               fail(f"severity is lowered to SEV{s} at 10:{t:02d}, before the incident is resolved. The criteria",
                    "never lower severity during an incident: an error rate that is falling is a rollback",
                    "half done, and it can rise again.")
@@ -161,7 +161,8 @@ tasks:
           t, who, kind = minute(r[0], "a task line"), r[1].lower(), r[2].lower()
           if kind not in KINDS:
               fail(f"the task at 10:{t:02d} has the kind '{kind}'; kinds are {', '.join(sorted(KINDS))}.")
-          if who == ic and kind in ("investigate", "change"):
+          debugs = re.search(r"\b(logs?|debug\w*|grep\w*|investigat\w*|dig\w*|traces?|profil\w*|query|queries)\b", r[3].lower())
+          if who == ic and (kind in ("investigate", "change") or debugs):
               fail(f"at 10:{t:02d} the commander, {ic}, will {kind}: '{r[3]}'.",
                    "A commander who debugs has stopped commanding. While their head is in the logs, nobody",
                    "is tracking the severity, the cadence or the next decision. If the commander is the best",
