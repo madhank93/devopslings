@@ -111,7 +111,10 @@ tasks:
       stash=$reg/devopslings-grader/runtime
       img=devopslings-m11/shop-web:verify
       work=$(mktemp -d)
-      crane auth login "$reg" -u devops -p devopslings >/dev/null 2>&1
+      if ! crane auth login "$reg" -u devops -p devopslings >/dev/null 2>&1; then
+        echo "not yet: the grader cannot log in to $reg. Reset the scenario."
+        exit 1
+      fi
 
       good=$(crane digest "$stash:2.4.1" 2>/dev/null || true)
       bad=$(crane digest "$stash:2.5.0" 2>/dev/null || true)
@@ -123,13 +126,16 @@ tasks:
       # Upstream as the scenario left it: every release reachable by digest,
       # and the tags where upstream put them.
       upstream_as_published() {
-        crane copy "$stash:2.4.1" "$up:2.4.1" >/dev/null 2>&1
-        crane copy "$stash:2.5.0" "$up:2.5.0" >/dev/null 2>&1
-        crane tag "$up:2.5.0" 2 >/dev/null 2>&1
+        crane copy "$stash:2.4.1" "$up:2.4.1" >/dev/null 2>&1 &&
+        crane copy "$stash:2.5.0" "$up:2.5.0" >/dev/null 2>&1 &&
+        crane tag "$up:2.5.0" 2 >/dev/null 2>&1 &&
         crane tag "$up:2.5.0" latest >/dev/null 2>&1
       }
-      trap 'upstream_as_published; docker rmi -f "$img" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
-      upstream_as_published
+      trap 'upstream_as_published || true; docker rmi -f "$img" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
+      if ! upstream_as_published; then
+        echo "not yet: the grader could not restore upstream/runtime in $reg. Reset the scenario."
+        exit 1
+      fi
 
       if [ ! -f /work/shop-web/Dockerfile ]; then
         echo "not yet: /work/shop-web/Dockerfile is missing."
@@ -207,11 +213,14 @@ tasks:
 
       # Upstream publishes 2.6.0 and re-pushes every tag it has, as an image
       # rebuild for a base-OS patch would.
-      for tag in 2.4.1 2.5.0 2.5 2 latest; do
-        crane copy "$stash:2.6.0" "$up:$tag" >/dev/null 2>&1
-      done
-      crane copy "$stash@$good" "$up@$good" >/dev/null 2>&1
-      crane copy "$stash@$bad" "$up@$bad" >/dev/null 2>&1
+      if ! ( for tag in 2.4.1 2.5.0 2.5 2 latest; do
+               crane copy "$stash:2.6.0" "$up:$tag" >/dev/null 2>&1 || exit 1
+             done
+             crane copy "$stash@$good" "$up@$good" >/dev/null 2>&1 &&
+             crane copy "$stash@$bad" "$up@$bad" >/dev/null 2>&1 ); then
+        echo "not yet: the grader could not push runtime 2.6.0 to $up. Reset the scenario."
+        exit 1
+      fi
 
       if ! build; then
         echo "not yet: the grader pushed runtime 2.6.0 to every upstream tag, and your build"
