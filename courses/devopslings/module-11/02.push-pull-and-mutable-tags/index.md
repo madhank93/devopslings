@@ -129,26 +129,34 @@ tasks:
         [ "$_img" = "$release" ] || [ "$_img" = "$release_cfg" ]
       }
 
-      if ! running_is_release; then
-        served=$(curl -s --max-time 5 http://shop-web:8080/ 2>/dev/null || true)
-        echo "not yet: production is not running release 1.4.0. It is serving:"
-        echo "  ${served:-nothing at all}"
-        exit 1
-      fi
-
       ref=$(sed -n 's/^[[:space:]]*image:[[:space:]]*//p' /work/deploy/compose.yaml | head -1 | tr -d "\"'")
       case "$ref" in
         *@sha256:*) ;;
         *)
           echo "not yet: /work/deploy/compose.yaml deploys '$ref'. That is a tag, and"
           echo "a tag is a pointer anyone with push access can move — a version tag"
-          echo "included. Production is right today because nobody has pushed since."
+          echo "included. Pin the digest."
           exit 1
           ;;
       esac
+      if [ "${ref##*@}" = "$release_cfg" ]; then
+        echo "not yet: compose.yaml pins ${ref##*@}, which is 1.4.0's image ID —"
+        echo "the digest of its config, as \`docker images\` and \`docker inspect .Id\` show it."
+        echo "The registry has no manifest by that digest; pin the manifest digest,"
+        echo "$release."
+        exit 1
+      fi
       if [ "${ref##*@}" != "$release" ]; then
         echo "not yet: compose.yaml pins ${ref##*@},"
         echo "but release 1.4.0 is $release."
+        exit 1
+      fi
+
+      if ! running_is_release; then
+        served=$(curl -s --max-time 5 http://shop-web:8080/ 2>/dev/null || true)
+        echo "not yet: production is not running release 1.4.0. It is serving:"
+        echo "  ${served:-nothing at all}"
+        echo "compose.yaml pins the right digest; run /work/deploy/deploy.sh to deploy it."
         exit 1
       fi
 

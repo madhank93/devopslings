@@ -40,7 +40,9 @@ The grader pulls through `/etc/containers/policy.json` exactly as the deploy
 does. Release 1.2.0 must be accepted, by tag and by digest. Then it pushes an
 unsigned image and requires it to be refused — and then it moves the `1.2.0`
 tag itself to that unsigned image, and requires the release's own name to be
-refused too. It puts the tag back afterwards.
+refused too. It puts the tag back afterwards. The same unsigned image, pushed
+to another repository in the registry, must be refused as well. Last, staging
+must be running the release.
 
 <details>
 <summary>Hint 1 — signing, offline</summary>

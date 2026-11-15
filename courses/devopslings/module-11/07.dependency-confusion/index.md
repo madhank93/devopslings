@@ -185,6 +185,10 @@ tasks:
             esac
             [ "$dist" = acme-ledger ] && echo "acme-ledger is never named in requirements.txt — it is acme-billing's own dependency."
             exit 1 ;;
+          *:-)
+            echo "not yet: $dist was not installed. acme-billing needs it at runtime, so CI"
+            echo "has to install the whole tree, from the internal index."
+            exit 1 ;;
           *)
             echo "not yet: $dist is $ver, which is not what the internal index serves."
             exit 1 ;;

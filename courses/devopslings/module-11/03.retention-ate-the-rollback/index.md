@@ -155,6 +155,7 @@ tasks:
       fi
       if [ "$ci" -lt 1 ]; then
         echo "not yet: retention deleted every git-* build, including the one just pushed."
+        echo "A tag that no keepTags rule matches is deleted; the CI builds need a rule too."
         exit 1
       fi
 

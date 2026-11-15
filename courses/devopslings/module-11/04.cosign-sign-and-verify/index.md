@@ -105,6 +105,8 @@ tasks:
         if [ -n "$moved" ]; then
           crane tag "$repo:git-7f3c2e1" 1.2.0 >/dev/null 2>&1 || true
         fi
+        d=$(crane digest "$reg/grader/unsigned:probe" 2>/dev/null || true)
+        [ -z "$d" ] || crane delete "$reg/grader/unsigned@$d" >/dev/null 2>&1 || true
         rm -rf "$DOCKER_CONFIG" "$work"
       }
       trap restore EXIT
@@ -161,11 +163,30 @@ tasks:
       crane tag "$repo:git-7f3c2e1" 1.2.0 >/dev/null 2>&1
       moved=""
 
+      # The same unsigned image in another repository of the same registry.
+      crane copy "$repo:grader-unsigned" "$reg/grader/unsigned:probe" >/dev/null 2>&1
+      if pull "$reg/grader/unsigned:probe" >/dev/null; then
+        echo "not yet: the grader pushed an unsigned image to $reg/grader/unsigned and the"
+        echo "policy let it through. The signature requirement covers shop/cart only; it"
+        echo "has to cover everything pulled from $reg."
+        exit 1
+      fi
+
       if ! out=$(pull "$repo@$release"); then
         echo "not yet: the signed release, pulled by digest, was refused:"
         echo "  $out" | tail -1
         exit 1
       fi
+
+      staged=$(docker cp shop-cart:/build.json - 2>/dev/null | tar -xO 2>/dev/null || true)
+      case $staged in
+        *'"ci 1.2.0"'*) ;;
+        *)
+          echo "not yet: the policy is right, but staging still runs:"
+          echo "  ${staged:-nothing (no shop-cart container)}"
+          echo "Deploy 1.2.0 with /work/deploy/deploy.sh."
+          exit 1 ;;
+      esac
 
       echo "PASS — release 1.2.0 deploys; an unsigned image, and an unsigned image"
       echo "wearing the release's tag, are both refused."

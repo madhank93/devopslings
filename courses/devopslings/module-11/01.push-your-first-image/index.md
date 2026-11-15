@@ -114,6 +114,11 @@ tasks:
         fi
       done
 
+      if [ "$first" = "$second" ] && [ "$first" = "$latest" ] && [ "$v10" != "$latest" ]; then
+        echo "not yet: first= and second= are both what latest names now. first= is what"
+        echo "it named after the first push — the tag moved, and 1.0 still names the old build."
+        exit 1
+      fi
       if [ "$first" = "$second" ]; then
         echo "not yet: first= and second= are the same digest. Change"
         echo "/work/hello/index.html between the two builds — a new build is a new"

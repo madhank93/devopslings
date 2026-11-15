@@ -242,6 +242,7 @@ tasks:
       # --- 3. the gate still lets reviewed packages through, and an unpublish --
       # --- upstream does not reach the mirror ----------------------------------
       if [ -f "$approved" ]; then cp "$approved" "$saved"; touched=had; else touched=absent; fi
+      if [ -s "$approved" ] && [ -n "$(tail -c1 "$approved")" ]; then echo >> "$approved"; fi
       echo "left-pad==1.3.0" >> "$approved"
       mkwheel /srv/pypi/public/simple left-pad 1.3.0 --origin "left-pad maintainer" >/dev/null
       mv /srv/pypi/public/simple/event-stream "$work/unpublished"
