@@ -231,8 +231,14 @@ tasks:
 
       # A required context is matched by name. The names the pipeline actually
       # reports are the ones on its commits, and they are not the job names.
-      curl -fsS $auth "${api}/repos/${repo}/commits/${base_sha}/statuses" 2>/dev/null \
-        | tr '}' '\n' | sed -n 's/.*"context":"\([^"]*\)".*/\1/p' | sort -u > "$work/real" || true
+      # The newest commit may still be queued for the runner, so take the
+      # newest one on main that reports anything.
+      : > "$work/real"
+      for sha in $(git rev-list -n 20 "$base_sha"); do
+        curl -fsS $auth "${api}/repos/${repo}/commits/${sha}/statuses" 2>/dev/null \
+          | tr '}' '\n' | sed -n 's/.*"context":"\([^"]*\)".*/\1/p' | sort -u > "$work/real" || true
+        [ -s "$work/real" ] && break
+      done
       # A pull request head reports the (pull_request) twin of each (push)
       # context, so requiring that one is equally valid.
       if grep -qs 'pull_request' .forgejo/workflows/*.yml .forgejo/workflows/*.yaml; then
@@ -240,7 +246,7 @@ tasks:
       fi
       real=$(cat "$work/real")
       if [ -z "$real" ]; then
-        echo "not yet: the tip of main carries no check results, so there is no evidence"
+        echo "not yet: no recent commit on main carries check results, so there is no evidence"
         echo "the pipeline runs at all. A required context that nothing reports blocks"
         echo "every merge forever."
         exit 1
