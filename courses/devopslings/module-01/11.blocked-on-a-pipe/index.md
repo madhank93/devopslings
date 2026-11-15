@@ -78,14 +78,25 @@ tasks:
       systemctl start --no-block export-orders.service >/dev/null 2>&1 || true
 
       # Wait for it to actually reach the blocking open before fingerprinting
-      # what it is blocked in. Reading too early catches it mid-exec.
+      # what it is blocked in. Reading too early catches it mid-exec, in a
+      # sleep that ends on its own, so only a value that holds for a full
+      # second is the open that never returns.
       wchan=""
-      for _ in $(seq 1 60); do
+      last=""
+      same=0
+      for _ in $(seq 1 120); do
         pid=$(systemctl show -p MainPID --value export-orders.service 2>/dev/null || echo 0)
+        w=""
         if [ -n "$pid" ] && [ "$pid" != "0" ] && [ -r "/proc/$pid/wchan" ]; then
           w=$(cat "/proc/$pid/wchan" 2>/dev/null || true)
-          if [ -n "$w" ] && [ "$w" != "0" ]; then wchan="$w"; break; fi
         fi
+        if [ -n "$w" ] && [ "$w" != "0" ] && [ "$pid:$w" = "$last" ]; then
+          same=$((same + 1))
+        else
+          same=0
+        fi
+        last="$pid:$w"
+        if [ "$same" -ge 4 ]; then wchan="$w"; break; fi
         sleep 0.25
       done
 
