@@ -59,6 +59,9 @@ your configuration as it is now. Then:
 - every credential has a lease, under `database/creds/<service>/`
 - the check revokes `orders`'s lease: `orders` must lose the database, and the
   other three must not
+- the check holds an open session on an `orders` credential and one on a
+  `billing` credential, then revokes the `orders` one: that session must end,
+  and the `billing` one must not
 - `orders` is recreated afterwards, so it gets a fresh credential
 
 <details>
