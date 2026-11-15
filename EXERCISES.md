@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 187 shipped, 2 blocked, 110 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 193 shipped, 2 blocked, 104 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 15, 16, 21.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 14, 15, 16, 21.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1740,30 +1740,35 @@ engine (`db_bench`) for the write-stall exercise.
 ## 14 — IaC: Pulumi (Go)
 `iac-stack`
 
-- **first-program-in-go** *(intro)* — one resource, in a language with a compiler.
+- **first-program-in-go** *(intro · shipped)* — one resource, in a language with a compiler.
   *Check:* `pulumi up` creates it and `pulumi destroy` removes it, and the answer
-  states what the compiler caught that HCL would have failed on at apply time.
+  states what the compiler caught, what only the provider caught, and which `tofu`
+  command catches the compiler's mistake in HCL.
   *Source:* own.
 
-- **same-infra-in-go** *(core)* — port the module-13 stack.
-  *Check:* both stacks converge on identical resources; plan is empty after port.
+- **same-infra-in-go** *(core · shipped)* — port a running OpenTofu stack to Pulumi.
+  *First guess:* `tofu destroy`, then `pulumi up`.
+  *Check:* Pulumi owns every resource, OpenTofu none; the data volume and network are
+  the originals, imported not recreated; preview is empty after the port.
   *Source:* own.
 
-- **what-hcl-cannot-say** *(core)* — conditional topology from a config value.
+- **what-hcl-cannot-say** *(core · shipped)* — conditional topology from a config value.
   *First guess:* nested `count` tricks in HCL.
-  *Check:* the Go program produces both topologies from one input.
+  *Check:* the Go program produces every topology from one input, and reordering the
+  site list replaces nothing whose site did not change.
   *Source:* own.
 
-- **stacks-and-secrets** *(core)* — dev and prod from one program.
-  *Check:* per-stack config, encrypted secret never present in plaintext in the repo.
+- **stacks-and-secrets** *(core · shipped)* — dev and prod from one program.
+  *Check:* per-stack config, encrypted secret never present in plaintext in the repo,
+  its history or state; a third stack deploys from its config alone.
   *Source:* own.
 
-- **unit-testing-infrastructure** *(deep)* — a test that fails when the bucket goes public.
+- **unit-testing-infrastructure** *(deep · shipped)* — a test that fails when the bucket goes public.
   *First guess:* apply and look.
   *Check:* mocks-based test fails on the bad property before anything is created.
   *Source:* Pulumi Go mocks; the capability HCL lacks.
 
-- **when-not-to** *(architect)* — a decision exercise with a written verdict.
+- **when-not-to** *(architect · shipped)* — a decision exercise with a written verdict.
   *Check:* the answer file picks a tool per scenario and cites the constraint that
   decided it; graded against a rubric of required factors.
   *Source:* own.
