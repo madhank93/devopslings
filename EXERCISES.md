@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 215 shipped, 2 blocked, 82 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 225 shipped, 2 blocked, 72 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 14, 15, 16, 18, 21, 22.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 14, 15, 16, 18, 21, 22, 23.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -2271,53 +2271,53 @@ failures transfer to any provider.
 ## 23 — Backup & Disaster Recovery
 `ha-stack`
 
-- **take-a-backup** *(intro)* — run the dump, then open it.
+- **take-a-backup** *(intro · shipped)* — run the dump, then open it.
   *Check:* the backup file exists and the answer states which of the three named
   tables it actually contains — the dump was taken with a flag that excluded one,
   and reading the file is the only way to find out.
   *Source:* own; the rung below backup-then-restore.
 
-- **rpo-and-rto-first** *(architect)* — numbers before design.
+- **rpo-and-rto-first** *(architect · shipped)* — numbers before design.
   *Check:* the stated objectives are consistent with the design that follows;
   a design that cannot meet them fails.
   *Source:* own.
 
-- **backup-then-restore** *(core)* — the backup nobody has restored.
+- **backup-then-restore** *(core · shipped)* — the backup nobody has restored.
   *First guess:* the dump exited 0, so it worked.
   *Check:* a restore into a clean instance reproduces the data exactly.
   *Source:* own.
 
-- **pitr** *(deep)* — recover to the moment before the bad `DELETE`.
+- **pitr** *(deep · shipped)* — recover to the moment before the bad `DELETE`.
   *Check:* the target timestamp is hit; the row count matches the pre-incident state.
   *Source:* own.
 
-- **restore-under-a-timer** *(core)* — measure the real RTO.
+- **restore-under-a-timer** *(core · shipped)* — measure the real RTO.
   *Check:* wall-clock restore time recorded and compared against the promise; the
   answer must reconcile the gap.
   *Source:* own.
 
-- **lost-state-file** *(core)* — the OpenTofu state is gone.
+- **lost-state-file** *(core · shipped)* — the OpenTofu state is gone.
   *First guess:* apply again and create everything twice.
   *Check:* infrastructure re-adopted by import; plan empty, nothing recreated.
   *Source:* own.
 
-- **lost-unseal-keys** *(core)* — OpenBao sealed, keys unavailable.
+- **lost-unseal-keys** *(core · shipped)* — OpenBao sealed, keys unavailable.
   *Check:* the documented recovery path is followed, or the honest conclusion is
   reached and the rebuild is executed.
   *Source:* own.
 
-- **3-2-1-and-immutable** *(deep)* — the ransomware angle.
+- **3-2-1-and-immutable** *(deep · shipped)* — the ransomware angle.
   *Check:* a backup copy survives an attacker with production credentials.
   *Source:* own.
 
-- **region-loss-tabletop** *(architect)* — the whole region is gone for six hours.
+- **region-loss-tabletop** *(architect · shipped)* — the whole region is gone for six hours.
   *Check:* the written plan meets the module's stated RPO and RTO using only
   resources that exist outside the lost region, names the decision owner for the
   failover call, and is graded against a rubric that rejects any step depending
   on something inside the failed region.
   *Source:* own.
 
-- **incident-gitlab-2017** *(architect · replay)* — five backup methods, none working.
+- **incident-gitlab-2017** *(architect · replay · shipped)* — five backup methods, none working.
   *Check:* each planted failure mode is detected by a verification job the student
   writes, before it is needed.
   *Source:* published GitLab postmortem, simplified.
