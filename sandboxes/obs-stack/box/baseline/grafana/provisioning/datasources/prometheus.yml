@@ -8,3 +8,7 @@ datasources:
     isDefault: true
     jsonData:
       timeInterval: 5s
+      # An exemplar's trace_id label opens that trace in Tempo.
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo

@@ -6,11 +6,14 @@
 set -euo pipefail
 . /usr/local/lib/obs.sh
 
-for d in prometheus alertmanager grafana apps queries; do
+for d in prometheus alertmanager grafana apps queries otel vector answers; do
   rm -rf "/obs/$d"
   [ -e "/opt/obs-baseline/$d" ] && cp -a "/opt/obs-baseline/$d" "/obs/$d"
 done
 rm -f /obs/run/*.down /obs/run/*.restart /obs/run/*.fault /obs/run/*.slow
+for a in $OBS_IDLE_APPS; do app_down "$a"; done
+mkdir -p /obs/answers /obs/otel/out
+chmod -R a+rwX /obs/otel/out
 chmod -R a+rX /obs
 
 obs_reload >/dev/null

@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""ticket-ship FILE — index support tickets into OpenSearch, the way the desk's shipper does.
+
+FILE holds one JSON ticket per line. Each is indexed through the alias
+`support`, with its ticket_id as the document id, so shipping a ticket twice
+leaves one copy. Tickets OpenSearch refuses are written to
+/obs/opensearch/dead-letter.ndjson, which each run replaces.
+"""
+import collections
+import json
+import sys
+import urllib.error
+import urllib.request
+
+OS = "http://opensearch:9200"
+DEAD = "/obs/opensearch/dead-letter.ndjson"
+
+
+def bulk(tickets):
+    body = "".join(json.dumps({"index": {"_id": t["ticket_id"]}}) + "\n" + json.dumps(t) + "\n" for t in tickets)
+    req = urllib.request.Request(f"{OS}/support/_bulk", data=body.encode(),
+                                 headers={"Content-Type": "application/x-ndjson"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            items = json.load(r)["items"]
+    except urllib.error.HTTPError as e:
+        err = e.read().decode(errors="replace")[:300]
+        return [(t, err) for t in tickets]
+    return [(t, it["index"]["error"]) for t, it in zip(tickets, items) if "error" in it["index"]]
+
+
+def main(argv):
+    if len(argv) != 1:
+        sys.exit(__doc__)
+    tickets = [json.loads(l) for l in open(argv[0]) if l.strip()]
+    failed = []
+    for i in range(0, len(tickets), 200):
+        failed += bulk(tickets[i:i + 200])
+    with open(DEAD, "w") as f:
+        for t, _ in failed:
+            f.write(json.dumps(t) + "\n")
+    print(f"indexed {len(tickets) - len(failed)} of {len(tickets)} tickets; {len(failed)} rejected", end="")
+    if not failed:
+        print()
+        return 0
+    print(f", written to {DEAD}")
+    reasons = collections.Counter(e.get("reason", str(e))[:200] if isinstance(e, dict) else e for _, e in failed)
+    for reason, n in reasons.most_common(3):
+        print(f"  {n:5d}  {reason}")
+    return 1
+
+
+sys.exit(main(sys.argv[1:]))
