@@ -204,7 +204,17 @@ tasks:
         exit 1
       fi
 
-      passes() { cat /srv/ledger/.passes 2>/dev/null || echo 0; }
+      # The job truncates and rewrites the counter on every pass, so a read can
+      # land between the two. An empty read is retried, never taken as a count.
+      passes() {
+        n=""
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+          n=$(cat /srv/ledger/.passes 2>/dev/null || true)
+          [ -n "$n" ] && break
+          sleep 0.05
+        done
+        echo "${n:-0}"
+      }
       oom_kills() { awk '/^oom_kill /{print $2; found=1} END {if (!found) print 0}' "$cg/memory.events"; }
 
       k0=$(oom_kills)
