@@ -1,0 +1,6 @@
+# Providers come from the copy baked into the image; nothing is downloaded.
+provider_installation {
+  filesystem_mirror {
+    path = "/usr/share/tofu-mirror"
+  }
+}

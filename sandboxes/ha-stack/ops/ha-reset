@@ -58,6 +58,16 @@ if [ "$(psql -h pg1 -tAXc 'select pg_is_in_recovery()' 2>/dev/null)" != "f" ]; t
   echo "ha-reset: pg1 is not a writable primary; run 'devopslings reset' for a clean stack"
 fi
 psql -h pg1 -qtAXc "ALTER SYSTEM RESET synchronous_standby_names" -c "ALTER SYSTEM RESET synchronous_commit" -c "ALTER SYSTEM RESET default_transaction_read_only" -c "SELECT pg_reload_conf()" >/dev/null 2>&1
+# WAL archiving (module 23) only switches off with a restart.
+psql -h pg1 -qtAXc "ALTER SYSTEM RESET archive_mode" -c "ALTER SYSTEM RESET archive_command" -c "ALTER SYSTEM RESET archive_timeout" -c "SELECT pg_reload_conf()" >/dev/null 2>&1
+if [ "$(psql -h pg1 -tAXc 'show archive_mode' 2>/dev/null)" = on ]; then
+  docker restart "$(c pg1)" >/dev/null
+  wait_for 60 "pg1" pg_isready -h pg1 -U postgres -d shop
+  echo "ha-reset: restarted pg1 to turn WAL archiving off"
+fi
+# Module 23's backups, archives and scratch restore instances.
+pkill -x postgres 2>/dev/null || true
+rm -rf /ha/backups /ha/archive /ha/infra /ha/backupd /ha/dr /ha/bao /var/lib/scratchdb /var/lib/pitr
 streaming=$(psql -h pg1 -tAXc "select count(*) from pg_stat_replication where application_name = 'pg2' and state = 'streaming'" 2>/dev/null)
 if [ "${streaming:-0}" != "1" ]; then
   mkdir -p /ha/pg2 && touch /ha/pg2/reclone

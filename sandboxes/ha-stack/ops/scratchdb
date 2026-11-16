@@ -1,0 +1,27 @@
+#!/bin/bash
+# scratchdb — a throwaway Postgres on this box, for restore drills.
+#
+#   scratchdb fresh   discard any previous one and start an empty instance
+#   scratchdb stop    stop it and delete its data
+#
+# It listens on localhost:5433: psql -h localhost -p 5433
+set -eu
+dir=/var/lib/scratchdb
+stop() {
+  if [ -s "$dir/postmaster.pid" ]; then
+    gosu postgres pg_ctl -D "$dir" -m immediate stop >/dev/null 2>&1 || true
+  fi
+  rm -rf "$dir"
+}
+case "${1:-}" in
+  fresh)
+    stop
+    mkdir -p "$dir" && chown postgres:postgres "$dir"
+    gosu postgres initdb -D "$dir" -U postgres --auth=trust >/dev/null
+    gosu postgres pg_ctl -D "$dir" -l "$dir/log" -w \
+      -o "-p 5433 -c listen_addresses=localhost -c shared_buffers=32MB" start >/dev/null
+    echo "scratchdb: empty instance on localhost:5433"
+    ;;
+  stop) stop; echo "scratchdb: stopped" ;;
+  *) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

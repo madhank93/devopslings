@@ -212,6 +212,48 @@ services:
     networks:
       back: { ipv4_address: 172.29.23.43 }
 
+  # OpenBao, sealed and uninitialised until a lesson sets it up: module 23's
+  # unseal-key lesson owns its whole lifecycle, so nothing here unseals it.
+  bao:
+    image: openbao/openbao:2.6.4
+    container_name: devopslings-ha-bao
+    hostname: bao
+    restart: "no"
+    entrypoint: ["bao", "server", "-config=/openbao/config/bao.hcl"]
+    volumes:
+      - bao-data:/openbao/file
+      - ./bao/bao.hcl:/openbao/config/bao.hcl:ro
+    networks:
+      back: { ipv4_address: 172.29.23.51 }
+    healthcheck:
+      # `bao status` exits 1 only when the server does not answer; sealed is 2.
+      test: ["CMD-SHELL", "BAO_ADDR=http://127.0.0.1:8200 bao status >/dev/null 2>&1; [ $$? -ne 1 ]"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The off-site backup repository: a restic REST server. Its flags come from
+  # /ha/backupd/options when it starts; in production that file would live on
+  # a machine the shop's own credentials cannot reach.
+  backupd:
+    image: restic/rest-server:0.14.0
+    container_name: devopslings-ha-backupd
+    hostname: backupd
+    restart: "no"
+    entrypoint: ["sh", "-c", "exec rest-server --path /data --listen :8000 --no-auth $$(cat /ha/backupd/options 2>/dev/null)"]
+    volumes:
+      - ha-conf:/ha
+      - backupd-data:/data
+    networks:
+      back: { ipv4_address: 172.29.23.52 }
+    depends_on:
+      ops: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8000"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
 volumes:
   ha-conf:
   pg1-data:
@@ -219,6 +261,8 @@ volumes:
   etcd1-data:
   etcd2-data:
   etcd3-data:
+  bao-data:
+  backupd-data:
 
 networks:
   front:
