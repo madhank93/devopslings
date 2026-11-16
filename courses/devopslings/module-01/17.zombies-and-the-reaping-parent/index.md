@@ -135,10 +135,22 @@ tasks:
         exit 1
       fi
 
+      # The runner truncates and rewrites the counter on every job, so a read
+      # can land between the two. An empty read is retried, never taken as zero.
+      completed() {
+        n=""
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+          n=$(cat /srv/jobrunner/completed 2>/dev/null || true)
+          [ -n "$n" ] && break
+          sleep 0.05
+        done
+        echo "${n:-0}"
+      }
+
       # It has to still be doing the work.
-      c1=$(cat /srv/jobrunner/completed 2>/dev/null || echo 0)
+      c1=$(completed)
       sleep 3
-      c2=$(cat /srv/jobrunner/completed 2>/dev/null || echo 0)
+      c2=$(completed)
       if [ "${c2:-0}" -le "${c1:-0}" ]; then
         echo "not yet: job-runner is up but its completed counter is not advancing"
         echo "         ($c1 -> $c2). It has to keep running jobs, not just stop making"
@@ -159,7 +171,7 @@ tasks:
       fi
 
       total=$(ps -eo stat= | grep -c '^Z' || true)
-      c3=$(cat /srv/jobrunner/completed 2>/dev/null || echo 0)
+      c3=$(completed)
       echo "PASS — $((c3 - c1)) more jobs completed, $zombies defunct children left"
       echo "       (box-wide total: $total)."
 ---

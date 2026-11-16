@@ -57,7 +57,9 @@ tasks:
       }
       break_wal-archive() {
         psql -qX -c "ALTER SYSTEM SET archive_command = 'cp %p $B/wal-2016/%f'" -c "SELECT pg_reload_conf()" >/dev/null
-        archived failed
+        # archived switches WAL, and pg2 reports its replay position only every
+        # few seconds; let it catch up so this fault is not also a replica fault.
+        archived failed && heal_replica
       }
       heal_replica() {
         psql -qtAX -h pg2 -c "SELECT pg_wal_replay_resume() WHERE pg_is_wal_replay_paused()" >/dev/null
