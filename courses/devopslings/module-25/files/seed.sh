@@ -165,8 +165,7 @@ while [ "$w" -lt "$weeks" ]; do
         git add -A; at $t
         git -c user.name=dev -c user.email=dev@example.invalid commit -q \
           -m "ops: Thursday release train, and redeploy production every night" \
-          -m "The nightly redeploy keeps the CDN cache warm and keeps our deploy
-frequency up where the dashboard wants it."
+          -m "The nightly redeploy keeps the CDN cache warm."
         ;;
       *) routine $t ;;
     esac
