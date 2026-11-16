@@ -1,0 +1,3 @@
+Prometheus loads every *.yml file in this directory as a rule file.
+Check one with:   promtool check rules /obs/prometheus/rules/FILE.yml
+Load changes with: obs-reload

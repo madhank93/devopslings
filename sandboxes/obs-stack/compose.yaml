@@ -1,0 +1,183 @@
+# obs-stack — the substrate for module 18 (metrics).
+#
+#   loadgen ──> shop ──> db    orders   worker-a/b   backup   gateway-exporter ──> gateway
+#      \          \       \      /          /          /          /
+#       └──────────┴───────┴── prometheus ──> alertmanager ──> sink (records pages)
+#                                  └── grafana
+#
+# Every editable file lives in one named volume mounted at /obs: Prometheus
+# config and rules, the Alertmanager config, the apps' source and Grafana
+# dashboards. `box` seeds it from the image on first start, and lessons work in
+# box, where `promq`, `promtool`, `amtool`, `obs-reload` and `obs-reset` are
+# on the PATH; /usr/local/lib/obs.sh holds the helpers checks share.
+# A named volume rather than a bind mount keeps lesson state out of the repo and
+# out of reach of macOS ownership remapping; `compose down -v` resets all of it.
+#
+# The apps run under `supervise`, which restarts one when its source changes,
+# when /obs/run/<app>.restart appears, and holds it stopped while
+# /obs/run/<app>.down exists. That is how a check restarts an exporter or takes
+# a target away without a docker socket.
+#
+# Timing is short on purpose so a check waits seconds, not minutes:
+#   scrape_interval 5s, evaluation_interval 5s     (box/baseline/prometheus)
+#   group_wait 2s, group_interval 5s, repeat 1h    (box/baseline/alertmanager)
+#
+# Module 19 extends this file: Loki, Tempo and an OpenTelemetry Collector join
+# as services on the same network, with Grafana datasources provisioned next to
+# the Prometheus one in box/baseline/grafana/provisioning/datasources.
+x-app: &app
+  image: devopslings/obs-box:local
+  pull_policy: never
+  init: true
+  volumes:
+    - obs:/obs
+  depends_on:
+    box:
+      condition: service_healthy
+  mem_limit: 128m
+
+services:
+  # The workbench: lessons run here, and the student's shell opens here.
+  box:
+    build: ./box
+    image: devopslings/obs-box:local
+    command: ["obs-seed"]
+    init: true
+    volumes:
+      - obs:/obs
+    healthcheck:
+      test: ["CMD", "test", "-e", "/obs/.seeded"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    mem_limit: 256m
+
+  shop:
+    <<: *app
+    command: ["supervise", "shop", "python3", "/obs/apps/shop.py"]
+    # A second name for the same process, so service discovery can hand
+    # Prometheus a new target without a second container.
+    networks:
+      default:
+        aliases: [shop-2]
+
+  db:
+    <<: *app
+    command: ["supervise", "db", "python3", "/obs/apps/db.py"]
+
+  orders:
+    <<: *app
+    command: ["supervise", "orders", "python3", "/obs/apps/orders.py"]
+
+  worker-a:
+    <<: *app
+    environment:
+      WORKER_ID: a
+    command: ["supervise", "worker-a", "python3", "/obs/apps/worker.py"]
+
+  worker-b:
+    <<: *app
+    environment:
+      WORKER_ID: b
+    command: ["supervise", "worker-b", "python3", "/obs/apps/worker.py"]
+
+  backup:
+    <<: *app
+    command: ["supervise", "backup", "python3", "/obs/apps/backup.py"]
+
+  # A vendor product with a JSON status page and no metrics of its own.
+  gateway:
+    <<: *app
+    command: ["supervise", "gateway", "python3", "/obs/apps/gateway.py"]
+
+  # Runs whatever /obs/apps/gateway_exporter.py is: the gateway's exporter,
+  # which a lesson has the student write.
+  gateway-exporter:
+    <<: *app
+    command: ["supervise", "gateway-exporter", "python3", "/obs/apps/gateway_exporter.py"]
+
+  # Receives Alertmanager's webhooks and keeps every notification, so a check
+  # can count the pages a scenario produced. GET /notifications, POST /reset.
+  sink:
+    <<: *app
+    command: ["supervise", "sink", "python3", "/obs/apps/sink.py"]
+
+  # Steady traffic against shop and orders, measured from the customer's side.
+  loadgen:
+    <<: *app
+    command: ["supervise", "loadgen", "python3", "/obs/apps/loadgen.py"]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/obs/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=6h
+      - --web.enable-lifecycle
+    volumes:
+      - obs:/obs:ro
+    ports:
+      - "19090:9090"
+    depends_on:
+      box:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command:
+      - --config.file=/obs/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=
+    volumes:
+      - obs:/obs:ro
+    ports:
+      - "19093:9093"
+    depends_on:
+      box:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 128m
+
+  grafana:
+    image: grafana/grafana:12.0.2
+    environment:
+      GF_PATHS_PROVISIONING: /obs/grafana/provisioning
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      # Grafana reaches out to grafana.com at boot unless told not to; the lab
+      # has to start and grade with no network.
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - obs:/obs:ro
+    ports:
+      - "13000:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      # First boot runs several hundred database migrations, which on a busy
+      # host outlast the retries; failures during start_period do not count.
+      start_period: 240s
+    mem_limit: 256m
+
+volumes:
+  obs:

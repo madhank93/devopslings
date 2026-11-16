@@ -1,0 +1,9 @@
+#!/bin/bash
+# lbctl start   bring HAProxy back after it has died
+# lbctl stat    one line per backend server: backend,server,status
+set -eu
+case "${1:-}" in
+  start) touch "/ha/$(hostname)/start-haproxy" ;;
+  stat) curl -fsS --max-time 2 'http://127.0.0.1:8404/stats;csv' | cut -d, -f1,2,18 | grep -vE '^(#|stats,)' ;;
+  *) echo "usage: lbctl start|stat" >&2; exit 2 ;;
+esac

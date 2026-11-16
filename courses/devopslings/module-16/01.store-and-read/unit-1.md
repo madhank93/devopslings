@@ -57,10 +57,11 @@ curl localhost:18160/status
 - The key is not in greeter's environment: not the image's `ENV`, and not the
   container's.
 - No file in the running container holds it. No layer of the image holds it,
-  and nothing in the build history does.
+  and nothing in the build history does. greeter's log does not hold it.
 - No file in `sandboxes/ci-stack` or `scratch/store-and-read` holds it.
 - `GET /status` reports the key's fingerprint. Leave that endpoint as it is.
-- greeter does not use the root token.
+- greeter does not use the root token, and does not hold it in its
+  environment, its image or its files.
 - The value really comes from OpenBao. The check writes a different value to
   OpenBao, restarts greeter, and expects the new fingerprint. Then it puts the
   real key back.

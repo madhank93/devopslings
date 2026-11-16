@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""gapwatch [seconds] [url] — request url every 50ms and report every outage.
+
+Prints a line each time requests start or stop failing, then a summary: how
+many requests each node answered and the longest run of failures — the gap a
+user would have seen.
+Default: 20 seconds against http://www/.
+"""
+import sys
+import time
+import urllib.request
+
+secs = float(sys.argv[1]) if len(sys.argv) > 1 else 20
+url = sys.argv[2] if len(sys.argv) > 2 else "http://www/"
+t0 = time.monotonic()
+last = None
+down_since = None
+longest = 0.0
+ok = fail = 0
+served = {}
+while time.monotonic() - t0 < secs:
+    now = time.monotonic()
+    try:
+        with urllib.request.urlopen(url, timeout=0.5) as r:
+            who = r.headers.get("X-Served-By") or r.read().decode().strip()
+            ans = "ok"
+        served[who] = served.get(who, 0) + 1
+        ok += 1
+    except Exception as e:
+        ans = "failing: " + type(e).__name__
+        fail += 1
+    if ans != "ok":
+        if down_since is None:
+            down_since = now
+    elif down_since is not None:
+        longest = max(longest, now - down_since)
+        down_since = None
+    if ans != last:
+        print(f"{now - t0:7.2f}s  {ans}", flush=True)
+        last = ans
+    time.sleep(max(0, 0.05 - (time.monotonic() - now)))
+if down_since is not None:
+    longest = max(longest, time.monotonic() - down_since)
+nodes = " ".join(f"{k}={v}" for k, v in sorted(served.items()))
+print(f"ok={ok} failed={fail} longest_gap={longest:.2f}s {nodes}")

@@ -124,13 +124,24 @@ tasks:
         fi
       fi
 
-      # Load first, then the rotation in the middle of it.
+      # Load first, then the rotation in the middle of it. A fresh orders
+      # fetches on its first request and every CRED_TTL after, so starting
+      # rotate.sh just past the second fetch gives it the worst case: a
+      # cached copy that stays stale for nearly the full TTL.
+      ttl=$(sed -n 's/^CRED_TTL = //p' "$L/orders.py")
+      dc restart orders >/dev/null 2>&1
+      for _ in $(seq 60); do
+        curl -fsS --max-time 2 http://127.0.0.1:18168/order >/dev/null 2>&1 && break
+        sleep 0.25
+      done
       work=$(mktemp -d)
       trap 'rm -rf "$work"; touch "$S/stop"' EXIT
       rm -f "$S/stop"
       dc exec -T loadgen python3 /lesson/load.py > "$work/load.out" 2>&1 &
       load=$!
-      sleep 3
+      dc exec -T loadgen python3 /lesson/watch.py "$u0" "$p0" devopslings-root > "$work/watch.out" 2>&1 &
+      watch=$!
+      sleep "$ttl.3"
 
       rc=0
       COMPOSE_FILE="compose.yaml:$G" bash "$S/rotate.sh" > "$work/rotate.out" 2>&1 &
@@ -145,6 +156,7 @@ tasks:
       sleep 3
       touch "$S/stop"
       wait "$load" || true
+      wait "$watch" || true
 
       ok=$(sed -n 's/^ok //p' "$work/load.out" | head -1 || true)
       fail=$(sed -n 's/^fail //p' "$work/load.out" | head -1 || true)
@@ -164,6 +176,13 @@ tasks:
 
       u1=$(kv username); p1=$(kv password)
       if ! login "$u1" "$p1"; then
+        pp=$(kv previous_password)
+        if [ -n "$pp" ] && login "$u1" "$pp"; then
+          echo "not yet: after rotate.sh, secret/orders/db's password does not log in; only its"
+          echo "         previous_password does. The new password never reached Postgres, so orders"
+          echo "         runs on the old one, and the rotation has not happened."
+          exit 1
+        fi
         echo "not yet: after rotate.sh, the credential in secret/orders/db ($u1) does not"
         echo "         log in. OpenBao and Postgres disagree, and orders is down from here on."
         exit 1
@@ -192,11 +211,26 @@ tasks:
           echo "         while the copy orders held did not match the database: until its next"
           echo "         fetch from OpenBao, which it caches for 10s."
         else
-          echo "         rotate.sh did publish two credentials, but the old one stopped working"
-          echo "         before orders had fetched the new pair. It caches for 10s: the window"
+          echo "         rotate.sh did make a second credential, but the old one stopped working"
+          echo "         before orders had fetched the new one. It caches for 10s: the window"
           echo "         has to outlast that."
         fi
         exit 1
+      fi
+
+      # Zero failures can be luck: it depends on when orders last fetched. The
+      # window itself must outlast the cache, measured publish to cut.
+      pub=$(sed -n 's/^published //p' "$work/watch.out" | head -1 || true)
+      cut=$(sed -n 's/^cut //p' "$work/watch.out" | head -1 || true)
+      if [ -n "$pub" ] && [ -n "$cut" ]; then
+        gap=$(awk -v a="$pub" -v b="$cut" 'BEGIN { printf "%.1f", b - a }')
+        if awk -v g="$gap" -v t="$ttl" 'BEGIN { exit !(g < t) }'; then
+          echo "not yet: no request failed, but only because of when orders last fetched. The old"
+          echo "         credential stopped working ${gap}s after rotate.sh published the new one,"
+          echo "         and orders caches for ${ttl}s: a copy fetched just before the publish would"
+          echo "         have been refused. Keep the old one working for longer than the cache."
+          exit 1
+        fi
       fi
 
       if login "$u0" "$p0"; then

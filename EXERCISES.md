@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 177 shipped, 2 blocked, 120 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 225 shipped, 2 blocked, 72 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 15, 16, 21.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 14, 15, 16, 18, 21, 22, 23.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 0/10 · 14 0/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 0/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 0/12 · 23 0/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1680,56 +1680,56 @@ engine (`db_bench`) for the write-stall exercise.
 ## 13 — IaC: OpenTofu
 `iac-stack` (new)
 
-- **first-resource** *(intro)* — a container managed by code instead of by hand.
+- **first-resource** *(intro · shipped)* — a container managed by code instead of by hand.
   *First guess:* `docker run` and write the HCL afterwards.
   *Check:* plan/apply/destroy cycle is clean and repeatable from an empty state.
   *Source:* roadmap.sh.
 
-- **what-is-in-state** *(core)* — the file everyone is afraid of.
+- **what-is-in-state** *(core · shipped)* — the file everyone is afraid of.
   *First guess:* edit state by hand.
   *Check:* the resource is corrected through `state mv`/`rm`/`import`, not an editor,
   and a subsequent plan is empty.
   *Source:* own.
 
-- **two-applies-one-lock** *(core)* — a colleague applies while you do.
+- **two-applies-one-lock** *(core · shipped)* — a colleague applies while you do.
   *First guess:* retry until it works.
   *Check:* locking enabled and demonstrated; the second apply waits rather than
   corrupting state.
   *Source:* own.
 
-- **drift** *(core)* — someone deleted a resource in the console.
+- **drift** *(core · shipped)* — someone deleted a resource in the console.
   *First guess:* re-run apply and hope.
   *Check:* drift detected in plan, reconciled, and a detection step added to CI.
   *Source:* roadmap.sh.
 
-- **modules-and-outputs** *(core)* — the same three resources copy-pasted four times.
+- **modules-and-outputs** *(core · shipped)* — the same three resources copy-pasted four times.
   *First guess:* copy it a fifth time.
   *Check:* one module, four instances, no duplicated resource blocks, plan stable.
   *Source:* own.
 
-- **import-what-exists** *(core)* — infrastructure that predates the code.
+- **import-what-exists** *(core · shipped)* — infrastructure that predates the code.
   *First guess:* destroy and recreate in production.
   *Check:* imported with an empty plan afterwards.
   *Source:* own.
 
-- **count-versus-for-each** *(core)* — removing the second item destroys the third.
+- **count-versus-for-each** *(core · shipped)* — removing the second item destroys the third.
   *First guess:* it is a provider bug.
   *Check:* keyed addressing; removing an item touches only that item in the plan.
   *Source:* own.
 
-- **remote-backend-on-minio** *(core)* — state on a laptop.
+- **remote-backend-on-minio** *(core · shipped)* — state on a laptop.
   *First guess:* commit the state file.
   *Check:* remote backend with locking, migrated without losing resources, and the
   state file is gitignored.
   *Source:* own.
 
-- **prevent-destroy** *(architect)* — a plan that would delete the database.
+- **prevent-destroy** *(architect · shipped)* — a plan that would delete the database.
   *First guess:* read the plan carefully every time.
   *Check:* the destructive plan is blocked by policy, and the legitimate change
   still applies.
   *Source:* own.
 
-- **serverless-cold-start** *(deep)* — a function that times out only on the first call.
+- **serverless-cold-start** *(deep · shipped)* — a function that times out only on the first call.
   *First guess:* raise the timeout to 30 seconds.
   *Check:* cold-start latency measured, timeout justified against it, and the
   initialisation moved out of the request path.
@@ -1740,30 +1740,35 @@ engine (`db_bench`) for the write-stall exercise.
 ## 14 — IaC: Pulumi (Go)
 `iac-stack`
 
-- **first-program-in-go** *(intro)* — one resource, in a language with a compiler.
+- **first-program-in-go** *(intro · shipped)* — one resource, in a language with a compiler.
   *Check:* `pulumi up` creates it and `pulumi destroy` removes it, and the answer
-  states what the compiler caught that HCL would have failed on at apply time.
+  states what the compiler caught, what only the provider caught, and which `tofu`
+  command catches the compiler's mistake in HCL.
   *Source:* own.
 
-- **same-infra-in-go** *(core)* — port the module-13 stack.
-  *Check:* both stacks converge on identical resources; plan is empty after port.
+- **same-infra-in-go** *(core · shipped)* — port a running OpenTofu stack to Pulumi.
+  *First guess:* `tofu destroy`, then `pulumi up`.
+  *Check:* Pulumi owns every resource, OpenTofu none; the data volume and network are
+  the originals, imported not recreated; preview is empty after the port.
   *Source:* own.
 
-- **what-hcl-cannot-say** *(core)* — conditional topology from a config value.
+- **what-hcl-cannot-say** *(core · shipped)* — conditional topology from a config value.
   *First guess:* nested `count` tricks in HCL.
-  *Check:* the Go program produces both topologies from one input.
+  *Check:* the Go program produces every topology from one input, and reordering the
+  site list replaces nothing whose site did not change.
   *Source:* own.
 
-- **stacks-and-secrets** *(core)* — dev and prod from one program.
-  *Check:* per-stack config, encrypted secret never present in plaintext in the repo.
+- **stacks-and-secrets** *(core · shipped)* — dev and prod from one program.
+  *Check:* per-stack config, encrypted secret never present in plaintext in the repo,
+  its history or state; a third stack deploys from its config alone.
   *Source:* own.
 
-- **unit-testing-infrastructure** *(deep)* — a test that fails when the bucket goes public.
+- **unit-testing-infrastructure** *(deep · shipped)* — a test that fails when the bucket goes public.
   *First guess:* apply and look.
   *Check:* mocks-based test fails on the bad property before anything is created.
   *Source:* Pulumi Go mocks; the capability HCL lacks.
 
-- **when-not-to** *(architect)* — a decision exercise with a written verdict.
+- **when-not-to** *(architect · shipped)* — a decision exercise with a written verdict.
   *Check:* the answer file picks a tool per scenario and cites the constraint that
   decided it; graded against a rubric of required factors.
   *Source:* own.
@@ -1916,52 +1921,52 @@ failures transfer to any provider.
 ## 18 — Metrics
 `obs-stack` (new)
 
-- **target-down** *(intro)* — a scrape target that is up but not scraped.
+- **target-down** *(intro · shipped)* — a scrape target that is up but not scraped.
   *First guess:* restart Prometheus.
   *Check:* the target reports `up == 1` for the right reason (network/relabel/port).
   *Source:* own.
 
-- **instrument-red** *(core)* — a service with no metrics of its own.
+- **instrument-red** *(core · shipped)* — a service with no metrics of its own.
   *Check:* rate, errors and duration exposed and queryable, histogram buckets sane.
   *Source:* own.
 
-- **exporter-you-write** *(core)* — the thing you need to measure has no exporter.
+- **exporter-you-write** *(core · shipped)* — the thing you need to measure has no exporter.
   *First guess:* scrape the log file.
   *Check:* the exporter serves valid metrics with correct types and help text,
   survives the scrape interval under load, and reports zero rather than
   disappearing when the source is unavailable.
   *Source:* own.
 
-- **use-for-a-node** *(core)* — saturation that no CPU graph shows.
+- **use-for-a-node** *(core · shipped)* — saturation that no CPU graph shows.
   *Check:* the saturating resource is identified from utilisation/saturation/errors.
   *Source:* Brendan Gregg's USE method.
 
-- **alert-that-pages-correctly** *(core)* — an alert that fires and reaches nobody.
+- **alert-that-pages-correctly** *(core · shipped)* — an alert that fires and reaches nobody.
   *Check:* route, grouping and inhibition deliver exactly one notification for a
   correlated outage.
   *Source:* own.
 
-- **dashboard-that-answers-a-question** *(core)* — a wall of 40 panels nobody reads.
+- **dashboard-that-answers-a-question** *(core · shipped)* — a wall of 40 panels nobody reads.
   *First guess:* add more panels.
   *Check:* the dashboard answers the three stated questions within the deadline,
   with templated variables working across environments — and a panel that answers
   none of the three must be gone.
   *Source:* own.
 
-- **cardinality-explosion** *(deep)* — Prometheus memory triples after a deploy.
+- **cardinality-explosion** *(deep · shipped)* — Prometheus memory triples after a deploy.
   *First guess:* give it more memory.
   *Check:* series count back under budget with the same question still answerable.
   *Source:* own; the most common self-inflicted observability wound.
 
-- **rate-versus-increase** *(core)* — a counter reset makes a graph lie.
+- **rate-versus-increase** *(core · shipped)* — a counter reset makes a graph lie.
   *Check:* the query survives a restart of the exporter and still reports truth.
   *Source:* own.
 
-- **recording-rules** *(core)* — a dashboard that times out.
+- **recording-rules** *(core · shipped)* — a dashboard that times out.
   *Check:* panel loads under the deadline; the rule's output matches the raw query.
   *Source:* own.
 
-- **absent-and-staleness** *(deep)* — the alert that did not fire because the data stopped.
+- **absent-and-staleness** *(deep · shipped)* — the alert that did not fire because the data stopped.
   *First guess:* thresholds only.
   *Check:* missing data pages; a normal deploy gap does not.
   *Source:* own.
@@ -2192,58 +2197,58 @@ failures transfer to any provider.
 ## 22 — High Availability
 `ha-stack` (new)
 
-- **two-nodes-one-name** *(intro)* — put a load balancer in front of two servers.
+- **two-nodes-one-name** *(intro · shipped)* — put a load balancer in front of two servers.
   *Check:* both backends receive traffic under a spread of requests, and stopping
   either one leaves the service answering — the baseline every later exercise in
   this module breaks.
   *Source:* own.
 
-- **hunt-the-spof** *(core)* — draw the topology, then break each box.
+- **hunt-the-spof** *(core · shipped)* — draw the topology, then break each box.
   *Check:* the answer file lists every single point of failure; the grader kills
   each one and compares.
   *Source:* own.
 
-- **vip-failover** *(core)* — keepalived, and the four seconds nobody measured.
+- **vip-failover** *(core · shipped)* — keepalived, and the four seconds nobody measured.
   *Check:* failover completes within the stated budget with no split VIP.
   *Source:* own.
 
-- **active-active** *(core)* — two nodes, one session store.
+- **active-active** *(core · shipped)* — two nodes, one session store.
   *First guess:* sticky sessions solve it.
   *Check:* a request served by either node sees the same session; killing one
   node loses no session.
   *Source:* own.
 
-- **the-lying-health-check** *(core · callback)* — 200 while the database is down.
+- **the-lying-health-check** *(core · callback · shipped)* — 200 while the database is down.
   *Check:* the node leaves rotation on dependency failure and rejoins on recovery.
   *Source:* own; callback to module 06.
 
-- **replica-promotion** *(core)* — the primary is gone; the replica is read-only.
+- **replica-promotion** *(core · shipped)* — the primary is gone; the replica is read-only.
   *Check:* promoted replica accepts writes, the application follows, and no
   committed transaction is lost.
   *Source:* own; builds on module 10's replication-lag-stale-read.
 
-- **split-brain** *(deep)* — three-node etcd, kill two.
+- **split-brain** *(deep · shipped)* — three-node etcd, kill two.
   *First guess:* force the survivor to accept writes.
   *Check:* the cluster refuses to lose quorum, and recovery restores consistency
   without data divergence.
   *Source:* own.
 
-- **leader-election** *(core)* — two schedulers both think they lead.
+- **leader-election** *(core · shipped)* — two schedulers both think they lead.
   *Check:* exactly one leader across a partition and a restart.
   *Source:* own.
 
-- **serve-stale** *(deep)* — degrade instead of 500.
+- **serve-stale** *(deep · shipped)* — degrade instead of 500.
   *Check:* with the backend down, users get stale-but-labelled content and the
   error budget is spent slowly rather than instantly.
   *Source:* own.
 
-- **incident-github-2018** *(architect · replay)* — 43 seconds of partition,
+- **incident-github-2018** *(architect · replay · shipped)* — 43 seconds of partition,
   24 hours of reconciliation.
   *Check:* the reconstruction demonstrates why failing back was harder than
   failing over; the runbook produced is graded against required steps.
   *Source:* published GitHub postmortem, simplified.
 
-- **cert-rotation-behind-a-vip** *(core)* — the certificate was renewed, and
+- **cert-rotation-behind-a-vip** *(core · shipped)* — the certificate was renewed, and
   half the handshakes still present the old one.
   *First guess:* restart the node holding the VIP; that is the node with the new
   certificate, and the stale one is behind the same address.
@@ -2253,7 +2258,7 @@ failures transfer to any provider.
   rotates on its own — which is nothing.
   *Source:* own.
 
-- **incident-facebook-bgp-2021** *(architect · replay)* — a routing withdrawal
+- **incident-facebook-bgp-2021** *(architect · replay · shipped)* — a routing withdrawal
   that removes the network the operators needed to reach the network.
   *First guess:* roll back the change — the path to roll it back is gone.
   *Check:* the reconstruction identifies every dependency that had to survive
@@ -2266,53 +2271,53 @@ failures transfer to any provider.
 ## 23 — Backup & Disaster Recovery
 `ha-stack`
 
-- **take-a-backup** *(intro)* — run the dump, then open it.
+- **take-a-backup** *(intro · shipped)* — run the dump, then open it.
   *Check:* the backup file exists and the answer states which of the three named
   tables it actually contains — the dump was taken with a flag that excluded one,
   and reading the file is the only way to find out.
   *Source:* own; the rung below backup-then-restore.
 
-- **rpo-and-rto-first** *(architect)* — numbers before design.
+- **rpo-and-rto-first** *(architect · shipped)* — numbers before design.
   *Check:* the stated objectives are consistent with the design that follows;
   a design that cannot meet them fails.
   *Source:* own.
 
-- **backup-then-restore** *(core)* — the backup nobody has restored.
+- **backup-then-restore** *(core · shipped)* — the backup nobody has restored.
   *First guess:* the dump exited 0, so it worked.
   *Check:* a restore into a clean instance reproduces the data exactly.
   *Source:* own.
 
-- **pitr** *(deep)* — recover to the moment before the bad `DELETE`.
+- **pitr** *(deep · shipped)* — recover to the moment before the bad `DELETE`.
   *Check:* the target timestamp is hit; the row count matches the pre-incident state.
   *Source:* own.
 
-- **restore-under-a-timer** *(core)* — measure the real RTO.
+- **restore-under-a-timer** *(core · shipped)* — measure the real RTO.
   *Check:* wall-clock restore time recorded and compared against the promise; the
   answer must reconcile the gap.
   *Source:* own.
 
-- **lost-state-file** *(core)* — the OpenTofu state is gone.
+- **lost-state-file** *(core · shipped)* — the OpenTofu state is gone.
   *First guess:* apply again and create everything twice.
   *Check:* infrastructure re-adopted by import; plan empty, nothing recreated.
   *Source:* own.
 
-- **lost-unseal-keys** *(core)* — OpenBao sealed, keys unavailable.
+- **lost-unseal-keys** *(core · shipped)* — OpenBao sealed, keys unavailable.
   *Check:* the documented recovery path is followed, or the honest conclusion is
   reached and the rebuild is executed.
   *Source:* own.
 
-- **3-2-1-and-immutable** *(deep)* — the ransomware angle.
+- **3-2-1-and-immutable** *(deep · shipped)* — the ransomware angle.
   *Check:* a backup copy survives an attacker with production credentials.
   *Source:* own.
 
-- **region-loss-tabletop** *(architect)* — the whole region is gone for six hours.
+- **region-loss-tabletop** *(architect · shipped)* — the whole region is gone for six hours.
   *Check:* the written plan meets the module's stated RPO and RTO using only
   resources that exist outside the lost region, names the decision owner for the
   failover call, and is graded against a rubric that rejects any step depending
   on something inside the failed region.
   *Source:* own.
 
-- **incident-gitlab-2017** *(architect · replay)* — five backup methods, none working.
+- **incident-gitlab-2017** *(architect · replay · shipped)* — five backup methods, none working.
   *Check:* each planted failure mode is detected by a verification job the student
   writes, before it is needed.
   *Source:* published GitLab postmortem, simplified.
