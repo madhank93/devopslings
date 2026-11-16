@@ -1,30 +1,33 @@
-# obs-stack — the substrate for module 18 (metrics).
+# obs-stack — the substrate for modules 18 (metrics) and 19 (logs and traces).
 #
 #   loadgen ──> shop ──> db    orders   worker-a/b   backup   gateway-exporter ──> gateway
 #      \          \       \      /          /          /          /
 #       └──────────┴───────┴── prometheus ──> alertmanager ──> sink (records pages)
-#                                  └── grafana
+#                                  └── grafana ── loki, tempo
+#
+#   checkout ──> broker ──> fulfil ──> ledger     traces ──> tempo
+#   billing ──> collector ──> loki                logs
+#   opensearch                                    (an index a lesson repairs)
 #
 # Every editable file lives in one named volume mounted at /obs: Prometheus
-# config and rules, the Alertmanager config, the apps' source and Grafana
-# dashboards. `box` seeds it from the image on first start, and lessons work in
-# box, where `promq`, `promtool`, `amtool`, `obs-reload` and `obs-reset` are
-# on the PATH; /usr/local/lib/obs.sh holds the helpers checks share.
+# config and rules, the Alertmanager config, the Collector config, the apps'
+# source and Grafana dashboards. `box` seeds it from the image on first start,
+# and lessons work in box, where `promq`, `promtool`, `amtool`, `logcli`,
+# `vector`, `obs-reload` and `obs-reset` are on the PATH;
+# /usr/local/lib/obs.sh holds the helpers checks share.
 # A named volume rather than a bind mount keeps lesson state out of the repo and
 # out of reach of macOS ownership remapping; `compose down -v` resets all of it.
 #
-# The apps run under `supervise`, which restarts one when its source changes,
-# when /obs/run/<app>.restart appears, and holds it stopped while
-# /obs/run/<app>.down exists. That is how a check restarts an exporter or takes
-# a target away without a docker socket.
+# The apps and the Collector run under `supervise`, which restarts one when its
+# source or config changes, when /obs/run/<app>.restart appears, and holds it
+# stopped while /obs/run/<app>.down exists. That is how a check restarts an
+# exporter or takes a target away without a docker socket. The tracing apps and
+# billing start held down (OBS_IDLE_APPS in obs.sh); module 19 starts them.
 #
 # Timing is short on purpose so a check waits seconds, not minutes:
 #   scrape_interval 5s, evaluation_interval 5s     (box/baseline/prometheus)
 #   group_wait 2s, group_interval 5s, repeat 1h    (box/baseline/alertmanager)
-#
-# Module 19 extends this file: Loki, Tempo and an OpenTelemetry Collector join
-# as services on the same network, with Grafana datasources provisioned next to
-# the Prometheus one in box/baseline/grafana/provisioning/datasources.
+#   Tempo trace_idle_period 2s                     (box/baseline/stack/tempo.yaml)
 x-app: &app
   image: devopslings/obs-box:local
   pull_policy: never
@@ -107,6 +110,35 @@ services:
     <<: *app
     command: ["supervise", "loadgen", "python3", "/obs/apps/loadgen.py"]
 
+  # The OpenTelemetry Collector, configured by /obs/otel/collector.yaml.
+  collector:
+    <<: *app
+    command: ["supervise", "collector", "otelcol-contrib", "--config", "/obs/otel/collector.yaml"]
+    mem_limit: 256m
+
+  # Four services joined by traces: checkout publishes each order to broker,
+  # an in-memory queue; fulfil consumes it and records it with ledger.
+  checkout:
+    <<: *app
+    command: ["supervise", "checkout", "python3", "/obs/apps/checkout.py"]
+
+  broker:
+    <<: *app
+    command: ["supervise", "broker", "python3", "/obs/apps/broker.py"]
+
+  fulfil:
+    <<: *app
+    command: ["supervise", "fulfil", "python3", "/obs/apps/fulfil.py"]
+
+  ledger:
+    <<: *app
+    command: ["supervise", "ledger", "python3", "/obs/apps/ledger.py"]
+
+  # Sends its logs to the Collector over OTLP.
+  billing:
+    <<: *app
+    command: ["supervise", "billing", "python3", "/obs/apps/billing.py"]
+
   prometheus:
     image: prom/prometheus:v3.5.0
     command:
@@ -114,6 +146,7 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=6h
       - --web.enable-lifecycle
+      - --enable-feature=exemplar-storage
     volumes:
       - obs:/obs:ro
     ports:
@@ -178,6 +211,56 @@ services:
       # host outlast the retries; failures during start_period do not count.
       start_period: 240s
     mem_limit: 256m
+
+  loki:
+    image: grafana/loki:3.5.1
+    command: ["-config.file=/obs/stack/loki.yaml"]
+    volumes:
+      - obs:/obs:ro
+    ports:
+      - "13100:3100"
+    depends_on:
+      box:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    mem_limit: 512m
+
+  tempo:
+    image: grafana/tempo:2.8.1
+    command: ["-config.file=/obs/stack/tempo.yaml"]
+    volumes:
+      - obs:/obs:ro
+    tmpfs:
+      - /var/tempo:uid=10001,gid=10001
+    ports:
+      - "13200:3200"
+    depends_on:
+      box:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3200/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    mem_limit: 512m
+
+  # One lesson's index lives here. No healthcheck, so `up --wait` does not hold
+  # every other lesson for its start; that lesson waits for it instead.
+  opensearch:
+    image: opensearchproject/opensearch:2.19.2
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms384m -Xmx384m
+      bootstrap.memory_lock: "false"
+    ports:
+      - "19200:9200"
+    mem_limit: 900m
 
 volumes:
   obs:

@@ -3,9 +3,11 @@
 # workbench. A volume that is already seeded is left alone: it holds the
 # student's work, and only `compose down -v` or obs-reset replaces it.
 set -eu
+. /usr/local/lib/obs.sh
 if [ ! -e /obs/.seeded ]; then
   cp -a /opt/obs-baseline/. /obs/
   mkdir -p /obs/run /obs/logs
+  for a in $OBS_IDLE_APPS; do app_down "$a"; done
   chmod -R a+rX /obs
   touch /obs/.seeded
 fi
