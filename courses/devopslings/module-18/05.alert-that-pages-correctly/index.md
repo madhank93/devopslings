@@ -292,8 +292,15 @@ tasks:
       settle_wait
       p2=$(pages)
       echo "shop bug, pages received:"; show "$p2"
-      if [ "$(jq length <<<"$p2")" -gt 1 ]; then
-        echo "not yet: one shop outage, $(jq length <<<"$p2") pages. ShopErrorRate and ShopCartFailing describe the"
+      # Counted by Alertmanager group: Prometheus resends resolved alerts for
+      # minutes, so shop's group from an earlier round can still exist, and an
+      # existing group sends each newly firing alert one group_interval later
+      # rather than batching them for group_wait.
+      groups=$(sink_all | jq --argjson t0 "$t0" '[.[] | select(.path == "/pager" and .at >= $t0)
+        | select(any(.payload.alerts[]; .status == "firing" and .labels.alertname != "PaymentProviderDown"))
+        | .payload.groupKey] | unique | length' 2>/dev/null || echo 0)
+      if [ "$groups" -gt 1 ]; then
+        echo "not yet: one shop outage, $groups pages. ShopErrorRate and ShopCartFailing describe the"
         echo "same broken service. Alertmanager groups alerts that share the labels in group_by"
         echo "into one notification; group_by: [alertname] gives every alert its own page."
         exit 1

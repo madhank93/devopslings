@@ -109,8 +109,9 @@ tasks:
     run: |
       . /usr/local/lib/obs.sh
       obs_require_loaded || exit 1
-      # Right after the scenario's reload, staging may not have been scraped yet.
-      prom_wait 'shop_http_requests_total{env="staging"}' 30 || true
+      # Right after the scenario's reload, either env may not have been scraped
+      # yet; each target is scraped at its own offset in the interval.
+      prom_wait 'count(count by (env) (shop_http_requests_total{env=~"prod|staging"})) == 2' 30 || true
       python3 - <<'PY'
       import json, re, statistics, sys, time, urllib.parse, urllib.request
 
@@ -213,11 +214,13 @@ tasks:
           ("the p99 latency", f'histogram_quantile(0.99, sum by (le) (rate({B}{{env="prod"}}[1m])))', 1),
       ]
       # Right after a start, shop may not have failed a request yet, so the error
-      # ratio has nothing to divide; give it up to 90 seconds.
+      # ratio has nothing to divide; give it up to 90 seconds. Staging is scraped
+      # at its own offset, so wait for its series too.
       for _ in range(18):
           end = time.time()
           truth = [series(expr)[0] for _, expr, _ in questions]
-          if None not in truth:
+          ready = [series(expr.replace('"prod"', '"staging"'))[0] for _, expr, _ in questions]
+          if None not in truth + ready:
               break
           time.sleep(5)
       else:
