@@ -1,0 +1,15 @@
+#!/bin/sh
+# ExecReload for nginx.service. `nginx -s reload` returns once SIGHUP is sent,
+# and the old workers keep accepting on the old config for 100ms or more after
+# that. Return only once they have stopped, so a request made after
+# `systemctl reload nginx` is answered by the configuration it just loaded.
+old=$(ps -o pid= -o args= -C nginx | awk '$2 == "nginx:" && $3 == "worker" && NF == 4 {print $1}')
+/usr/sbin/nginx -g 'daemon on; master_process on;' -s reload || exit
+for _ in $(seq 1 100); do
+  accepting=""
+  for p in $old; do
+    ps -o args= -p "$p" 2>/dev/null | grep -qx 'nginx: worker process *' && accepting=yes
+  done
+  [ -z "$accepting" ] && exit 0
+  sleep 0.1
+done

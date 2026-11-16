@@ -45,7 +45,7 @@ tasks:
         --stats_interval_seconds=5 \
         \
         --write_buffer_size=4194304 \
-        --max_write_buffer_number=8 \
+        --max_write_buffer_number=16 \
         --level0_file_num_compaction_trigger=2 \
         --level0_slowdown_writes_trigger=3 \
         --level0_stop_writes_trigger=4 \

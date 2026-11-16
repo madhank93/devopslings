@@ -215,7 +215,7 @@ tasks:
         -d '{"name":"flaky","type":"reset_peer","stream":"upstream","toxicity":0.05,"attributes":{"timeout":0}}' \
         >/dev/null
 
-      echo "fault armed: 5% of connections reset; a 5s stall fires 10s into the load test"
+      echo "fault armed: 5% of connections reset; a 5s stall fires 13s into the load test"
 
   verify_done:
     needs: [init_scenario, inject_fault]
@@ -244,9 +244,9 @@ tasks:
       export const options = {
         scenarios: {
           // Open-loop: customers keep arriving whether or not pricing is coping.
-          users: { executor: 'constant-arrival-rate', rate: 25, timeUnit: '1s', duration: '30s',
+          users: { executor: 'constant-arrival-rate', rate: 25, timeUnit: '1s', duration: '33s',
                    preAllocatedVUs: 50, maxVUs: 400, exec: 'users' },
-          fault: { executor: 'per-vu-iterations', vus: 1, iterations: 1, startTime: '10s', exec: 'stall' },
+          fault: { executor: 'per-vu-iterations', vus: 1, iterations: 1, startTime: '13s', exec: 'stall' },
         },
         thresholds: {
           'checks{phase:steady}': ['rate>0.99'],
@@ -263,7 +263,9 @@ tasks:
 
       export function users() {
         const t = (Date.now() - exec.scenario.startTime) / 1000;
-        const phase = t < 10 ? 'steady' : t < 15 ? 'stall' : t < 19 ? 'recovering' : 'after';
+        // checkout starts with an empty retry budget at every verify, which a
+        // long-running client never has; the first 3s earn it and are not graded.
+        const phase = t < 3 ? 'warmup' : t < 13 ? 'steady' : t < 18 ? 'stall' : t < 22 ? 'recovering' : 'after';
         const sku = Math.random() < 0.1 ? 'retired' : 'widget';
         const r = http.get(`http://checkout:8130/checkout?sku=${sku}`, { timeout: '30s', tags: { phase } });
         check(r, { 'correct answer': (r) => r.status === (sku === 'retired' ? 404 : 200) }, { phase });
