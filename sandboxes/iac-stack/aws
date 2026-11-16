@@ -1,0 +1,8 @@
+#!/bin/sh
+# ws's environment holds MinIO's key, for OpenTofu's s3 backend. floci's S3
+# accepts only its own root key (test/test) and IAM users' keys, so swap the
+# root key in for MinIO's. A key you export yourself is used as given.
+if [ "${AWS_ACCESS_KEY_ID:-}" = devopslings ]; then
+  export AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test
+fi
+exec /usr/bin/aws "$@"
