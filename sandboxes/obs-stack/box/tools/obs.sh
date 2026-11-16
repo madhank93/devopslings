@@ -4,6 +4,12 @@
 PROM=${PROM:-http://prometheus:9090}
 AM=${AM:-http://alertmanager:9093}
 SINK=${SINK:-http://sink:8080}
+LOKI=${LOKI:-http://loki:3100}
+TEMPO=${TEMPO:-http://tempo:3200}
+
+# The tracing apps idle until a lesson starts them, so module 18 runs without
+# their traffic.
+OBS_IDLE_APPS="checkout broker fulfil ledger billing"
 
 # Raw JSON of an instant query.
 prom_query() {
@@ -117,4 +123,24 @@ obs_require_loaded() {
     echo "running the old version. Run obs-reload."
     return 1
   fi
+}
+
+# collector_settle — wait until the Collector has been up for a few seconds
+# on the current /obs/otel/collector.yaml. supervise notices a changed config
+# within half a second, hence the first sleep. When it will not stay up (a
+# config it refuses), print a "not yet" line with the reason from its log and
+# return 1.
+collector_settle() {
+  local started i
+  sleep 1
+  for i in $(seq 1 25); do
+    started=$(cat /obs/run/collector.started 2>/dev/null || echo 0)
+    [ $(( $(date +%s) - started )) -ge 3 ] && return 0
+    sleep 1
+  done
+  echo "not yet: the Collector will not stay up with /obs/otel/collector.yaml. The end of"
+  echo "/obs/logs/collector.log:"
+  tail -n 200 /obs/logs/collector.log 2>/dev/null | grep -v '^\[supervise\]' | grep -iE 'error|invalid|cannot|unknown' |
+    sed -E 's/^[0-9/]+ [0-9:]+ //' | awk '!seen[$0]++' | tail -n 3 | cut -c1-300 | sed 's/^/  /' || true
+  return 1
 }

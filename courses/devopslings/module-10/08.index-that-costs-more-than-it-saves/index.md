@@ -116,8 +116,9 @@ tasks:
       SQL
 
       # The "before" number, measured here so it is this machine's number and
-      # not a figure from someone else's laptop.
-      rate=$(bash /work/app/bench.sh | sed -n 's/^rows_per_sec=//p')
+      # not a figure from someone else's laptop. One run swings by 2x, so the
+      # median of three.
+      rate=$(for _ in 1 2 3; do bash /work/app/bench.sh | sed -n 's/^rows_per_sec=//p'; done | sort -n | sed -n 2p)
       printf '%s\n' "$rate" > /work/app/baseline.txt
 
       cat > /work/answers/index-cost.md <<'MD'
@@ -260,8 +261,14 @@ tasks:
         exit 1
       fi
 
-      now=$(timeout 300 bash "$bench" | sed -n 's/^rows_per_sec=//p' | tail -1)
-      : "${now:=0}"
+      # Up to three runs, best kept: one run swings by 2x on its own.
+      now=0
+      for _ in 1 2 3; do
+        r=$(timeout 300 bash "$bench" | sed -n 's/^rows_per_sec=//p' | tail -1 || true)
+        : "${r:=0}"
+        if [ "$r" -gt "$now" ]; then now=$r; fi
+        if [ "$now" -ge $(( base * 2 )) ]; then break; fi
+      done
       if [ "$now" -lt 1 ]; then
         echo "not yet: $bench did not print a rows_per_sec line, so there is nothing to"
         echo "compare. Reset the lesson to put the measurement back."

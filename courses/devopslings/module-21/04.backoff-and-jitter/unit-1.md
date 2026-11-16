@@ -106,7 +106,9 @@ Full jitter can produce a delay close to zero, and a delay close to zero
 during a one-second outage is a wasted attempt. Cut the attempts to three with
 full jitter, and about 200 polls run out of attempts before the network comes
 back. Jitter spreads the retries over time, so leave enough attempts for that
-time to cover the outage.
+time to cover the outage. Six attempts is still a little short: five short
+draws in a row are rare for one client, but with 200 clients one of them runs
+out on roughly one run in ten.
 
 </details>
 
@@ -116,7 +118,7 @@ time to cover the outage.
 `sandboxes/chaos-stack/.env`:
 
 ```
-RETRY_MAX_ATTEMPTS=6
+RETRY_MAX_ATTEMPTS=8
 RETRY_BACKOFF_MS=500
 RETRY_JITTER=full
 ```
