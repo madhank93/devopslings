@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 247 shipped, 2 blocked, 50 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 256 shipped, 2 blocked, 41 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 21, 22, 23, 24.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 19, 21, 22, 23, 24.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1987,45 +1987,45 @@ failures transfer to any provider.
 ## 19 — Logs & Traces
 `obs-stack`
 
-- **ship-one-log-line** *(intro)* — get a single application log line into Loki
+- **ship-one-log-line** *(intro · shipped)* — get a single application log line into Loki
   and find it again by query.
   *Check:* the line is queryable by its label set, and the answer states which
   part of the record became a label and which stayed in the line.
   *Source:* own.
 
-- **collector-pipeline** *(core)* — receivers, processors, exporters, in the right order.
+- **collector-pipeline** *(core · shipped)* — receivers, processors, exporters, in the right order.
   *Check:* a signal makes it end to end with the expected attributes.
   *Source:* own.
 
-- **ottl-transform** *(core)* — one field needs to become three.
+- **ottl-transform** *(core · shipped)* — one field needs to become three.
   *Check:* transformed records match the target schema; malformed input is dropped
   rather than crashing the pipeline.
   *Source:* own.
 
-- **vrl-redact-pii** *(core)* — customer emails are in the logs.
+- **vrl-redact-pii** *(core · shipped)* — customer emails are in the logs.
   *First guess:* a regex that also eats the order ids.
   *Check:* PII gone, everything else intact, verified field by field.
   *Source:* own.
 
-- **loki-labels** *(deep)* — a query that scans everything.
+- **loki-labels** *(deep · shipped)* — a query that scans everything.
   *First guess:* add a label for request id.
   *Check:* label cardinality bounded and the same query returns in budget.
   *Source:* own.
 
-- **mapping-explosion** *(deep)* — an OpenSearch index that will not accept new documents.
+- **mapping-explosion** *(deep · shipped)* — an OpenSearch index that will not accept new documents.
   *Check:* explicit mapping, bounded fields, ingest resumes without data loss.
   *Source:* own.
 
-- **broken-trace** *(core)* — the trace stops at a queue boundary.
+- **broken-trace** *(core · shipped)* — the trace stops at a queue boundary.
   *First guess:* the tracer is misconfigured.
   *Check:* context propagated across the async hop; one trace spans all three services.
   *Source:* own.
 
-- **exemplars** *(core)* — a p99 you cannot explain.
+- **exemplars** *(core · shipped)* — a p99 you cannot explain.
   *Check:* the metric links to a trace that demonstrates the slow path.
   *Source:* own.
 
-- **the-four-percent** *(deep)* — the pipeline silently drops 4% of logs.
+- **the-four-percent** *(deep · shipped)* — the pipeline silently drops 4% of logs.
   *First guess:* the application stopped logging.
   *Check:* the drop is located (queue/batch/backpressure), fixed, and a metric now
   alerts on it.
@@ -2546,7 +2546,7 @@ Not exercises. Pointers to [kubelings](https://github.com/madhank93/kubelings),
 | `web-stack` | built | 06 — nginx, Caddy, two upstreams, a cache |
 | `db-stack` | built | 10 — Postgres primary/replica, pgbouncer, Redis, a seeded 10M-row table, an LSM sidecar |
 | `iac-stack` | **to build** | 13, 14, 17 — MinIO, floci, docker provider target |
-| `obs-stack` | **to build** | 18, 19, 20, 24, 25, 26 — Prometheus, Grafana, Loki, Tempo, OTel, Vector |
+| `obs-stack` | built | 18, 19, 20, 24, 25, 26 — Prometheus, Grafana, Loki, Tempo, OTel, Vector, OpenSearch |
 | `ha-stack` | **to build** | 22, 23, 24 — HAProxy, keepalived, Postgres primary/replica, etcd |
 
 `db-stack` and `ha-stack` both run Postgres. They stay separate: `db-stack` is
