@@ -68,6 +68,10 @@ COPY app/upstream.py /opt/upstream/upstream.py
 # measured from the command line rather than inferred from a browser console.
 COPY app/wsprobe /usr/local/bin/wsprobe
 COPY app/haproxy-container.conf /etc/systemd/system/haproxy.service.d/container.conf
+# `systemctl reload nginx` returns once the old workers stop accepting, so the
+# next request — a student's curl or a check's — sees the new config.
+COPY app/nginx-reload /usr/local/sbin/nginx-reload
+COPY app/nginx-reload.conf /etc/systemd/system/nginx.service.d/reload.conf
 COPY app/upstream.service /etc/systemd/system/upstream.service
 COPY app/upstream-b.service /etc/systemd/system/upstream-b.service
 # The edge filter nginx consults with auth_request. It ships disabled: only the

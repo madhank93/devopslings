@@ -23,7 +23,7 @@ Each attempt times out after one second, and retries go out immediately.
 pricing can do about **50 requests a second**. Customers arrive at 25 a second,
 so it is half busy.
 
-At verify time, ten seconds into a load test, the network stalls for five
+At verify time, thirteen seconds into a load test, the network stalls for five
 seconds: every response from pricing arrives too late. Then the stall clears,
 and pricing is healthy again.
 

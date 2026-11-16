@@ -129,8 +129,12 @@ tasks:
       # Long enough that a once-a-second AOF flush is not a coin toss. SIGKILL,
       # as the OOM killer delivers it: a clean shutdown would write a snapshot
       # and let save points pass for a durability they do not have.
+      # start is a no-op on a container that has not finished dying, so wait
+      # for the exit before starting it again.
       sleep 2
+      cid=$(docker compose ps -q redis)
       docker compose kill -s SIGKILL redis >/dev/null
+      docker wait "$cid" >/dev/null 2>&1 || true
       docker compose start redis >/dev/null
 
       ready=no

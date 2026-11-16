@@ -431,11 +431,14 @@ tasks:
           ;;
       esac
 
+      # Three missed deadlines, or one missed by tenfold: paging against a
+      # disk-backed swapfile can take tens of seconds over a single record,
+      # where zram misses by milliseconds on every one.
       broke=""
-      for _ in $(seq 1 30); do
+      for _ in $(seq 1 60); do
         sleep 1
         read -r n f p99 why < <(stats_since "$seeded")
-        if [ "$f" -ge 3 ]; then broke=yes; break; fi
+        if [ "$f" -ge 3 ] || { [ "$f" -ge 1 ] && [ "$p99" -ge 1000 ]; }; then broke=yes; break; fi
       done
       if [ -z "$broke" ]; then
         echo "the $fault fault was seeded and ingest still meets its deadline"
