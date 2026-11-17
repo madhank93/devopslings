@@ -25,13 +25,13 @@ than at exercise one.
 | **architect** | A written decision or design, graded against a rubric. |
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 273 shipped, 2 blocked, 24 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 282 shipped, 2 blocked, 15 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
 <!-- /counts -->
 
 Modules 01–23 and 25 each open with an `intro` exercise. Modules 24, 26 and 27
@@ -1020,7 +1020,7 @@ leaderboard · the AI Capabilities Model.
 
 ## Platform
 
-### 26 — Platform Engineering
+### 26 — Platform Engineering · *shipped*
 `ci-stack` + `obs-stack`
 
 The discipline the roadmap names and no exercise set teaches: making the right
