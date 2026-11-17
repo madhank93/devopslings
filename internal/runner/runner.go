@@ -11,6 +11,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -449,6 +450,9 @@ func run(ctx context.Context, c *exec.Cmd, timeout time.Duration, sink func(stri
 	defer cancel()
 
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// A descendant that left the group (setsid, nohup) can hold the output
+	// pipe open after the kill; without this, Wait blocks on it forever.
+	c.WaitDelay = 5 * time.Second
 	var buf strings.Builder
 
 	// Stdout and Stderr must be the same value, not two writers wrapping the
@@ -470,7 +474,7 @@ func run(ctx context.Context, c *exec.Cmd, timeout time.Duration, sink func(stri
 
 	select {
 	case err := <-done:
-		return buf.String(), err == nil
+		return buf.String(), err == nil || errors.Is(err, exec.ErrWaitDelay)
 	case <-ctx.Done():
 		_ = syscall.Kill(-c.Process.Pid, syscall.SIGKILL)
 		<-done
