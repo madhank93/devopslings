@@ -25,13 +25,13 @@ than at exercise one.
 | **architect** | A written decision or design, graded against a rubric. |
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 225 shipped, 2 blocked, 72 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 243 shipped, 2 blocked, 54 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 14, 15, 16, 18, 21, 22, 23.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 19, 21, 22, 23.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Modules 01–23 and 25 each open with an `intro` exercise. Modules 24, 26 and 27
@@ -638,16 +638,69 @@ read its own write.
 
 ## Delivery
 
-### 11 — Artifacts & Supply Chain
-`ci-stack`
+### 11 — Artifacts & Supply Chain · *shipped*
+`registry-stack`
 
-Push your first image, and learn what the tag names versus what the digest
-names · Harbor tag immutability, after `:latest` changed under a running
-deploy · a retention policy that ate the rollback · `cosign` sign and verify ·
-`syft` SBOM + `trivy` scan, with an exception that expires · pinning the base
-image by digest · **dependency confusion**, where an internal name resolves to a
-public package · scoped robot accounts · the left-pad and event-stream
-postmortems, and why you mirror.
+zot, not Harbor: Harbor ships amd64-only images across about nine containers,
+and zot is one multi-arch container with the same OCI distribution API and the
+features the module grades — per-repository access control, retention, and the
+referrers API signatures attach to. Each lesson names the Harbor equivalent.
+
+- **push-your-first-image** *(shipped)* — build a page, push it under a
+  version and under `latest`, push a second build the same way, and record the
+  digest `latest` named each time. Graded by a second client that never built
+  either image. The trap is the hash `docker images` prints: that is the image
+  ID, the digest of the config, and the registry has never heard of it. Also
+  measured and taught: zot drops a manifest from the repository the moment its
+  last tag moves, where Distribution and Harbor keep it untagged until garbage
+  collection — what a registry keeps is a registry decision.
+- **push-pull-and-mutable-tags** *(shipped)* — production deploys
+  `shop/web:latest` with `pull_policy: always`, CI pushes every build to
+  `latest`, and the nightly restart quietly deployed a debug release candidate
+  nobody released. Re-tagging the release as `latest` fixes it until CI next
+  runs; pinning `:1.4.0` reads as a fix and is still a tag. Graded by acting as
+  CI — push to `latest`, run the routine deploy — and requiring production not
+  to move, with the deploy file naming the release by digest. Harbor's tag
+  immutability and ECR's `IMMUTABLE` are taught as the registry-side second
+  line, which cannot help `latest`.
+- **retention-ate-the-rollback** *(shipped)* — v1.8.0 has a bug and the
+  rollback to v1.7.0 fails with `MANIFEST_UNKNOWN`: a registry-wide "keep the
+  last eight tags" policy, written to stop CI builds filling the disk, counted
+  releases and branch builds together, and a release lasts as long as it takes
+  main to get eight commits. The team rebuilt the old tag and shipped untested
+  bytes. Graded by replaying a release cycle — 24 CI builds around three
+  releases — through the student's policy, waiting for real retention passes,
+  then pulling each release and counting the CI builds left. Turning retention
+  off or into `dryRun` keeps the releases by giving up the clean-up, and is
+  refused. zot logs every keep/delete decision with the rule behind it, which is
+  how the student diagnoses it.
+
+- **cosign-sign-and-verify** *(shipped)* — sign the release by digest and
+  make the runtime's `policy.json` require the key; an unsigned image, and one
+  wearing the release's tag, are refused.
+- **sbom-and-the-cve-gate** *(shipped)* — a trivy gate over a CycloneDX SBOM
+  blocks on an unfixable `ecdsa` CVE in the test requirements. The exception
+  must be justified, scoped by path to the tests and expire within 90 days;
+  the grader re-runs the gate with the CVE in the runtime requirements, a new
+  test HIGH, a fixable runtime HIGH, and the expiry moved to yesterday. The
+  sandbox's advisory database is cut at a fixed date so findings do not drift.
+- **base-image-by-digest** *(shipped)* — upstream moved `runtime:2` to a
+  release that breaks the build; CI logs show both digests. Graded by pushing
+  a new release to every upstream tag, version tags included, and rebuilding.
+- **dependency-confusion** *(shipped)* — `--extra-index-url` let a public
+  `acme-billing` 99.0.0 win. The grader adds build-tagged same-version
+  impostors of it and of its internal dependency, so version pins and
+  index-order swaps fail; one internal index that mirrors the public packages
+  passes.
+- **registry-auth** *(shipped)* — production lost anonymous pulls. A
+  dedicated read-only account, checked both ways: push, overwrite, delete,
+  another team's repository and an unclaimed one refused; anonymous pulls and
+  other accounts' reads stay refused; CI still pushes.
+- **incident-eventstream-2018** *(shipped)* — the replay in pip: an exact pin
+  on `ps-tree` and a sync-everything mirror still delivered `flatmap-stream`.
+  Each control is graded with the others broken: a hash lockfile against a
+  poisoned mirror, a sync gate with an approvals file that never mirrors an
+  unpublish (left-pad), and a write-up of the transitive range.
 
 ### 12 — CI/CD · *shipped*
 `ci-stack`
@@ -853,7 +906,7 @@ alert that did not fire because the data stopped.
 Ship one log line and find it again · OTel Collector receivers/processors/
 exporters · **OTTL** transform · **Vector + VRL**: parse, redact PII, sample,
 route · Loki labels and the query that scans everything · OpenSearch index,
-mapping, retention (heavy profile) · a Tempo trace that survives an async queue
+mapping, retention · a Tempo trace that survives an async queue
 boundary · correlating trace ↔ log ↔ metric with exemplars · the pipeline
 silently dropping 4% of logs.
 

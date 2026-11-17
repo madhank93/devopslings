@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 225 shipped, 2 blocked, 72 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 243 shipped, 2 blocked, 54 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 12, 13, 14, 15, 16, 18, 21, 22, 23.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 19, 21, 22, 23.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 0/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 0/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1512,54 +1512,65 @@ engine (`db_bench`) for the write-stall exercise.
 ---
 
 ## 11 — Artifacts & Supply Chain
-`ci-stack` (Harbor)
+`registry-stack` (zot)
 
-- **push-your-first-image** *(intro)* — tag it, push it, pull it back on another host.
-  *Check:* the image is pullable from Harbor by a second client, and the answer
-  states what the tag actually names and what the digest names.
+- **push-your-first-image** *(intro · shipped)* — tag it, push it, push a second
+  build under the same moving tag, pull both back on another client.
+  *Check:* both builds are pullable by digest from a client that built neither,
+  and the recorded digests are the manifests `latest` named after each push —
+  not the image ID `docker images` prints.
   *Source:* own.
 
-- **push-pull-and-mutable-tags** *(core)* — `:latest` changed under a running deploy.
-  *First guess:* re-tag and redeploy.
+- **push-pull-and-mutable-tags** *(core · shipped)* — `:latest` changed under a running deploy.
+  *First guess:* re-tag and redeploy; or pin the version tag, which is still a tag.
   *Check:* deployment pinned by digest; a re-pushed tag no longer changes what runs.
   *Source:* own.
 
-- **retention-ate-the-rollback** *(core)* — the image you need to roll back to is gone.
+- **retention-ate-the-rollback** *(core · shipped)* — the image you need to roll back to is gone.
   *First guess:* rebuild the old commit; the build is not reproducible.
   *Check:* a retention policy that keeps what the rollback window requires, proven
   by attempting the rollback.
   *Source:* own.
 
-- **cosign-sign-and-verify** *(core)* — an unsigned image reaches staging.
+- **cosign-sign-and-verify** *(core · shipped)* — an unsigned image reaches staging.
   *First guess:* trust the registry.
   *Check:* signed images deploy, an unsigned or re-tagged one is rejected.
   *Source:* roadmap.sh supply chain.
 
-- **sbom-and-the-cve-gate** *(deep)* — the scanner blocks the build on a CVE in a test dep.
-  *First guess:* turn the gate off.
-  *Check:* gate passes with a justified, expiring exception and still fails on a
-  genuinely exploitable runtime CVE.
+- **sbom-and-the-cve-gate** *(deep · shipped)* — the scanner blocks the build on a CVE in a test dep.
+  *First guess:* turn the gate off; or gate on CRITICAL only, or `--ignore-unfixed`.
+  *Check:* gate passes with a justified exception, scoped to the test
+  requirements and expiring within 90 days; still fails on the same CVE in the
+  runtime requirements, a new HIGH in the tests, a fixable runtime HIGH, and
+  once the exception's date has passed.
   *Source:* own.
 
-- **base-image-by-digest** *(core)* — the build broke and nothing in the repo changed.
-  *First guess:* clear the cache.
-  *Check:* pinned base by digest; a moved upstream tag no longer changes the build.
+- **base-image-by-digest** *(core · shipped)* — the build broke and nothing in the repo changed.
+  *First guess:* clear the cache; or pin the version tag, which upstream also rebuilds.
+  *Check:* pinned base by digest; the grader pushes a new release to every
+  upstream tag and the build still runs on the base it was tested with.
   *Source:* own.
 
-- **dependency-confusion** *(deep)* — an internal package name resolves to a public one.
-  *First guess:* rename the package.
-  *Check:* the resolver prefers the internal mirror and a planted public
-  impostor is never installed.
+- **dependency-confusion** *(deep · shipped)* — an internal package name resolves to a public one.
+  *First guess:* rename the package; or pin the version, or swap index and extra-index.
+  *Check:* CI's install, in a clean checkout, takes both internal packages from
+  the internal index while the public one offers higher versions and
+  build-tagged same-version impostors of each, including the transitive one.
   *Source:* the left-pad and event-stream incidents, generalised.
 
-- **registry-auth** *(core)* — CI can pull, the runtime cannot.
-  *First guess:* make the repository public.
-  *Check:* a scoped robot account with pull-only rights, verified both ways.
+- **registry-auth** *(core · shipped)* — CI can pull, the runtime cannot.
+  *First guess:* make the repository public; or copy CI's credentials to production.
+  *Check:* a dedicated account pulls shop/web and shop/cart, and cannot push,
+  overwrite, delete, read finance/ or an unclaimed repository; anonymous pulls
+  and other teams' accounts stay refused; CI still pushes.
   *Source:* own.
 
-- **incident-eventstream-2018** *(architect · replay)* — a maintainer handoff ships malware.
+- **incident-eventstream-2018** *(architect · replay · shipped)* — a maintainer handoff ships malware.
   *First guess:* pin versions, which this incident defeats.
-  *Check:* lockfile plus mirror plus review gate stops the malicious version.
+  *Check:* each control alone stops it — a hash lockfile against a poisoned
+  mirror (with a same-version rebuild) and the public index offline; a sync gate
+  that refuses unapproved releases, admits approved ones and never mirrors an
+  unpublish; and the write-up names the transitive range the pin did not cover.
   *Source:* published write-ups, simplified.
 
 ---
@@ -1976,45 +1987,45 @@ failures transfer to any provider.
 ## 19 — Logs & Traces
 `obs-stack`
 
-- **ship-one-log-line** *(intro)* — get a single application log line into Loki
+- **ship-one-log-line** *(intro · shipped)* — get a single application log line into Loki
   and find it again by query.
   *Check:* the line is queryable by its label set, and the answer states which
   part of the record became a label and which stayed in the line.
   *Source:* own.
 
-- **collector-pipeline** *(core)* — receivers, processors, exporters, in the right order.
+- **collector-pipeline** *(core · shipped)* — receivers, processors, exporters, in the right order.
   *Check:* a signal makes it end to end with the expected attributes.
   *Source:* own.
 
-- **ottl-transform** *(core)* — one field needs to become three.
+- **ottl-transform** *(core · shipped)* — one field needs to become three.
   *Check:* transformed records match the target schema; malformed input is dropped
   rather than crashing the pipeline.
   *Source:* own.
 
-- **vrl-redact-pii** *(core)* — customer emails are in the logs.
+- **vrl-redact-pii** *(core · shipped)* — customer emails are in the logs.
   *First guess:* a regex that also eats the order ids.
   *Check:* PII gone, everything else intact, verified field by field.
   *Source:* own.
 
-- **loki-labels** *(deep)* — a query that scans everything.
+- **loki-labels** *(deep · shipped)* — a query that scans everything.
   *First guess:* add a label for request id.
   *Check:* label cardinality bounded and the same query returns in budget.
   *Source:* own.
 
-- **mapping-explosion** *(deep)* — an OpenSearch index that will not accept new documents.
+- **mapping-explosion** *(deep · shipped)* — an OpenSearch index that will not accept new documents.
   *Check:* explicit mapping, bounded fields, ingest resumes without data loss.
   *Source:* own.
 
-- **broken-trace** *(core)* — the trace stops at a queue boundary.
+- **broken-trace** *(core · shipped)* — the trace stops at a queue boundary.
   *First guess:* the tracer is misconfigured.
   *Check:* context propagated across the async hop; one trace spans all three services.
   *Source:* own.
 
-- **exemplars** *(core)* — a p99 you cannot explain.
+- **exemplars** *(core · shipped)* — a p99 you cannot explain.
   *Check:* the metric links to a trace that demonstrates the slow path.
   *Source:* own.
 
-- **the-four-percent** *(deep)* — the pipeline silently drops 4% of logs.
+- **the-four-percent** *(deep · shipped)* — the pipeline silently drops 4% of logs.
   *First guess:* the application stopped logging.
   *Check:* the drop is located (queue/batch/backpressure), fixed, and a metric now
   alerts on it.
@@ -2535,7 +2546,7 @@ Not exercises. Pointers to [kubelings](https://github.com/madhank93/kubelings),
 | `web-stack` | built | 06 — nginx, Caddy, two upstreams, a cache |
 | `db-stack` | built | 10 — Postgres primary/replica, pgbouncer, Redis, a seeded 10M-row table, an LSM sidecar |
 | `iac-stack` | **to build** | 13, 14, 17 — MinIO, floci, docker provider target |
-| `obs-stack` | **to build** | 18, 19, 20, 24, 25, 26 — Prometheus, Grafana, Loki, Tempo, OTel, Vector |
+| `obs-stack` | built | 18, 19, 20, 24, 25, 26 — Prometheus, Grafana, Loki, Tempo, OTel, Vector, OpenSearch |
 | `ha-stack` | **to build** | 22, 23, 24 — HAProxy, keepalived, Postgres primary/replica, etcd |
 
 `db-stack` and `ha-stack` both run Postgres. They stay separate: `db-stack` is

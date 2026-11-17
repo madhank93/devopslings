@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""support-logs [N] — N JSON log events from the support desk (default 200).
+
+Customer emails turn up in free text, in a field of their own, nested, and in
+lists. So do strings that contain an @ and are not emails: order references
+routed to a region, release tags, social handles.
+"""
+import json
+import random
+import sys
+
+FIRST = ["jane", "omar", "li", "ana", "Kofi", "MARTA", "s"]
+LAST = ["doe", "haddad", "wei", "silva", "mensah", "ROSSI", "o-neill"]
+DOMAINS = ["example.com", "mail.example.co.uk", "Example.ORG", "shop-mail.io", "uni.example.edu"]
+REGIONS = ["eu-west-1", "us-east-2", "ap-south-1", "shop-eu", "dc3"]
+
+
+def email(r):
+    local = f"{r.choice(FIRST)}{r.choice(['.', '_', '', '+promo.'])}{r.choice(LAST)}"
+    return f"{local}@{r.choice(DOMAINS)}"
+
+
+def event(r):
+    order = f"ord-{r.randrange(10000, 99999)}@{r.choice(REGIONS)}"
+    who, cc = email(r), email(r)
+    tag = f"release@{r.choice(['2024.11', '4.2.1', '2025.03'])}"
+    msg = r.choice([
+        f"refund issued to {who}, order {order}.",
+        f"customer {who} asked about {order} (escalated by @{r.choice(LAST)}_support)",
+        f"order {order} shipped; receipt sent to {who}",
+        f"password reset for {who.upper()}",
+        f"no customer details on {order}, build {tag}",
+        f"reply from {who.split('@')[0].title()} <{who}> on {order}",
+        f"unsubscribe clicked: https://shop.example/unsub?email={who}&list=news",
+    ])
+    return {
+        "ts": f"2026-11-14T10:{r.randrange(60):02d}:{r.randrange(60):02d}Z",
+        "level": r.choice(["info", "info", "warn"]),
+        "service": "support",
+        "order_id": order,
+        "message": msg,
+        "customer": {"email": who, "tier": r.choice(["gold", "basic"]), "id": r.randrange(1000, 9999)},
+        "cc": [cc, "billing-team"] if r.random() < 0.5 else [],
+        "build": tag,
+        "amount": round(r.uniform(5, 500), 2),
+        "gift": r.random() < 0.2,
+    }
+
+
+n = int(sys.argv[1]) if len(sys.argv) > 1 else 200
+rnd = random.Random()
+for _ in range(n):
+    print(json.dumps(event(rnd), separators=(",", ":")))

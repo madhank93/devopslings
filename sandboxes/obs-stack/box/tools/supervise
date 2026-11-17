@@ -3,7 +3,7 @@
 #
 #   /obs/run/NAME.down     present: keep the app stopped
 #   /obs/run/NAME.restart  appears: restart once (the file is consumed)
-#   its source file        changes: restart, so an edited app goes live on save
+#   its source or config   changes: restart, so an edited app goes live on save
 #
 # Output goes to /obs/logs/NAME.log, which is where a student reads the
 # traceback of an app they broke. /obs/run/NAME.started holds the epoch second
@@ -13,10 +13,11 @@ name=$1; shift
 run=/obs/run; log=/obs/logs/$name.log
 mkdir -p "$run" /obs/logs
 
-# The watched sources are the arguments that are files under /obs/apps. Content,
-# not mtime, so rewriting a file with the same bytes restarts nothing.
+# The watched files are the arguments under /obs: an app's source, or a
+# collector's config. Content, not mtime, so rewriting a file with the same
+# bytes restarts nothing.
 watch=()
-for a in "$@"; do case $a in /obs/apps/*) watch+=("$a") ;; esac; done
+for a in "$@"; do case $a in /obs/*) watch+=("$a") ;; esac; done
 stamp() { cat "${watch[@]}" 2>/dev/null | md5sum; }
 
 trap 'kill "$pid" 2>/dev/null; exit 0' TERM INT
