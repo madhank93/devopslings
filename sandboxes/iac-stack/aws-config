@@ -1,0 +1,4 @@
+[default]
+region = us-east-1
+endpoint_url = http://floci:4566
+output = json
