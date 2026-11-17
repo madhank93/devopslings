@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 256 shipped, 2 blocked, 41 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 266 shipped, 2 blocked, 31 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 19, 21, 22, 23, 24.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1865,63 +1865,63 @@ misconfiguration — the three that cause the breaches — are reachable without
 account or a bill. Concepts are AWS-shaped because the vocabulary is; the
 failures transfer to any provider.
 
-- **identity-not-keys** *(intro)* — a static access key pair in the repository.
+- **identity-not-keys** *(intro · shipped)* — a static access key pair in the repository.
   *Check:* the workload authenticates with an assumed role and no long-lived key
   exists anywhere in the tree or the environment.
   *Source:* own.
 
-- **policy-least-privilege** *(core)* — the policy is `Action: "*"` on `Resource: "*"`.
+- **policy-least-privilege** *(core · shipped)* — the policy is `Action: "*"` on `Resource: "*"`.
   *First guess:* narrow it until something breaks, then widen it back.
   *Check:* the application's real operations succeed, a seeded probe of three
   adjacent actions is denied, and no wildcard remains on either field.
   *Source:* roadmap.sh cloud fundamentals.
 
-- **assume-role-across-accounts** *(core)* — the trust policy trusts everyone.
+- **assume-role-across-accounts** *(core · shipped)* — the trust policy trusts everyone.
   *First guess:* the permission policy is what matters.
   *Check:* the intended principal can assume the role, an unintended one cannot,
   and the answer names which of the two policies did the work.
   *Source:* own.
 
-- **public-bucket** *(core)* — an object is world-readable through a path nobody audited.
+- **public-bucket** *(core · shipped)* — an object is world-readable through a path nobody audited.
   *First guess:* remove the public ACL on the object.
   *Check:* the object is private by every route — ACL, bucket policy, and account
   setting — and the application still reads it.
   *Source:* own; the most repeated cloud breach there is.
 
-- **presigned-not-public** *(core)* — a customer needs one file.
+- **presigned-not-public** *(core · shipped)* — a customer needs one file.
   *First guess:* make the bucket public for an afternoon.
   *Check:* the customer's link works, expires at the stated time, and the bucket
   is never public — an expired link is verified to fail.
   *Source:* own.
 
-- **sg-versus-nacl** *(core)* — the security group allows it and the traffic still dies.
+- **sg-versus-nacl** *(core · shipped)* — the security group allows it and the traffic still dies.
   *First guess:* widen the security group further.
   *Check:* traffic flows, and the answer names why the stateless rule dropped the
   return packet while the stateful one did not.
   *Source:* own.
 
-- **private-subnet-egress** *(core)* — the instance must reach the internet and
+- **private-subnet-egress** *(core · shipped)* — the instance must reach the internet and
   must not be reachable from it.
   *First guess:* give it a public address and a restrictive security group.
   *Check:* outbound works, inbound from outside fails, and the route table shows
   the traffic leaving by the gateway the design requires.
   *Source:* own.
 
-- **lifecycle-and-versioning** *(core)* — the deleted object is still billed, and
+- **lifecycle-and-versioning** *(core · shipped)* — the deleted object is still billed, and
   the one you needed is gone.
   *First guess:* deletion frees the storage.
   *Check:* the needed version is recovered, and a lifecycle rule bounds the cost
   of noncurrent versions without breaking the recovery window.
   *Source:* own.
 
-- **cost-surprise** *(deep)* — the bill went up $2,000 and nothing was deployed.
+- **cost-surprise** *(deep · shipped)* — the bill went up $2,000 and nothing was deployed.
   *First guess:* the biggest instance is the cause; it is not.
   *Check:* the three contributors are identified from the seeded billing and
   resource data — unattached volumes, cross-zone egress, and an untagged resource
   with no owner — with the saving quantified for each.
   *Source:* own.
 
-- **managed-versus-self** *(architect)* — four services, buy or build.
+- **managed-versus-self** *(architect · shipped)* — four services, buy or build.
   *Check:* each decision names what the managed option actually removes from the
   on-call rotation and what it adds in lock-in or cost, graded against a rubric
   that rejects an answer with no stated downside.
