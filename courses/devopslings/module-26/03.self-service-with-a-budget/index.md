@@ -173,12 +173,13 @@ tasks:
       id=$(head -c 3 /dev/urandom | od -An -tx1 | tr -d ' \n')
       fresh="probe-${id}"
       stale="probe-${id}-stale"
+      kept="probe-${id}-kept"
 
       sync() { (cd "$work/e" && git fetch -q origin && git reset -q --hard origin/main) 2>/dev/null; }
       # push_change MSG — commit what is staged, retrying over the workflows' own pushes.
       push_change() {
         (cd "$work/e"
-          git commit -qm "$1 [skip ci]" || return 0
+          git commit -qm "$1 [skip ci]" >/dev/null 2>&1 || return 0
           for _ in 1 2 3 4 5 6; do
             git push -q origin HEAD:main 2>/dev/null && return 0
             git pull -q --rebase origin main 2>/dev/null || true
@@ -188,7 +189,7 @@ tasks:
       }
       cleanup() {
         sync
-        (cd "$work/e" && git rm -q --ignore-unmatch "envs/${fresh}.json" "envs/${stale}.json" >/dev/null 2>&1)
+        (cd "$work/e" && git rm -q --ignore-unmatch "envs/${fresh}.json" "envs/${stale}.json" "envs/${kept}.json" >/dev/null 2>&1)
         push_change "platform check: remove probes" || true
         rm -rf "$work"
       }
@@ -272,11 +273,11 @@ tasks:
       fi
 
       # 3. Extending needs a reason, and nothing else.
-      dispatch "$ana" extend.yml "{\"name\":\"${fresh}\",\"hours\":\"24\",\"reason\":\"\"}" >/dev/null
+      dispatch "$ana" extend.yml "{\"name\":\"${fresh}\",\"hours\":\"24\",\"reason\":\"   \"}" >/dev/null
       sync
       x1=$(epoch "$(field "$fresh" expires)")
       if [ "$x1" != "$x" ]; then
-        echo "not yet: extend with an empty reason moved ${fresh}'s expiry by $(( (x1 - x) / 3600 )) hours. An"
+        echo "not yet: extend with a blank reason moved ${fresh}'s expiry by $(( (x1 - x) / 3600 )) hours. An"
         echo "         extension without a reason is a TTL nobody has to justify."
         exit 1
       fi
@@ -309,16 +310,19 @@ tasks:
       fi
 
       # 4. Reclaiming happens on a schedule, not when someone remembers.
-      node - "$stale" <<'JS'
+      #    Both are older than the TTL; only one is past its expiry.
+      node - "$stale" "$kept" <<'JS'
       const fs = require("node:fs");
-      const name = process.argv[2];
+      const [stale, kept] = process.argv.slice(2);
       const iso = (h) => new Date(Date.now() + h * 3600e3).toISOString().replace(/\.\d+Z$/, "Z");
-      fs.writeFileSync(`envs/${name}.json`, JSON.stringify({
-        name, owner: "platform-check", created: iso(-100), expires: iso(-28), url: `http://${name}.preview.internal`,
+      const write = (name, extra) => fs.writeFileSync(`envs/${name}.json`, JSON.stringify({
+        name, owner: "platform-check", created: iso(-100), url: `http://${name}.preview.internal`, ...extra,
       }, null, 2) + "\n");
+      write(stale, { expires: iso(-28) });
+      write(kept, { expires: iso(20), extensions: [{ by: "platform-check", at: iso(-30), hours: 48, reason: "load test through Friday" }] });
       JS
-      git add "envs/${stale}.json"
-      push_change "platform check: an environment that expired yesterday" || { echo "not yet: could not push to ${repo}."; exit 1; }
+      git add "envs/${stale}.json" "envs/${kept}.json"
+      push_change "platform check: one environment that expired yesterday, one extended to tomorrow" || { echo "not yet: could not push to ${repo}."; exit 1; }
       pushed=$(date +%s)
       gone=no
       for _ in $(seq 1 60); do
@@ -332,10 +336,20 @@ tasks:
         [ "$sched" = 0 ] && echo "         No workflow in ${repo} has run on a schedule."
         exit 1
       fi
-      by=$(runs | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=(JSON.parse(s).workflow_runs||[]).filter(x=>x.event==="schedule"&&x.status==="success"&&Date.parse(x.updated_at||x.created_at)/1000>=+process.argv[1]);console.log(r.length)})' "$pushed")
+      # The run that removed it may still be finishing.
+      for _ in $(seq 1 20); do
+        by=$(runs | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=(JSON.parse(s).workflow_runs||[]).filter(x=>x.event==="schedule"&&x.status==="success"&&Date.parse(x.updated_at||x.created_at)/1000>=+process.argv[1]);console.log(r.length)})' "$pushed")
+        [ "$by" != 0 ] && break
+        sleep 3
+      done
       if [ "$by" = 0 ]; then
         echo "not yet: ${stale} was removed, and no scheduled run finished after it was pushed. Something"
         echo "         removed it, and it was not the schedule. Reclaiming has to happen with nobody watching."
+        exit 1
+      fi
+      if [ ! -e "envs/${kept}.json" ]; then
+        echo "not yet: the reaper removed ${kept}, created 100 hours ago and extended with a reason to"
+        echo "         expire tomorrow. Reclaim at an environment's expires time, whatever its age."
         exit 1
       fi
       if [ ! -e "envs/${fresh}.json" ]; then
