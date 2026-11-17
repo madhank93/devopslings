@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 266 shipped, 2 blocked, 31 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 273 shipped, 2 blocked, 24 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -2407,35 +2407,35 @@ failures transfer to any provider.
 ## 25 — DORA & Delivery Measurement
 `ci-stack` + `obs-stack`
 
-- **count-your-deploys** *(intro)* — how often does this repository actually ship?
+- **count-your-deploys** *(intro · shipped)* — how often does this repository actually ship?
   *Check:* the deployment count over the seeded history is correct, and the answer
   states what was counted as a deployment and what was excluded.
   *Source:* DORA 2025.
 
-- **emit-the-events** *(core)* — a pipeline that measures itself.
+- **emit-the-events** *(core · shipped)* — a pipeline that measures itself.
   *Check:* deployment events recorded with commit and timestamp for every deploy.
   *Source:* own.
 
-- **lead-time** *(core)* — from commit to production, honestly.
+- **lead-time** *(core · shipped)* — from commit to production, honestly.
   *Check:* computed distribution matches the seeded history; the median is not
   reported as the whole story.
   *Source:* DORA 2025.
 
-- **change-failure-and-fdrt** *(core)* — the 2025 definitions.
+- **change-failure-and-fdrt** *(core · shipped)* — the 2025 definitions.
   *First guess:* count every incident, including the datacentre outage.
   *Check:* only change-caused failures count toward Failed Deployment Recovery
   Time; the infrastructure incident is correctly excluded.
   *Source:* DORA 2025.
 
-- **rework-rate** *(deep)* — the metric most teams fail.
+- **rework-rate** *(deep · shipped)* — the metric most teams fail.
   *Check:* rework identified from the commit history under the published definition.
   *Source:* DORA 2025.
 
-- **gaming-the-numbers** *(architect)* — four keys that improved while delivery got worse.
+- **gaming-the-numbers** *(architect · shipped)* — four keys that improved while delivery got worse.
   *Check:* the gamed metric is identified and the counter-signal proposed.
   *Source:* own.
 
-- **archetypes** *(architect)* — where does this team actually sit.
+- **archetypes** *(architect · shipped)* — where does this team actually sit.
   *Check:* the mapping is justified against the seeded data, not vibes.
   *Source:* DORA 2025.
 
