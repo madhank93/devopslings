@@ -44,7 +44,9 @@ jobs:
     # Lessons are validated against this image; ubuntu-26.04 fails netlab,
     # ci-stack, db-stack and web-stack lessons that pass here.
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # The longest shard (obs-stack) runs its lessons serially; split it if it
+    # nears this budget, and update the required checks on main to match.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -65,7 +67,7 @@ jobs:
           ./bin/devopslings doctor
 
       - name: Lesson contract
-        run: go test ./internal/runner/ -run TestLessonContract -v -timeout 55m
+        run: go test ./internal/runner/ -run TestLessonContract -v -timeout 115m
 
       - name: Tear down
         if: always()
