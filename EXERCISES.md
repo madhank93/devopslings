@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 243 shipped, 2 blocked, 54 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 256 shipped, 2 blocked, 41 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 19, 21, 22, 23.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 18, 19, 21, 22, 23, 24.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 0/13 · 25 0/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 0/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 0/7 · 26 0/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -2338,66 +2338,66 @@ failures transfer to any provider.
 ## 24 — SRE Practice & Progressive Delivery
 `ha-stack` + `obs-stack`
 
-- **pick-an-sli** *(core)* — three candidate indicators, one correlates with pain.
+- **pick-an-sli** *(core · shipped)* — three candidate indicators, one correlates with pain.
   *Check:* the chosen SLI moves during the seeded incident and stays flat during
   the seeded non-incident.
   *Source:* Google SRE Workbook.
 
-- **slo-and-error-budget** *(core)* — the maths, on real numbers.
+- **slo-and-error-budget** *(core · shipped)* — the maths, on real numbers.
   *Check:* budget computed correctly and burn during the incident matches.
   *Source:* Google SRE Workbook.
 
-- **multi-burn-rate-alerts** *(deep)* — page for the fast burn, ticket for the slow one.
+- **multi-burn-rate-alerts** *(deep · shipped)* — page for the fast burn, ticket for the slow one.
   *Check:* fast burn pages within minutes; slow burn does not page; a blip does
   neither.
   *Source:* Google SRE Workbook.
 
-- **golden-use-red** *(core)* — the same service, three framings.
+- **golden-use-red** *(core · shipped)* — the same service, three framings.
   *Check:* each framing answers the question it is good at; the mismatch is named.
   *Source:* own.
 
-- **kill-the-toil** *(core)* — a weekly manual task.
+- **kill-the-toil** *(core · shipped)* — a weekly manual task.
   *Check:* automated, measured, and the time saved is demonstrated by a second run.
   *Source:* Google SRE Workbook.
 
-- **canary-with-analysis** *(deep)* — a bad build that passes CI.
+- **canary-with-analysis** *(deep · shipped)* — a bad build that passes CI.
   *Check:* automated analysis rejects the canary on the metric that moved.
   *Source:* own.
 
-- **blue-green-and-rollback** *(core)* — roll back in under a minute.
+- **blue-green-and-rollback** *(core · shipped)* — roll back in under a minute.
   *Check:* traffic returns to the good version within the budget; database
   compatibility is preserved both directions.
   *Source:* own; the database half builds on module 10's zero-downtime-migration.
 
-- **feature-flag-kill-switch** *(core)* — turn it off without a deploy.
+- **feature-flag-kill-switch** *(core · shipped)* — turn it off without a deploy.
   *Check:* the flag disables the path in seconds and the stale-flag audit is clean.
   *Source:* own.
 
-- **incident-command** *(architect)* — an incident with three people and no structure.
+- **incident-command** *(architect · shipped)* — an incident with three people and no structure.
   *Check:* roles are assigned and held, the severity call matches the published
   criteria, status updates land at the stated cadence, and the answer is graded
   against a rubric that rejects a commander who also debugs.
   *Source:* own.
 
-- **capacity-planning** *(architect)* — the growth forecast and the Little's Law
+- **capacity-planning** *(architect · shipped)* — the growth forecast and the Little's Law
   numbers from module 20.
   *Check:* the plan states the headroom target, derives instance counts from
   measured service time rather than a guess, and identifies which resource
   saturates first — a plan that scales the wrong dimension fails.
   *Source:* Google SRE Workbook; builds on module 20.
 
-- **error-budget-policy** *(architect)* — the budget is spent in week two.
+- **error-budget-policy** *(architect · shipped)* — the budget is spent in week two.
   *Check:* the written policy states what stops, who decides, and what unblocks
   it, and is graded against a rubric requiring a consequence that is actually
   enforceable by the team that wrote it.
   *Source:* Google SRE Workbook.
 
-- **chaos-done-properly** *(architect)* — hypothesis, blast radius, experiment, conclusion.
+- **chaos-done-properly** *(architect · shipped)* — hypothesis, blast radius, experiment, conclusion.
   *Check:* the experiment is bounded, the hypothesis is falsifiable, and the
   written conclusion matches what the data showed.
   *Source:* own.
 
-- **the-postmortem** *(architect)* — for the incident you caused in module 21.
+- **the-postmortem** *(architect · shipped)* — for the incident in incident-command.
   *Check:* timeline, contributing factors, and action items with owners; graded
   against a rubric that rejects blame language and unowned actions.
   *Source:* Google SRE Workbook.
