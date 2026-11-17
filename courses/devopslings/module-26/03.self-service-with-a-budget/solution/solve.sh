@@ -169,8 +169,9 @@ git push -q origin HEAD:main
 curl -fsS $auth -X POST "${api}/repos/devops/environments/actions/workflows/reap.yml/dispatches" \
   -H 'Content-Type: application/json' -d '{"ref":"main"}' >/dev/null
 for _ in $(seq 1 60); do
-  n=$(curl -fsS $auth "${api}/repos/devops/environments/contents/envs?ref=main" | grep -o '"type":"file"' | wc -l | tr -d ' ')
-  [ "$n" -le 6 ] && exit 0
+  # A listing read mid-push can come back without files; that is not "reclaimed".
+  n=$(curl -fsS $auth "${api}/repos/devops/environments/contents/envs?ref=main" | grep -o '"type":"file"' | wc -l | tr -d ' ') || true
+  [ "$n" -gt 0 ] && [ "$n" -le 6 ] && exit 0
   sleep 3
 done
 echo "reap did not reclaim the backlog (still ${n} environments)" >&2
