@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       fail2ban \
       ansible-core python3-apt \
       git python3-venv \
+      bpftrace \
     && rm -rf /var/lib/apt/lists/*
 
 # Module 15's role lesson tests a role with molecule from a clean target. There

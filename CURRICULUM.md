@@ -25,13 +25,13 @@ than at exercise one.
 | **architect** | A written decision or design, graded against a rubric. |
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 282 shipped, 2 blocked, 15 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 283 shipped, 1 blocked, 15 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
 Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 12/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
 <!-- /counts -->
 
 Modules 01–23 and 25 each open with an `intro` exercise. Modules 24, 26 and 27
@@ -408,9 +408,14 @@ entry points, trust boundaries — that has to find the one real gap (a root
 cron job running a script the service user owns), name each attacker by what
 they can do rather than "hackers", and state what every proposed control costs.
 
-Still to build: an AppArmor denial in enforce mode and auditd answering who
-changed the file at 02:14 — both blocked by this sandbox's kernel (no AppArmor
-LSM, no audit subsystem), to be reframed or moved to a VM-backed sandbox.
+- **trace-who-changed-it** *(shipped)* — a refund limit keeps changing and
+  mtime plus shell history point at the wrong person. The student writes the
+  path watch auditd would hold (`-w … -p wa`) as a bpftrace program — writes and
+  renames onto the path, never reads — and reads the culprit off the trail. The
+  audit socket refuses containers, so bpftrace stands in, and the unit says so.
+
+Still to build: an AppArmor denial in enforce mode — the sandbox kernel has no
+AppArmor at all; a nested TCG VM booting a Debian kernel is the open route.
 
 ### 08 — Version Control · *shipped*
 no sandbox, except `git-box` for the LFS lesson
