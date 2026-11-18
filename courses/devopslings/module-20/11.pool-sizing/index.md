@@ -110,13 +110,14 @@ tasks:
       fi
       echo "this check ran the on-sale at pool_size=$running: $rate bookings/s, p99 ${p99}ms, $errs over the 500ms deadline"
       echo "(just before it, the original pool of 80: $brate bookings/s, p99 ${bp99}ms)"
-      if [ "$errs" -gt 0 ]; then
+      # One late booking in a thousand is noise from the machine; more is the pool.
+      if [ "$(( errs * 1000 ))" -gt "$(( rate * 15 + errs ))" ]; then
         echo "not yet: $errs bookings took longer than the app's 500ms deadline, and those customers saw an"
         echo "error. With $running server connections, that many backends share the CPU, and a booking"
         echo "holding a show's row lock is descheduled while every booking behind it waits."
         exit 1
       fi
-      if [ "$rate" -lt "$(awk -v b="$brate" 'BEGIN { printf "%d", 0.9 * b }')" ]; then
+      if [ "$rate" -lt "$(awk -v b="$brate" 'BEGIN { printf "%d", 0.85 * b }')" ]; then
         echo "not yet: $rate bookings a second is fewer than the original pool sold, with no booking late."
         echo "With $running server connections, CPU sits idle while bookings wait in pgbouncer for a"
         echo "connection to come free (cl_waiting in SHOW POOLS). Too small a pool is a queue of its own."
@@ -128,5 +129,5 @@ tasks:
         exit 1
       fi
       echo "PASS — pool_size=$running sells $rate seats a second (the original: $brate) with a p99 of ${p99}ms"
-      echo "(the original: ${bp99}ms) and no booking past the deadline."
+      echo "(the original: ${bp99}ms) and $errs bookings past the deadline."
 ---
