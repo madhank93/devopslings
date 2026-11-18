@@ -150,7 +150,6 @@ resource "docker_container" "shop" {
     name         = "devopslings-ha-stack_front"
     ipv4_address = "172.29.22.3${count.index + 1}"
   }
-  # labels unchanged
 }
 ```
 

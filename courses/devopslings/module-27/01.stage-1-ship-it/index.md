@@ -144,13 +144,6 @@ tasks:
           name         = "devopslings-ha-stack_front"
           ipv4_address = "172.29.22.31"
         }
-
-        # Marks the container as part of ha-stack, so tearing the stack down
-        # removes it too instead of leaving it holding the network.
-        labels {
-          label = "com.docker.compose.project"
-          value = "devopslings-ha-stack"
-        }
       }
       HCL
 

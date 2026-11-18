@@ -67,6 +67,9 @@ every runbook command run against the sandbox.
 
 - `devopslings stop` and the UI's shared-sandbox warning only look at
   `stack`, not `with`.
+- The replicas are not compose containers, so tearing ha-stack down leaves
+  them holding `front`; compose reuses the network on the next start and
+  stage 1's init removes them.
 - Stage 1 cannot tell "plan -out then apply the file" from a bare
   `apply -auto-approve`; both leave the same state. The digest rule is what
   makes the plan meaningful, and that is graded.
