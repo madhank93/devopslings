@@ -43,11 +43,25 @@ digest, running CI's image; both servers UP on lb1 and lb2), kills a replica
 under traffic, then pushes a grader commit and runs the release check again
 plus the new version through `www`.
 
-**Stage 2.** A randomised drill in the shape of 21/14: one fault from the
-table above, injected by `inject_fault` at a layer the prose does not name.
-The verify is that fault's own lesson check followed by stage 1's release
-check on a grader commit, so fixing the symptom by hand fails. The contract
-must sweep every branch (patch the draw), as other drills do.
+**Stage 2.** Built, as a randomised drill in the shape of 21/14. Init keeps
+the student's stage 1 if its check passes (and no earlier draw is still in
+the repository), else lays the reference down and ships it; then it seeds one
+fault and writes what was seen to `scratch/stage-2-break-it/INCIDENT.txt`:
+
+| Fault | Seeded as | The fault's own check |
+|---|---|---|
+| health (22/05) | `src/server.js` calls a pricing service; `/health` does not | pricing drops shop1: out of rotation on both LBs, no failed orders, back when healed |
+| drift (13/04) | a replica removed by hand | state matches what runs; `ci/drift-check.sh` exits 0 / 2 / other, never repairs, runs on a schedule |
+| retention (11/03) | a retention workflow keeping one release | after 12 stale tags and a release: the previous image still pulls, at most ten tags |
+| cache (12/05) | a BuildKit cache mount that returns the first build's bundle | cache mount kept; stage 1's probe reaches www |
+| split (22/07) | the on-call's `hotfix` workspace owns the replicas, with `PAYMENTS=disabled` | one state manages production, and the flag survives |
+
+`inject_fault` only resets the pricing service; nothing else needs arming.
+The verify runs the fault's check, then all of stage 1, then the fault's
+check again for health, cache and split, on what the pipeline redeployed: a
+repair made to running containers passes the first and fails the last.
+`run_jobs` waits for the newest run of every workflow on a commit, since the
+retention and drift workflows run beside `ci.yml`.
 
 **Stage 3.** k6 at a constant arrival rate on the `front` network against
 `www` while the grader (a) pushes a release and (b) kills a replica. Pass is
@@ -70,6 +84,10 @@ every runbook command run against the sandbox.
 - The replicas are not compose containers, so tearing ha-stack down leaves
   them holding `front`; compose reuses the network on the next start and
   stage 1's init removes them.
+- Stage 2's drift check is run by the grader in the ops image on
+  `devopslings-ci-net`, as `bash ci/drift-check.sh` from the repository root.
+  A `-refresh-only` plan does not work there: the docker provider reports its
+  own attribute normalisation as drift on every refresh.
 - Stage 1 cannot tell "plan -out then apply the file" from a bare
   `apply -auto-approve`; both leave the same state. The digest rule is what
   makes the plan meaningful, and that is graded.
