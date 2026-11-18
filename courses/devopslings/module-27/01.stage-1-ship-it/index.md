@@ -468,7 +468,9 @@ tasks:
       probe_sha=$(git rev-parse HEAD)
 
       if ! check_release "$probe_sha"; then
-        echo "(That was on the grader's commit ${probe_sha:0:12}, which only changes VERSION.)"
+        echo "That was on the grader's commit ${probe_sha:0:12}, which only changes VERSION."
+        echo "Your own commit passed the same checks, so something that got it to production"
+        echo "does not happen for a new commit: a step done by hand, or a value pinned to it."
         exit 1
       fi
       out=$(through_www)
