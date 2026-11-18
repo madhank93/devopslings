@@ -2535,7 +2535,7 @@ all stacks · 4 stages
 - **stage-1-ship-it** *(core · shipped)* — commit to production through the whole pipeline.
 - **stage-2-break-it** *(deep · shipped)* — a fault injected at a layer you are not told.
 - **stage-3-hold-the-line** *(deep · shipped)* — p99 and the SLO survive the experiment.
-- **stage-4-write-it-up** *(architect)* — postmortem and runbook, graded against
+- **stage-4-write-it-up** *(architect · shipped)* — postmortem and runbook, graded against
   the rubric.
 
 Each stage's check is the composition of earlier modules' checks: nothing new is

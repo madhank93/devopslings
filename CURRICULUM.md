@@ -1047,7 +1047,7 @@ what it will say no to.
 
 ## Finishing
 
-### 27 — Capstone
+### 27 — Capstone · *shipped*
 all stacks
 
 Build it, break it, measure it: git push → CI → Harbor → `tofu apply` → an HA
