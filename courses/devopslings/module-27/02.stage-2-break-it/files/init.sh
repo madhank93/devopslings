@@ -6,7 +6,7 @@ set -euo pipefail
 . "$DEVOPSLINGS_ROOT/courses/devopslings/module-27/02.stage-2-break-it/files/common.sh"
 
 mkdir -p "$S"
-rm -f "$S/.state" "$S/stage-1.log" "$S/INCIDENT.txt"
+rm -f "$S/.state" "$S/.seed" "$S/stage-1.log" "$S/INCIDENT.txt"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
@@ -151,6 +151,9 @@ TXT
 esac
 
 printf '%s' "$fault" | sha256sum | awk '{print $1}' > "$S/.state"
+# Commits after this one are the student's.
+tip > "$S/.seed"
+capstone_event stage-2 fault_injected "$fault"
 
 cat <<'Q'
 Stage 1 shipped checkout. Since then something has gone wrong in production,

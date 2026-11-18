@@ -27,6 +27,22 @@ reference solution is laid down and given a pipeline run. To make that
 possible, stage 1's seed and solve move into `module-27/files/` when stage 2
 is built, and every stage calls them from there.
 
+## The event log
+
+`capstone_event <stage> <event> [detail]` (files/lib.sh) appends
+`<RFC3339 UTC>\t<stage>\t<event>\t<detail>` to
+`/var/lib/capstone/events.log` in `devopslings-ha-ops`. That path is the
+named volume `capstone` in ha-stack's compose file, so it survives a recreated
+ops container and is wiped with the rest of the stacks' state by
+`compose down -v`. `CAPSTONE_AT` overrides the time for an event noticed
+after it happened. Stage 4 grades its timeline against this file.
+
+- stage-2: `fault_injected` (init), then once per draw on the first pass,
+  `first_detected` (time of the first commit after the seed) and `fixed`;
+  detail is the fault.
+- stage-3: `experiment_start`, `release_pushed`, `replica_killed`,
+  `experiment_end` (detail `p99_ms=<n> error_budget_burn=<x>`).
+
 ## Stages
 
 | Stage | Stacks | Reuses the checks of |
