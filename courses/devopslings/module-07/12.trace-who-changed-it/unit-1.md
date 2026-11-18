@@ -54,7 +54,11 @@ flags. `write(2)` only has a file descriptor. Tracepoints carry the arguments:
 
 ```
 $ bpftrace -lv 'tracepoint:syscalls:sys_enter_openat'
+$ bpftrace -lv 'tracepoint:raw_syscalls:sys_enter'
 ```
+
+The first names openat's arguments; the second sees every syscall as a number
+plus six raw arguments, in the same order.
 
 </details>
 
@@ -64,8 +68,8 @@ $ bpftrace -lv 'tracepoint:syscalls:sys_enter_openat'
 `sed -i`, `vi`, `ansible` and most config tools write a temporary file next to
 the target and `rename(2)` it over the top. The target path never appears in
 an `openat` for writing; it appears as rename's `newname`. Which rename syscall
-glibc uses differs by CPU, so `tracepoint:syscalls:sys_enter_rename*` covers
-them all.
+glibc uses differs by CPU: `rename` on x86_64, `renameat` on arm64, and
+`renameat2` from anything that asks for it.
 
 </details>
 
@@ -73,7 +77,7 @@ them all.
 <summary>Hint 3 — reads are not changes</summary>
 
 `O_RDONLY` is 0. The access mode is the low two bits of the flags, so
-`(args->flags & 3) != 0` is "opened for writing".
+`(flags & 3) != 0` is "opened for writing".
 
 </details>
 
@@ -107,28 +111,52 @@ record who made them, and leave the reads out.
 
 ## Writing the watch
 
-The in-place writer is the straightforward one:
+The in-place writer is the straightforward one. The obvious probe is
+`tracepoint:syscalls:sys_enter_openat`, with the arguments by name — and on
+some kernels it is a trap: Ubuntu's 7.0 kernels hand the per-syscall
+`sys_enter_*` tracepoints to BPF only for syscalls made on CPU 0. On a
+four-core box the watch then misses three changes in four and looks fine while
+it does. `raw_syscalls:sys_enter` fires on every CPU; it gives the syscall as a
+number (`args->id`) and the arguments as `args->args[0..5]`:
+
+| syscall | x86_64 | arm64 | path argument |
+|---|---|---|---|
+| openat | 257 | 56 | `args[1]`, flags in `args[2]` |
+| rename | 82 | — | `args[1]` is the new name |
+| renameat, renameat2 | 264, 316 | 38, 276 | `args[3]` is the new name |
+
+`uname -m` says which column. On x86_64:
 
 ```
-tracepoint:syscalls:sys_enter_openat
-/ str(args->filename) == "/etc/pay/limits.conf" && (args->flags & 3) != 0 /
+tracepoint:raw_syscalls:sys_enter
+/ args->id == 257 && (args->args[2] & 3) != 0
+  && str(uptr(args->args[1])) == "/etc/pay/limits.conf" /
 {
-  printf("%s uid=%d comm=%s syscall=%s\n",
-         strftime("%H:%M:%S", nsecs), uid, comm, probe);
+  printf("%s uid=%d comm=%s syscall=openat\n",
+         strftime("%H:%M:%S", nsecs), uid, comm);
 }
 ```
 
-That catches `echo >> limits.conf` and a bash script redirecting into the file.
-It misses `sed -i` entirely: sed opens the original only to *read* it, writes
-`/etc/pay/sedXXXXXX`, and renames that over the target. That is why auditd's
-`-w` is a watch on the *path*, and a rename onto it counts:
+`uptr()` says the number is a user-space address, so `str()` reads it from the
+process. That catches `echo >> limits.conf` and a bash script redirecting into
+the file. It misses `sed -i` entirely: sed opens the original only to *read*
+it, writes `/etc/pay/sedXXXXXX`, and renames that over the target. That is why
+auditd's `-w` is a watch on the *path*, and a rename onto it counts:
 
 ```
-tracepoint:syscalls:sys_enter_rename*
-/ str(args->newname) == "/etc/pay/limits.conf" /
+tracepoint:raw_syscalls:sys_enter
+/ args->id == 82 && str(uptr(args->args[1])) == "/etc/pay/limits.conf" /
 {
-  printf("%s uid=%d comm=%s syscall=%s\n",
-         strftime("%H:%M:%S", nsecs), uid, comm, probe);
+  printf("%s uid=%d comm=%s syscall=rename\n",
+         strftime("%H:%M:%S", nsecs), uid, comm);
+}
+
+tracepoint:raw_syscalls:sys_enter
+/ (args->id == 264 || args->id == 316)
+  && str(uptr(args->args[3])) == "/etc/pay/limits.conf" /
+{
+  printf("%s uid=%d comm=%s syscall=renameat\n",
+         strftime("%H:%M:%S", nsecs), uid, comm);
 }
 ```
 
@@ -141,8 +169,8 @@ watch would not; a real investigation adds a probe on the resolved path
 
 ```
 $ bpftrace /root/watch.bt
-Attaching 4 probes...
-09:41:20 uid=999 comm=warm syscall=tracepoint:syscalls:sys_enter_openat
+Attaching 3 probes...
+09:41:20 uid=999 comm=warm syscall=openat
 $ getent passwd 999
 svc-cache:x:999:999::/home/svc-cache:/usr/sbin/nologin
 $ systemctl status cache-warmer
@@ -161,17 +189,28 @@ openat line), write `/etc/pay/other` (nothing).
 <details>
 <summary>Solution</summary>
 
+On x86_64 (on arm64: openat is 56, there is no rename, renameat/renameat2 are
+38/276):
+
 ```
-tracepoint:syscalls:sys_enter_openat
-/ str(args->filename) == "/etc/pay/limits.conf" && (args->flags & 3) != 0 /
+tracepoint:raw_syscalls:sys_enter
+/ args->id == 257 && (args->args[2] & 3) != 0
+  && str(uptr(args->args[1])) == "/etc/pay/limits.conf" /
 {
-  printf("%s uid=%d comm=%s syscall=%s\n", strftime("%H:%M:%S", nsecs), uid, comm, probe);
+  printf("%s uid=%d comm=%s syscall=openat\n", strftime("%H:%M:%S", nsecs), uid, comm);
 }
 
-tracepoint:syscalls:sys_enter_rename*
-/ str(args->newname) == "/etc/pay/limits.conf" /
+tracepoint:raw_syscalls:sys_enter
+/ args->id == 82 && str(uptr(args->args[1])) == "/etc/pay/limits.conf" /
 {
-  printf("%s uid=%d comm=%s syscall=%s\n", strftime("%H:%M:%S", nsecs), uid, comm, probe);
+  printf("%s uid=%d comm=%s syscall=rename\n", strftime("%H:%M:%S", nsecs), uid, comm);
+}
+
+tracepoint:raw_syscalls:sys_enter
+/ (args->id == 264 || args->id == 316)
+  && str(uptr(args->args[3])) == "/etc/pay/limits.conf" /
+{
+  printf("%s uid=%d comm=%s syscall=renameat\n", strftime("%H:%M:%S", nsecs), uid, comm);
 }
 ```
 

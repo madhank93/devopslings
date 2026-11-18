@@ -182,6 +182,15 @@ tasks:
       trap - EXIT
 
       names() { printf '%s\n' "$log" | grep -F "$1" || true; }
+      # Some kernels (Ubuntu's 7.0) run BPF on syscalls:sys_enter_* only for
+      # syscalls made on CPU 0, so such a watch misses most changes.
+      cpu0_note() {
+        grep -q 'syscalls:sys_enter_' "$w" || return 0
+        echo "         If you are sure the filter is right: on some kernels the"
+        echo "         per-syscall sys_enter_* tracepoints reach bpftrace only for"
+        echo "         syscalls made on CPU 0. tracepoint:raw_syscalls:sys_enter"
+        echo "         sees every CPU — the unit shows how."
+      }
       identifies() {
         printf '%s\n' "$1" | grep -Eq "\\b($2|$(id -u "$2"))\\b"
       }
@@ -202,6 +211,7 @@ tasks:
       if [ -z "$line" ]; then
         echo "not yet: dave appended to $f with '$ap' and your watch printed"
         echo "         nothing for it. An append is an openat with a write flag."
+        cpu0_note
         exit 1
       fi
       if ! identifies "$line" dave; then
@@ -216,6 +226,7 @@ tasks:
         echo "         nothing. sed -i writes a temporary file and renames it over"
         echo "         the original — the path arrives as rename's new name, not in"
         echo "         an openat."
+        cpu0_note
         exit 1
       fi
       if ! identifies "$line" carol; then
