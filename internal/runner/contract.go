@@ -65,7 +65,7 @@ func (r *Runner) Contract(ctx context.Context, l course.Lesson) ContractResult {
 	}
 
 	// 1. Clean slate, then set the scenario up.
-	if _, err := r.Down(ctx, l.Sandbox.Stack); err != nil {
+	if err := r.downAll(ctx, l); err != nil {
 		return fail("teardown before start: %w", err)
 	}
 	start, err := r.Start(ctx, l)

@@ -2514,7 +2514,7 @@ they actually took it.
 ## 27 — Capstone
 all stacks · 4 stages
 
-- **stage-1-ship-it** *(core)* — commit to production through the whole pipeline.
+- **stage-1-ship-it** *(core · shipped)* — commit to production through the whole pipeline.
 - **stage-2-break-it** *(deep)* — a fault injected at a layer you are not told.
 - **stage-3-hold-the-line** *(deep)* — p99 and the SLO survive the experiment.
 - **stage-4-write-it-up** *(architect)* — postmortem and runbook, graded against

@@ -8,13 +8,14 @@ FROM postgres:17.6-bookworm
 ARG TARGETARCH
 ARG TOFU_VERSION=1.13.2
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl jq python3 iproute2 procps less nano vim-tiny iputils-ping ca-certificates \
+ && apt-get install -y --no-install-recommends curl git jq python3 iproute2 procps less nano vim-tiny iputils-ping ca-certificates \
  && rm -rf /var/lib/apt/lists/*
-# OpenTofu, with the one provider module 23 uses mirrored into the image, so
-# `tofu init` works offline.
+# OpenTofu, with the providers modules 23 and 27 use mirrored into the image,
+# so `tofu init` works offline. Module 27's pipeline also runs this image as a
+# CI job container, which is why it carries the docker provider.
 RUN curl -fsSL "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${TARGETARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin tofu \
- && mkdir -p /tmp/m && printf 'terraform {\n  required_providers {\n    postgresql = { source = "cyrilgdn/postgresql", version = "1.27.0" }\n  }\n}\n' > /tmp/m/main.tf \
+ && mkdir -p /tmp/m && printf 'terraform {\n  required_providers {\n    postgresql = { source = "cyrilgdn/postgresql", version = "1.27.0" }\n    docker = { source = "kreuzwerker/docker", version = "4.6.0" }\n  }\n}\n' > /tmp/m/main.tf \
  && tofu -chdir=/tmp/m providers mirror /usr/share/tofu-mirror && rm -rf /tmp/m
 COPY tofurc /etc/tofurc
 ENV TF_CLI_CONFIG_FILE=/etc/tofurc
