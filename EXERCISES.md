@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 274 shipped, 1 blocked, 24 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 283 shipped, 1 blocked, 15 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 12/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 0/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 12/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -2466,62 +2466,62 @@ The discipline the roadmap names and no exercise set teaches: making the right
 thing the easy thing for teams who do not report to you, and measuring whether
 they actually took it.
 
-- **golden-path-template** *(core)* — a new service takes three days of copying
+- **golden-path-template** *(core · shipped)* — a new service takes three days of copying
   from an existing one.
   *First guess:* write a README explaining the steps.
   *Check:* generating from the template produces a service with a working
   pipeline, a dashboard and an alert, all green, with no manual step in between.
   *Source:* own.
 
-- **paved-road-guardrail** *(core)* — the misconfiguration that reached production
+- **paved-road-guardrail** *(core · shipped)* — the misconfiguration that reached production
   twice.
   *First guess:* add it to the review checklist.
   *Check:* policy-as-code rejects the bad configuration in CI, permits the
   documented exception with an expiry, and the exception's expiry is enforced.
   *Source:* own.
 
-- **self-service-with-a-budget** *(core)* — 40 preview environments and 6 in use.
+- **self-service-with-a-budget** *(core · shipped)* — 40 preview environments and 6 in use.
   *First guess:* ask people to clean up after themselves.
   *Check:* environments are created on demand and reclaimed automatically at the
   stated TTL, with an extension path that requires a reason and does not require
   the platform team.
   *Source:* own.
 
-- **ownership-metadata** *(core)* — an alert fires and nobody knows whose it is.
+- **ownership-metadata** *(core · shipped)* — an alert fires and nobody knows whose it is.
   *First guess:* a spreadsheet of owners.
   *Check:* the alert routes to the owning team from metadata that lives with the
   service, and a service with no owner fails the pipeline rather than shipping.
   *Source:* own.
 
-- **deprecate-a-paved-road** *(core)* — v1 of the template has a flaw and 30
+- **deprecate-a-paved-road** *(core · shipped)* — v1 of the template has a flaw and 30
   services use it.
   *First guess:* announce the deprecation and set a date.
   *Check:* every consumer is migrated, the check proves none remain on v1, and
   the migration path was executed without a coordinated downtime window.
   *Source:* own.
 
-- **platform-slo** *(deep)* — the platform is "up" and nobody can ship.
+- **platform-slo** *(deep · shipped)* — the platform is "up" and nobody can ship.
   *First guess:* measure CI uptime.
   *Check:* the SLI reflects a developer completing the journey the platform
   exists for, moves during the seeded degradation that leaves every component
   technically healthy, and the error budget is computed against it.
   *Source:* own; module 24's method turned on the platform itself.
 
-- **adoption-not-mandate** *(deep)* — two teams route around the golden path.
+- **adoption-not-mandate** *(deep · shipped)* — two teams route around the golden path.
   *First guess:* mandate it.
   *Check:* the reason is identified from the usage and pipeline data rather than
   asserted, and the change made to the path is validated by those teams adopting
   it without being told to.
   *Source:* own.
 
-- **noisy-neighbour** *(deep)* — one team's build queue starves everyone else's.
+- **noisy-neighbour** *(deep · shipped)* — one team's build queue starves everyone else's.
   *First guess:* add runners.
   *Check:* per-tenant throughput stays within its share under a seeded burst,
   the heavy tenant still completes, and the answer names the isolation mechanism
   chosen over the two rejected.
   *Source:* own.
 
-- **platform-as-a-product** *(architect)* — a roadmap from the data.
+- **platform-as-a-product** *(architect · shipped)* — a roadmap from the data.
   *Check:* the plan is derived from the adoption, toil and platform-SLO data
   rather than from requests, states what will be said no to, and is graded
   against a rubric requiring a measurable success criterion per item.
