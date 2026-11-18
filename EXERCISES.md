@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 283 shipped, 1 blocked, 15 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 298 shipped, 1 blocked, 0 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26.
+Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 12/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 0/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 12/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -2054,79 +2054,79 @@ failures transfer to any provider.
 ## 20 — Performance, Percentiles & Scalability
 `obs-stack` + `chaos-stack`
 
-- **read-a-percentile** *(intro)* — 1,000 request durations, computed by hand,
+- **read-a-percentile** *(intro · shipped)* — 1,000 request durations, computed by hand,
   then by query.
   *Check:* the hand-computed p50, p95 and p99 match the query's answers, and the
   answer states how many of the 1,000 requests are worse than the p99.
   *Source:* own; the arithmetic before the argument.
 
-- **the-average-lies** *(core)* — a healthy mean over a broken service.
+- **the-average-lies** *(core · shipped)* — a healthy mean over a broken service.
   *Check:* the answer identifies the affected user share from the distribution.
   *Source:* own.
 
-- **histograms-versus-summaries** *(deep)* — averaging a quantile across instances.
+- **histograms-versus-summaries** *(deep · shipped)* — averaging a quantile across instances.
   *First guess:* `avg(p99)`.
   *Check:* correct aggregate computed from histogram buckets; the wrong method's
   error is quantified in the answer.
   *Source:* own.
 
-- **coordinated-omission** *(deep)* — the load generator hides the worst latency.
+- **coordinated-omission** *(deep · shipped)* — the load generator hides the worst latency.
   *First guess:* the p99 in the report is the p99.
   *Check:* open-model measurement reveals the true tail; both numbers reported.
   *Source:* Gil Tene's argument, made hands-on with k6.
 
-- **load-test-shapes** *(core)* — the same service under five different tests.
+- **load-test-shapes** *(core · shipped)* — the same service under five different tests.
   *First guess:* one ramp test tells you everything.
   *Check:* ramp, soak, spike, stress and breakpoint each run, and the answer names
   which failure only one of them exposed — the soak-only leak is seeded.
   *Source:* own.
 
-- **k6-thresholds-as-a-gate** *(core)* — a load test that always passes.
+- **k6-thresholds-as-a-gate** *(core · shipped)* — a load test that always passes.
   *First guess:* eyeball the summary output.
   *Check:* thresholds fail the run on the seeded regression and pass the healthy
   build, with the process exit code driving the pipeline.
   *Source:* own.
 
-- **fan-out-amplification** *(deep)* — a fast backend that produces a slow page.
+- **fan-out-amplification** *(deep · shipped)* — a fast backend that produces a slow page.
   *Check:* the arithmetic is demonstrated and the fix (parallel/hedged/cached)
   brings the page p99 under budget.
   *Source:* own.
 
-- **littles-law** *(core)* — how many workers do you actually need.
+- **littles-law** *(core · shipped)* — how many workers do you actually need.
   *Check:* the computed number is validated by a run at that concurrency.
   *Source:* own.
 
-- **the-knee** *(deep)* — the ninth node makes it slower.
+- **the-knee** *(deep · shipped)* — the ninth node makes it slower.
   *First guess:* scale out further.
   *Check:* the contention point is identified and throughput improves without
   adding nodes.
   *Source:* own.
 
-- **usl-and-the-second-coefficient** *(architect)* — fit the curve, then predict.
+- **usl-and-the-second-coefficient** *(architect · shipped)* — fit the curve, then predict.
   *Check:* contention and coherency coefficients are fitted from the measured
   throughput series, the predicted peak matches a held-out run within tolerance,
   and the answer states what the model cannot tell you.
   *Source:* the Universal Scalability Law, made measurable.
 
-- **pool-sizing** *(core)* — more connections, less throughput.
+- **pool-sizing** *(core · shipped)* — more connections, less throughput.
   *Check:* pgbouncer sized from measurement; p99 improves and errors go to zero.
   *Source:* own; pairs with module 10.
 
-- **cache-stampede** *(deep)* — one expiry takes the database down.
+- **cache-stampede** *(deep · shipped)* — one expiry takes the database down.
   *First guess:* longer TTL.
   *Check:* single-flight or jittered TTL; origin load stays bounded at expiry.
   *Source:* own.
 
-- **flame-graph** *(deep)* — 30% of CPU in a function nobody suspected.
+- **flame-graph** *(deep · shipped)* — 30% of CPU in a function nobody suspected.
   *Check:* the hot path is named from the profile and the fix is measured.
   *Source:* Brendan Gregg.
 
-- **benchmark-traps** *(core)* — the same code, three different numbers.
+- **benchmark-traps** *(core · shipped)* — the same code, three different numbers.
   *Check:* warm-up, cache state and noisy neighbours controlled; results repeatable
   within tolerance.
   *Source:* own.
 
-- **cpu-over-eighty** *(architect)* — a bad alert replaced by a good one.
+- **cpu-over-eighty** *(architect · shipped)* — a bad alert replaced by a good one.
   *Check:* the new alert fires on user-visible harm and stays quiet through a
   harmless CPU spike.
   *Source:* own.

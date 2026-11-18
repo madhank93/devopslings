@@ -23,3 +23,6 @@ sandboxes/*/.env
 
 # Python bytecode from running the sandbox apps on the host.
 __pycache__/
+
+# Answers written while working a chaos-stack lesson.
+sandboxes/*/answers/
