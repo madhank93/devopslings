@@ -13,10 +13,12 @@ accept='application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distr
 # ha-stack back to its starting topology, then nothing on the front
 # network that ha-stack did not start itself: a replica left by an
 # earlier attempt would answer at the addresses the student has to fill.
+# Other stacks' containers (stage 3's Prometheus) are only disconnected.
 docker exec devopslings-ha-ops ha-reset
 for c in $(docker ps -aq --filter network=devopslings-ha-stack_front); do
   case "$(docker inspect -f '{{.Name}}' "$c")" in
     /devopslings-ha-*) ;;
+    /devopslings-*) docker network disconnect -f devopslings-ha-stack_front "$c" >/dev/null ;;
     *) docker rm -f "$c" >/dev/null ;;
   esac
 done

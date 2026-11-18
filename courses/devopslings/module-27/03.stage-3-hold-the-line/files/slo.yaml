@@ -1,0 +1,4 @@
+# checkout's promise to its customers, held over every window the business
+# looks at, including the minutes a release or a failure happens in.
+availability_percent: 99.9   # requests through www answered without an error
+latency_p99_ms: 500          # 99 in 100 requests answered within this

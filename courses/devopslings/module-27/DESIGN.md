@@ -79,13 +79,23 @@ repair made to running containers passes the first and fails the last.
 `run_jobs` waits for the newest run of every workflow on a commit, since the
 retention and drift workflows run beside `ci.yml`.
 
-**Stage 3.** k6 at a constant arrival rate on the `front` network against
-`www` while the grader (a) pushes a release and (b) kills a replica. Pass is
-p99 and the error budget held over the window, measured from HAProxy's own
-metrics, which obs-stack's Prometheus scrapes once init connects it to
-`front`. The seed's in-place replace (destroy then create both) breaks the
-SLO; the fix is the earlier lessons' rolling or blue-green deploy plus a
-drain on SIGTERM.
+**Stage 3.** Built. Init keeps the student's stage 1 if its check passes,
+else ships the reference, then commits `slo.yaml` (99.9%, p99 500ms) and
+connects obs-stack's Prometheus to `front`, scraping HAProxy's exporter
+(`:8404/metrics`, in ha-stack's `base.cfg`). The experiment: k6 at 40 req/s
+for 150s from a throwaway container on `front`; ten seconds in a release is
+pushed through the pipeline; once it is live one replica gets `docker stop
+-t 10`, with its `/health` and `/` sampled twice a second. Errors are the
+higher of HAProxy's 5xx and k6's failures. Most failures are client timeouts
+HAProxy never answers, so k6 logs each failure's second and the "not yet"
+places them against the release and the stop. Pass is the budget and p99
+held, the stopped replica failing `/health` while still serving `/`, then all
+of stage 1. `slo.yaml` changed is rejected before the experiment. In the seed,
+the in-place replace costs latency, not errors (HAProxy's retries land on the
+new container about a second later, so p99 ~1s), and the stop costs errors
+(PID 1 ignores SIGTERM: about 4x the budget). k6 logs slow answers too, so
+the p99 "not yet" is placed the same way. The reference rolls one replica at
+a time (`-target`, waiting on both LBs' stats) and drains on SIGTERM.
 
 **Stage 4.** No new system work. `scratch/stage-4-write-it-up/` holds
 `postmortem.md` and `runbook.md`; the check is 24/13's rubric (timeline,
