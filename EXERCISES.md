@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 297 shipped, 2 blocked, 0 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 298 shipped, 1 blocked, 0 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
 Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 11/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 12/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
@@ -1121,17 +1121,35 @@ each lesson says so.
   *First guess:* set the profile back to complain, or disable AppArmor.
   *Check:* the profile is in enforce, the service works, and the specific denial
   from the audit log is quoted — a profile widened to `/** rwk` fails.
-  *Blocked:* the sandbox kernel loads no AppArmor LSM (`capability,landlock,yama,bpf`);
-  needs a host kernel booted with `apparmor` in `lsm=`.
+  *Blocked:* verified 2026-11-17 on OrbStack (kernel 7.2.12-orbstack, arm64): a
+  `--privileged` container sees `capability,landlock,yama,bpf` in
+  `/sys/kernel/security/lsm` (after mounting securityfs), no `/sys/module/apparmor`,
+  and `/proc/config.gz` has no `CONFIG_SECURITY_APPARMOR` at all — not loadable,
+  not just unselected. Docker Desktop's kernel untested. Landlock is no substitute:
+  its denials are a bare `EACCES`, logged only through audit (also unreachable,
+  see below), so "quote the denial" has nothing to quote. A nested VM is the open
+  route: no `/dev/kvm`, but `qemu-system-aarch64 -accel tcg -smp 2 -m 1024` in a
+  container boots Debian's 6.12 arm64 kernel with `lsm=landlock,yama,apparmor` to
+  `AppArmor initialized` and `/init` in 4s and the installer UI in 11s. Still
+  needed: a small rootfs with `apparmor_parser` and the service, and a per-arch
+  kernel (TCG across architectures on an x86 CI runner is unmeasured).
   *Source:* own.
 
-- **auditd-who-changed-it** *(deep · blocked)* — a config file changed at 02:14 and nobody
-  admits to it.
-  *First guess:* check the file's mtime and the shell history.
-  *Check:* the answer names the user, the process, and the syscall from the audit
-  trail, having first written the watch rule that would have caught it.
-  *Blocked:* the sandbox kernel is built without `CONFIG_AUDIT` ("audit support not in
-  kernel"); needs a host kernel with audit enabled.
+- **trace-who-changed-it** *(deep · shipped)* — the refund limit in a config file
+  changed at 02:14 and nobody admits to it.
+  *First guess:* check the file's mtime and the shell history — which point at
+  alice, who opened it in vi once.
+  *Check:* the student's bpftrace watch, run by the grader, prints a line naming
+  the user for an append and for a `sed -i` (a rename over the path), each by a
+  fresh randomly named process, and nothing for a read of the file or a write to
+  its neighbour; the answer names the service account, its process and `openat`.
+  *Substitutes for auditd:* verified 2026-11-17 on OrbStack (kernel
+  7.2.12-orbstack): `CONFIG_AUDIT=y`, but `auditctl -s` gets EPERM even with
+  `--privileged --pid=host`, because OrbStack's dockerd runs in a non-initial PID
+  namespace (PID 1 is `simplevisor`) and the kernel only answers audit requests
+  from the initial one. bpftrace (BTF, kprobes, tracepoints all present) works in
+  the privileged `linux-box` once tracefs is mounted; no fanotify in that kernel.
+  The unit teaches the `auditctl -w … -p wa` / `ausearch` equivalent alongside.
   *Source:* own.
 
 - **file-integrity-baseline** *(deep · shipped)* — a baseline that cries wolf every deploy.
