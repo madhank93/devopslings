@@ -1,4 +1,4 @@
-# iac-stack — the substrate for module 13 (and later 14 and 17).
+# iac-stack — the substrate for modules 13, 14 and 17.
 #
 # ws is the student's workstation: OpenTofu, a docker CLI and curl. What tofu
 # manages lives in dind, a Docker daemon of its own, so `tofu destroy` can only
@@ -52,6 +52,16 @@ services:
       # A user-defined network in dind, so functions reach other containers
       # there by name. ws creates it at start.
       FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK: lambda
+      # Deny what no policy allows, and treat unsigned S3 requests as
+      # anonymous. Keys that belong to no IAM user, like ws's own, act as the
+      # account root.
+      FLOCI_SERVICES_IAM_ENFORCEMENT_ENABLED: "true"
+      FLOCI_SERVICES_S3_ENFORCE_AUTH: "true"
+    # S3 Control calls go to <account-id>.<endpoint>, so the account's name
+    # has to resolve too.
+    networks:
+      default:
+        aliases: [000000000000.floci]
     depends_on:
       dind:
         condition: service_healthy

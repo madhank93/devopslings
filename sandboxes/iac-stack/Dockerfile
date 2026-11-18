@@ -18,7 +18,7 @@ ARG DOCKER_CLI_VERSION=29.8.1
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl git jq unzip procps less nano vim-tiny \
+      ca-certificates curl git jq unzip procps less nano vim-tiny awscli python3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN arch=$(dpkg --print-architecture) \
@@ -76,6 +76,12 @@ COPY load-lambda-runtime /usr/local/bin/load-lambda-runtime
 RUN git config --system user.email dev@example.com \
     && git config --system user.name 'Dev' \
     && git config --system init.defaultBranch main
+
+# The AWS CLI talks to floci. Tools that take explicit endpoints (OpenTofu's
+# provider and backend blocks) are unaffected.
+COPY aws-config /etc/aws/config
+ENV AWS_CONFIG_FILE=/etc/aws/config
+COPY aws /usr/local/bin/aws
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 WORKDIR /root
