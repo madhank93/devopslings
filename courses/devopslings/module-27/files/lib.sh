@@ -202,3 +202,19 @@ EOF
   done
   return 0
 }
+
+# capstone_event <stage> <event> [detail] appends one line,
+# "<RFC3339 UTC>\t<stage>\t<event>\t<detail>", to /var/lib/capstone/events.log
+# in devopslings-ha-ops: the timeline later stages are graded against. It is
+# on a named volume, so it lasts exactly as long as the stacks' other state.
+# CAPSTONE_AT sets the time, for an event noticed after it happened.
+capstone_event() {
+  printf '%s\t%s\t%s\t%s\n' "${CAPSTONE_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" "$1" "$2" "${3:-}" \
+    | docker exec -i devopslings-ha-ops sh -c 'mkdir -p /var/lib/capstone && cat >> /var/lib/capstone/events.log'
+}
+
+# The last event a stage recorded, or empty.
+capstone_last() {
+  docker exec devopslings-ha-ops sh -c 'cat /var/lib/capstone/events.log 2>/dev/null' \
+    | awk -F'\t' -v s="$1" '$2 == s { e = $3 } END { print e }' || true
+}

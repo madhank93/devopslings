@@ -42,6 +42,8 @@ services:
       - ./defaults:/defaults:ro
       # The student's lever for crashing, freezing and partitioning nodes.
       - /var/run/docker.sock:/var/run/docker.sock
+      # Module 27's event log, kept across a recreated container.
+      - capstone:/var/lib/capstone
     extra_hosts:
       - "www:172.29.22.100"
     networks:
@@ -256,6 +258,7 @@ services:
 
 volumes:
   ha-conf:
+  capstone:
   pg1-data:
   pg2-data:
   etcd1-data:

@@ -368,6 +368,15 @@ case "$fault" in
   cache) check_cache "$again" || exit 1 ;;
 esac
 
+# Once per draw: when the first fix was committed, then now. The first
+# commit after the seed is the earliest moment the record can show.
+if [ "$(capstone_last stage-2)" = fault_injected ]; then
+  first=$(TZ=UTC git log --reverse --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd \
+            "$(cat "$S/.seed" 2>/dev/null)..${head_sha}" 2>/dev/null | head -1 || true)
+  [ -z "$first" ] || CAPSTONE_AT=$first capstone_event stage-2 first_detected "$fault"
+  capstone_event stage-2 fixed "$fault"
+fi
+
 case "$fault" in
   health) echo "PASS: a replica that cannot price an order leaves rotation, and comes back when it can." ;;
   drift) echo "PASS: production matches the state, and a scheduled check finds the next drift without touching it." ;;
