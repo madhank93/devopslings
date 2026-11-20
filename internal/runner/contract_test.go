@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -139,9 +140,14 @@ func TestLessonContract(t *testing.T) {
 			if !l.TimingSensitive {
 				t.Parallel()
 			}
-			mu := lockFor(l.Sandbox.Stack)
-			mu.Lock()
-			defer mu.Unlock()
+			// Every stack the lesson tears down is held, taken in sorted order
+			// so two multi-stack lessons cannot deadlock on each other.
+			stacks := slices.Sorted(slices.Values(l.Sandbox.Stacks()))
+			for _, s := range slices.Compact(stacks) {
+				mu := lockFor(s)
+				mu.Lock()
+				defer mu.Unlock()
+			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 			defer cancel()

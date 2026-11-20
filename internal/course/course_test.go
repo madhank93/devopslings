@@ -118,8 +118,10 @@ func TestDiscover(t *testing.T) {
 			if l.Sandbox.Stack == "" {
 				t.Errorf("%s: names no sandbox stack", l.Name)
 			}
-			if !ValidSandboxName(l.Sandbox.Stack) {
-				t.Errorf("%s: invalid sandbox stack %q", l.Name, l.Sandbox.Stack)
+			for _, s := range l.Sandbox.Stacks() {
+				if !ValidSandboxName(s) {
+					t.Errorf("%s: invalid sandbox stack %q", l.Name, s)
+				}
 			}
 			if l.Sandbox.Service == "" {
 				t.Errorf("%s: names no sandbox service", l.Name)

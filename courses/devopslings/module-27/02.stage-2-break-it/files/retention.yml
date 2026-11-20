@@ -1,0 +1,45 @@
+name: retention
+
+# CI pushes an image for every commit, and the registry's disk is small. This
+# keeps the images of the newest releases on main and deletes the rest.
+on: [push]
+
+env:
+  KEEP: 1
+
+jobs:
+  prune:
+    runs-on: docker
+    container:
+      image: devopslings-ha-stack-ops
+    steps:
+      - run: |
+          git clone -q http://forge:3000/devops/checkout.git .
+          git checkout -q "${{ github.sha }}"
+          reg=http://registry:5000
+          accept='application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
+          # Empty for a tag an earlier delete already took with its digest.
+          digest() {
+            curl -sSI -H "Accept: ${accept}" "${reg}/v2/checkout/manifests/$1" \
+              | tr -d '\r' | awk 'tolower($1) == "docker-content-digest:" { print $2 }'
+          }
+
+          releases=$(git log -n "$KEEP" --format=%H)
+          kept=""
+          drop=""
+          for tag in $(curl -fsS "${reg}/v2/checkout/tags/list" | jq -r '.tags // [] | .[]'); do
+            keep=no
+            for c in $releases; do
+              case "$tag" in "$c"|*"$(echo "$c" | cut -c1-7)"*) keep=yes ;; esac
+            done
+            if [ "$keep" = yes ]; then kept="$kept $(digest "$tag")"; else drop="$drop $tag"; fi
+          done
+
+          # The registry deletes by digest, so a digest a kept tag shares stays.
+          for tag in $drop; do
+            d=$(digest "$tag")
+            [ -n "$d" ] || continue
+            case " $kept " in *" $d "*) continue ;; esac
+            echo "deleting checkout:$tag ($d)"
+            curl -fsS -X DELETE "${reg}/v2/checkout/manifests/${d}" || true
+          done

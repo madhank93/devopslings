@@ -37,7 +37,15 @@ const (
 type Sandbox struct {
 	Stack   string `yaml:"stack"`
 	Service string `yaml:"service"`
+
+	// With names further stacks a lesson drives from host tasks, for the
+	// capstone, whose pipeline crosses several. They start before Stack and are
+	// torn down with it; tasks and shells still target Stack alone.
+	With []string `yaml:"with"`
 }
+
+// Stacks returns every stack the lesson needs, in start order: With, then Stack.
+func (s Sandbox) Stacks() []string { return append(append([]string{}, s.With...), s.Stack) }
 
 // Task is one script in a lesson's `tasks:` block.
 type Task struct {

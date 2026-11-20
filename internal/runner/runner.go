@@ -245,11 +245,13 @@ func (r *Runner) RunTask(ctx context.Context, l course.Lesson, name string) (Res
 // Start brings the sandbox up and runs the lesson's init task, leaving the
 // scenario broken and ready for the student.
 func (r *Runner) Start(ctx context.Context, l course.Lesson) (Result, error) {
-	if res, err := r.Up(ctx, l.Sandbox.Stack); err != nil || !res.OK {
-		if err != nil {
-			return Result{}, err
+	for _, stack := range l.Sandbox.Stacks() {
+		if res, err := r.Up(ctx, stack); err != nil || !res.OK {
+			if err != nil {
+				return Result{}, err
+			}
+			return Result{Output: res.Output, OK: false}, nil
 		}
-		return Result{Output: res.Output, OK: false}, nil
 	}
 	if _, ok := l.Tasks[course.TaskInit]; !ok {
 		return Result{OK: true}, nil
@@ -282,10 +284,20 @@ func (r *Runner) Verify(ctx context.Context, l course.Lesson) (Result, error) {
 
 // Reset tears the sandbox down and starts the lesson again from scratch.
 func (r *Runner) Reset(ctx context.Context, l course.Lesson) (Result, error) {
-	if _, err := r.Down(ctx, l.Sandbox.Stack); err != nil {
+	if err := r.downAll(ctx, l); err != nil {
 		return Result{}, err
 	}
 	return r.Start(ctx, l)
+}
+
+// downAll tears down every stack the lesson uses.
+func (r *Runner) downAll(ctx context.Context, l course.Lesson) error {
+	for _, stack := range l.Sandbox.Stacks() {
+		if _, err := r.Down(ctx, stack); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ShellCmdRC returns an interactive shell into a lesson's sandbox with rc
