@@ -97,6 +97,11 @@ type Lesson struct {
 	// CI runs them serially; the UI warns that a loaded machine skews results.
 	TimingSensitive bool
 
+	// Requires names host kernel features the lesson cannot run without, such
+	// as "apparmor". The sandbox shares the Docker host's kernel, and a feature
+	// that kernel was built without cannot be installed into a container.
+	Requires []string
+
 	// Tasks are the lesson's scripts, keyed by TaskInit/TaskFault/TaskVerify.
 	Tasks map[string]Task
 
@@ -121,6 +126,7 @@ type frontmatter struct {
 	Sandbox         Sandbox         `yaml:"sandbox"`
 	Tasks           map[string]Task `yaml:"tasks"`
 	TimingSensitive bool            `yaml:"timingSensitive"`
+	Requires        []string        `yaml:"requires"`
 }
 
 var (
@@ -198,6 +204,7 @@ func Discover(root string) ([]Module, error) {
 				HasTasks:        len(fm.Tasks) > 0,
 				Source:          strings.TrimSpace(fm.Source),
 				TimingSensitive: fm.TimingSensitive,
+				Requires:        fm.Requires,
 				Tasks:           fm.Tasks,
 			}
 			_, ls.InjectsFault = fm.Tasks[TaskFault]

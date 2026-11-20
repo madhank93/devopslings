@@ -138,6 +138,7 @@ func list(root string) int {
 			if l.TimingSensitive {
 				tags = append(tags, "timed")
 			}
+			tags = append(tags, l.Requires...)
 			fmt.Printf("  %s %-24s %-38s [%s]\n",
 				progress.Get(done, l.Name).Marker(), l.Name, truncate(l.Title, 38),
 				strings.Join(tags, ","))

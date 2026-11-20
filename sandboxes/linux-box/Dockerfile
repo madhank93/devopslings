@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ansible-core python3-apt \
       git python3-venv \
       bpftrace \
+      apparmor apparmor-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Module 15's role lesson tests a role with molecule from a clean target. There
@@ -97,6 +98,11 @@ RUN systemctl disable ssh.service 2>/dev/null || true \
 # firewall backend; its lesson analyses jails with fail2ban-regex and
 # fail2ban-client offline, so the daemon stays off.
 RUN systemctl disable fail2ban.service 2>/dev/null || true
+
+# The box shares the host's kernel, so a profile it loads is loaded on the host.
+# apparmor.service would load every profile in the box's /etc/apparmor.d at
+# boot, replacing the host's profiles of the same name; lessons load their own.
+RUN systemctl mask apparmor.service
 
 # Persist the journal to disk so `journalctl -b` has history to show. The
 # default volatile journal is wiped on restart, which would erase the evidence
