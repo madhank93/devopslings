@@ -31,9 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN case "$TARGETARCH" in amd64) a=x86_64 ;; arm64) a=arm64 ;; *) exit 1 ;; esac \
- && curl -fsSL "https://github.com/google/go-containerregistry/releases/download/v${CRANE_VERSION}/go-containerregistry_Linux_${a}.tar.gz" \
+ && curl -fsSL --retry 5 --retry-all-errors "https://github.com/google/go-containerregistry/releases/download/v${CRANE_VERSION}/go-containerregistry_Linux_${a}.tar.gz" \
     | tar -xz -C /usr/local/bin crane \
- && curl -fsSL -o /usr/local/bin/cosign \
+ && curl -fsSL --retry 5 --retry-all-errors -o /usr/local/bin/cosign \
     "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-${TARGETARCH}" \
  && chmod +x /usr/local/bin/cosign
 

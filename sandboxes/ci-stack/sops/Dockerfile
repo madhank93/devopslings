@@ -15,11 +15,11 @@ RUN apk add --no-cache git curl \
              age_sum=57fd79a7ece5fe501f351b9dd51a82fbee1ea8db65a8839db17f5c080245e99f ;; \
       *) echo "unsupported arch: $TARGETARCH" >&2; exit 1 ;; \
     esac \
- && curl -fsSLo /usr/local/bin/sops \
+ && curl -fsSL --retry 5 --retry-all-errors -o /usr/local/bin/sops \
       "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.${TARGETARCH}" \
  && echo "${sops_sum}  /usr/local/bin/sops" | sha256sum -c - \
  && chmod +x /usr/local/bin/sops \
- && curl -fsSLo /tmp/age.tgz \
+ && curl -fsSL --retry 5 --retry-all-errors -o /tmp/age.tgz \
       "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-${TARGETARCH}.tar.gz" \
  && echo "${age_sum}  /tmp/age.tgz" | sha256sum -c - \
  && tar -xzf /tmp/age.tgz -C /usr/local/bin --strip-components=1 age/age age/age-keygen \

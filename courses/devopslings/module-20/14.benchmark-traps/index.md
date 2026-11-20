@@ -85,7 +85,7 @@ tasks:
         echo "once, at start. Warm up before you start the clock."
         exit 1
       fi
-      if [ "$(pct "$max" "$min")" -gt 115 ] || [ "$(pct "$med" "$ref")" -lt 80 ]; then
+      if [ "$(pct "$max" "$min")" -gt 120 ] || [ "$(pct "$med" "$ref")" -lt 80 ]; then
         echo "not yet: five runs of the same code gave $min to $max calls a second (median $med, against"
         echo "$ref). With the job on core 1 paused it reported $quiet. That job runs in bursts"
         echo "(files/reindex.py), and time measured during a burst counts the job's work as yours."

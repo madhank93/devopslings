@@ -13,7 +13,7 @@ for k in KEYS:
 # Something else can share the core, and interference only ever adds time:
 # the fastest of several full passes is the code's own speed.
 best = float("inf")
-for _ in range(7):
+for _ in range(15):
     start = time.perf_counter()
     for k in KEYS:
         catalog.price(k)

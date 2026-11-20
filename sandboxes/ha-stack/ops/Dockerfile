@@ -13,10 +13,13 @@ RUN apt-get update \
 # OpenTofu, with the providers modules 23 and 27 use mirrored into the image,
 # so `tofu init` works offline. Module 27's pipeline also runs this image as a
 # CI job container, which is why it carries the docker provider.
-RUN curl -fsSL "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${TARGETARCH}.tar.gz" \
+RUN curl -fsSL --retry 5 --retry-all-errors "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${TARGETARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin tofu \
  && mkdir -p /tmp/m && printf 'terraform {\n  required_providers {\n    postgresql = { source = "cyrilgdn/postgresql", version = "1.27.0" }\n    docker = { source = "kreuzwerker/docker", version = "4.6.0" }\n  }\n}\n' > /tmp/m/main.tf \
- && tofu -chdir=/tmp/m providers mirror /usr/share/tofu-mirror && rm -rf /tmp/m
+ && { tofu -chdir=/tmp/m providers mirror /usr/share/tofu-mirror \
+      || { sleep 10; tofu -chdir=/tmp/m providers mirror /usr/share/tofu-mirror; } \
+      || { sleep 30; tofu -chdir=/tmp/m providers mirror /usr/share/tofu-mirror; }; } \
+ && rm -rf /tmp/m
 COPY tofurc /etc/tofurc
 ENV TF_CLI_CONFIG_FILE=/etc/tofurc
 COPY --from=etcd /usr/local/bin/etcdctl /usr/local/bin/

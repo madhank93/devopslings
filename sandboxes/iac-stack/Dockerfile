@@ -22,13 +22,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN arch=$(dpkg --print-architecture) \
-    && curl -fsSL -o /tmp/tofu.zip \
+    && curl -fsSL --retry 5 --retry-all-errors -o /tmp/tofu.zip \
        "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${arch}.zip" \
     && unzip -q /tmp/tofu.zip tofu -d /usr/local/bin \
     && rm /tmp/tofu.zip
 
 RUN case "$(dpkg --print-architecture)" in amd64) a=x86_64 ;; arm64) a=aarch64 ;; esac \
-    && curl -fsSL "https://download.docker.com/linux/static/stable/${a}/docker-${DOCKER_CLI_VERSION}.tgz" \
+    && curl -fsSL --retry 5 --retry-all-errors "https://download.docker.com/linux/static/stable/${a}/docker-${DOCKER_CLI_VERSION}.tgz" \
        | tar -xz -C /usr/local/bin --strip-components=1 docker/docker
 
 COPY providers.tf /opt/providers/providers.tf
@@ -54,9 +54,9 @@ ARG PULUMI_VERSION=3.272.0
 ARG PULUMI_DOCKER_VERSION=5.2.0
 ARG PULUMI_MINIO_VERSION=0.17.1
 RUN arch=$(dpkg --print-architecture) \
-    && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${arch}.tar.gz" | tar -xz -C /usr/local \
+    && curl -fsSL --retry 5 --retry-all-errors "https://go.dev/dl/go${GO_VERSION}.linux-${arch}.tar.gz" | tar -xz -C /usr/local \
     && case "$arch" in amd64) p=x64 ;; *) p=$arch ;; esac \
-    && curl -fsSL "https://github.com/pulumi/pulumi/releases/download/v${PULUMI_VERSION}/pulumi-v${PULUMI_VERSION}-linux-${p}.tar.gz" \
+    && curl -fsSL --retry 5 --retry-all-errors "https://github.com/pulumi/pulumi/releases/download/v${PULUMI_VERSION}/pulumi-v${PULUMI_VERSION}-linux-${p}.tar.gz" \
        | tar -xz -C /usr/local/bin --strip-components=1 pulumi/pulumi pulumi/pulumi-language-go
 ENV PATH=/usr/local/go/bin:/root/go/bin:$PATH \
     PULUMI_SKIP_UPDATE_CHECK=true \
