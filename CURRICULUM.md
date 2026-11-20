@@ -25,13 +25,13 @@ than at exercise one.
 | **architect** | A written decision or design, graded against a rubric. |
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 298 shipped, 1 blocked, 0 specified.
+**299 exercises** across 26 modules, drills included, capstone stages not: 299 shipped, 0 blocked, 0 specified.
 
 By tier: 29 intro · 166 core · 74 deep · 30 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26.
+Complete modules: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 12/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
 <!-- /counts -->
 
 Modules 01–23 and 25 each open with an `intro` exercise. Modules 24, 26 and 27
@@ -414,8 +414,13 @@ they can do rather than "hackers", and state what every proposed control costs.
   renames onto the path, never reads — and reads the culprit off the trail. The
   audit socket refuses containers, so bpftrace stands in, and the unit says so.
 
-Still to build: an AppArmor denial in enforce mode — the sandbox kernel has no
-AppArmor at all; a nested TCG VM booting a Debian kernel is the open route.
+- **apparmor-denial** *(shipped · Linux host only)* — the hardening rollout put
+  a receipt renderer's profile in enforce and every receipt is a 500. The
+  service logs no errno; the denial in the kernel log names the cache path a
+  release moved. Allow exactly that path — complain mode, an unconfined unit,
+  `/** rwk` and a rule over the whole data directory each fail the check. The
+  box shares the host kernel, so the lesson runs only where that kernel has
+  AppArmor; macOS Docker VMs do not, and devopslings says so instead of starting.
 
 ### 08 — Version Control · *shipped*
 no sandbox, except `git-box` for the LFS lesson

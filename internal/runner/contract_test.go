@@ -135,6 +135,9 @@ func TestLessonContract(t *testing.T) {
 			continue
 		}
 		t.Run(l.Name, func(t *testing.T) {
+			if missing := Unmet(context.Background(), l); len(missing) > 0 {
+				t.Skipf("Docker host lacks %v", missing)
+			}
 			// Timing-sensitive lessons measure wall-clock latency, so they get
 			// the machine to themselves rather than competing for it.
 			if !l.TimingSensitive {

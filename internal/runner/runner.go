@@ -242,9 +242,30 @@ func (r *Runner) RunTask(ctx context.Context, l course.Lesson, name string) (Res
 		time.Duration(t.TimeoutSeconds)*time.Second)
 }
 
+// Unmet returns the lesson's Requires entries the Docker host cannot provide.
+// An unknown requirement is reported as unmet rather than assumed present.
+func Unmet(ctx context.Context, l course.Lesson) []string {
+	var missing []string
+	for _, req := range l.Requires {
+		switch req {
+		case "apparmor":
+			out, err := exec.CommandContext(ctx, "docker", "info", "--format", "{{json .SecurityOptions}}").Output()
+			if err == nil && strings.Contains(string(out), "name=apparmor") {
+				continue
+			}
+		}
+		missing = append(missing, req)
+	}
+	return missing
+}
+
 // Start brings the sandbox up and runs the lesson's init task, leaving the
 // scenario broken and ready for the student.
 func (r *Runner) Start(ctx context.Context, l course.Lesson) (Result, error) {
+	if missing := Unmet(ctx, l); len(missing) > 0 {
+		return Result{}, fmt.Errorf("%s needs a Docker host whose Linux kernel provides %s, and this one does not (macOS Docker VMs such as OrbStack and Docker Desktop lack AppArmor; a Linux machine or Ubuntu VM has it)",
+			l.Name, strings.Join(missing, ", "))
+	}
 	for _, stack := range l.Sandbox.Stacks() {
 		if res, err := r.Up(ctx, stack); err != nil || !res.OK {
 			if err != nil {
