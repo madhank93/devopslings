@@ -96,6 +96,7 @@ tasks:
       r=$(bash "$lesson/files/load.sh" 15 2>&1 | tail -1)
       brate=$(jq -r '.bookings_per_s // empty' <<<"$b" 2>/dev/null || true)
       bp99=$(jq -r '.booking_p99_ms // empty' <<<"$b" 2>/dev/null || true)
+      berrs=$(jq -r '.booking_errors // 0' <<<"$b" 2>/dev/null || echo 0)
       rate=$(jq -r '.bookings_per_s // empty' <<<"$r" 2>/dev/null || true)
       p99=$(jq -r '.booking_p99_ms // empty' <<<"$r" 2>/dev/null || true)
       errs=$(jq -r '.booking_errors // empty' <<<"$r" 2>/dev/null || true)
@@ -109,9 +110,11 @@ tasks:
         exit 1
       fi
       echo "this check ran the on-sale at pool_size=$running: $rate bookings/s, p99 ${p99}ms, $errs over the 500ms deadline"
-      echo "(just before it, the original pool of 80: $brate bookings/s, p99 ${bp99}ms)"
+      echo "(just before it, the original pool of 80: $brate bookings/s, p99 ${bp99}ms, $berrs over)"
       # One late booking in a hundred is noise from the machine; more is the pool.
-      if [ "$(( errs * 100 ))" -gt "$(( rate * 15 + errs ))" ]; then
+      # A machine too slow for the deadline at any size is held to a quarter of
+      # the original pool's late bookings, measured just before.
+      if [ "$(( errs * 100 ))" -gt "$(( rate * 15 + errs ))" ] && [ "$(( errs * 4 ))" -gt "$berrs" ]; then
         echo "not yet: $errs bookings took longer than the app's 500ms deadline, and those customers saw an"
         echo "error. With $running server connections, that many backends share the CPU, and a booking"
         echo "holding a show's row lock is descheduled while every booking behind it waits."
