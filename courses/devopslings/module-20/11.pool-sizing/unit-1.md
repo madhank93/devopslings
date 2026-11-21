@@ -88,7 +88,7 @@ sizes you measured and must match the file. Then it runs the on-sale twice,
 15 seconds each, back to back: once through `boxoffice_before`, a second
 pgbouncer entry the init left at the original pool of 80, and once through
 yours. Yours must sell at least 85% as many seats a second as the original,
-with at most one booking in a thousand past the 500ms deadline, and a booking
+with at most one booking in a hundred past the 500ms deadline, and a booking
 p99 at most half the original's.
 
 <details>
