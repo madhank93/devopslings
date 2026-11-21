@@ -16,7 +16,9 @@ setpool() {
 }
 mkdir -p answers
 : > answers/pool-sizing.txt
-for n in 4 8 12 16 24 48; do
+# Starts at 8: at 4, bookings queue in pgbouncer and p99 sits at the 500ms
+# deadline on a 4-core host, so one noisy run makes customers late.
+for n in 8 12 16 24 48; do
   setpool "$n"
   bash "$lesson/files/load.sh" 8 >> answers/pool-sizing.txt
 done
