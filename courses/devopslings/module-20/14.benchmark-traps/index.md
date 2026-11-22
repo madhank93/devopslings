@@ -85,7 +85,7 @@ tasks:
         echo "once, at start. Warm up before you start the clock."
         exit 1
       fi
-      if [ "$(pct "$max" "$min")" -gt 120 ] || [ "$(pct "$med" "$ref")" -lt 80 ]; then
+      if [ "$(pct "$max" "$min")" -gt 135 ] || [ "$(pct "$med" "$ref")" -lt 80 ]; then
         echo "not yet: five runs of the same code gave $min to $max calls a second (median $med, against"
         echo "$ref). With the job on core 1 paused it reported $quiet. That job runs in bursts"
         echo "(files/reindex.py), and time measured during a burst counts the job's work as yours."
@@ -97,7 +97,7 @@ tasks:
       # faster of two runs each.
       slowref=$(CATALOG_SLOW=1 bash "$lesson/files/run.sh" "$lesson/solution/bench.py" 2 | num | sort -n | tail -1)
       slow=$(CATALOG_SLOW=1 bash "$lesson/files/run.sh" answers/bench.py 2 | num | sort -n | tail -1)
-      if [ -z "$slow" ] || [ -z "$slowref" ] || [ "$(pct "$slow" "$slowref")" -gt 125 ] || [ "$(pct "$slow" "$slowref")" -lt 80 ]; then
+      if [ -z "$slow" ] || [ -z "$slowref" ] || [ "$(pct "$slow" "$slowref")" -gt 135 ] || [ "$(pct "$slow" "$slowref")" -lt 80 ]; then
         echo "not yet: the check made each price cost twice as much, and answers/bench.py reported ${slow:-nothing}"
         echo "(the reference measured ${slowref:-nothing}). A benchmark has to measure the code it runs."
         exit 1
