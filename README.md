@@ -102,7 +102,7 @@ that transfers.
 
 ## What it covers
 
-Twenty-eight modules from Linux triage to platform engineering.
+Thirty modules from Linux triage to platform engineering.
 See [CURRICULUM.md](CURRICULUM.md) for the map and [EXERCISES.md](EXERCISES.md)
 for every exercise — what breaks, which obvious fix is wrong, and what the check
 measures.
@@ -118,13 +118,13 @@ are rather than at exercise one:
 | **architect** | A written decision or design, graded against a rubric. |
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 299 shipped, 0 blocked, 0 specified.
+**359 exercises** across 28 modules, drills included, capstone stages not: 299 shipped, 2 blocked, 58 specified.
 
-By tier: 29 intro · 166 core · 74 deep · 30 architect.
+By tier: 33 intro · 201 core · 89 deep · 36 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26.
+Complete modules: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 22, 23, 24, 25, 26.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/15 · 19 9/13 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9 · 29 0/27 · 30 0/24.
 <!-- /counts -->
 
 If you arrive from a job title rather than from the top, `CURRICULUM.md` maps

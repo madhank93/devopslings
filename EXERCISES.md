@@ -41,16 +41,16 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 299 shipped, 0 blocked, 0 specified.
+**359 exercises** across 28 modules, drills included, capstone stages not: 299 shipped, 2 blocked, 58 specified.
 
-By tier: 29 intro · 166 core · 74 deep · 30 architect.
+By tier: 33 intro · 201 core · 89 deep · 36 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26.
+Complete modules: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 22, 23, 24, 25, 26.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/15 · 19 9/13 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9 · 29 0/27 · 30 0/24.
 <!-- /counts -->
 
-Every module opens at the tier its prerequisites allow. Modules 01–23 and 25
+Every module opens at the tier its prerequisites allow. Modules 01–23, 25, 29 and 30
 each have an `intro` rung. Modules 24, 26 and 27 do not, because they are built
 entirely on earlier modules — starting there is the mistake, not the on-ramp.
 
@@ -1993,6 +1993,57 @@ failures transfer to any provider.
   *Check:* missing data pages; a normal deploy gap does not.
   *Source:* own.
 
+- **blackbox-probe** *(core)* — every internal metric is green, the error rate is
+  zero, and users cannot log in.
+  *First guess:* add another internal metric; the service cannot report on a
+  request that never reached it.
+  *Check:* a blackbox_exporter probe hits the login path from outside the
+  service, asserts on status and body content, and alerts on both a wrong body
+  (a 200 serving the error page) and a certificate inside its expiry window.
+  The grader breaks each in turn and expects exactly one alert per break.
+  *Source:* own. Needs a `blackbox_exporter` service, which `obs-stack` does not
+  have today.
+
+- **pushgateway-ghosts** *(core)* — the nightly batch job has been failing for
+  three days and its "last success" metric still looks fine.
+  *First guess:* alert on the success gauge being absent; the Pushgateway keeps
+  the last pushed value forever, so it never goes absent or stale.
+  *Check:* the alert is on `time() - push_time_seconds` against the job's
+  schedule, fires when the job stops pushing, and stays quiet across one normal
+  run.
+  *Source:* own. Needs a `pushgateway` service, which `obs-stack` does not have
+  today.
+
+- **remote-write-and-ha-pairs** *(core)* — two Prometheus replicas scrape the
+  same targets for HA, and long-term storage reports every request twice.
+  *First guess:* turn one replica off; that removes the HA it was there for.
+  *Check:* replicas carry `cluster` and `__replica__` external labels, Mimir's HA
+  tracker accepts one replica's samples per cluster, and a counter summed in long-term storage matches one
+  replica's own value — including after one replica is stopped mid-run.
+  *Source:* own. Needs a second Prometheus and a Mimir service,
+  neither of which `obs-stack` has today.
+
+- **delta-versus-cumulative** *(deep)* — an OTel SDK service's request counter
+  graphs as a sawtooth in Prometheus, and `rate()` reports nonsense.
+  *First guess:* switch to `increase()` or smooth it with a longer window; the
+  data points are deltas, so every function that assumes a counter is wrong.
+  *Check:* the series arrives cumulative — either the SDK's temporality
+  preference or the Collector's `deltatocumulative` processor (present in
+  otelcol-contrib 0.128) — and `rate()` over it matches the load generator's
+  known request rate within tolerance.
+  *Source:* own.
+
+- **native-histograms** *(deep)* — the latency SLO is 300 ms and the fixed
+  buckets jump from 250 ms to 500 ms, so the SLO query cannot tell 310 ms from
+  490 ms.
+  *First guess:* add a 300 ms bucket; that fixes one boundary and moves the
+  problem to the next SLO someone writes.
+  *Check:* native (exponential) histograms are enabled end to end — the app
+  exposes them over the protobuf scrape format and Prometheus 3.5 runs with
+  `--enable-feature=native-histograms` — and the p99 from
+  `histogram_quantile` is within 5% of the true p99 of the known load.
+  *Source:* own.
+
 ---
 
 ## 19 — Logs & Traces
@@ -2040,6 +2091,40 @@ failures transfer to any provider.
   *First guess:* the application stopped logging.
   *Check:* the drop is located (queue/batch/backpressure), fixed, and a metric now
   alerts on it.
+  *Source:* own.
+
+- **structured-logging** *(intro)* — the service logs printf-style lines, and
+  the question "errors for order 812" can only be answered with a regex.
+  *Check:* the service emits JSON with stable keys (`level`, `msg`, `order_id`,
+  and one more the answer names), and a LogQL `| json | order_id="812"` query
+  returns exactly that order's lines.
+  *Source:* own.
+
+- **multiline-stack-traces** *(core)* — a Python traceback arrives in Loki as 30
+  separate lines, interleaved with other requests' logs.
+  *First guess:* grep for `Traceback` and read the next lines; under concurrency
+  the next lines belong to someone else.
+  *Check:* a multiline rule in the Collector's `filelog` receiver or in Vector
+  joins each traceback into one record; the grader raises three concurrent
+  exceptions and expects exactly three records, each holding its whole trace.
+  *Source:* own.
+
+- **log-to-trace** *(core)* — a log line says a payment failed, and there is no
+  way from it to the request that failed.
+  *First guess:* search Tempo by time window; dozens of traces overlap it.
+  *Check:* `trace_id` is injected into every log record from the active span, and
+  a Grafana derived field on the Loki datasource opens that exact trace. The
+  pivot is log→trace; `exemplars` already covers metric→trace.
+  *Source:* own.
+
+- **alert-on-a-log** *(core)* — the team wants a page when payments error, and
+  the first attempt pages on every stray error and once per pod in a burst.
+  *First guess:* `count_over_time(... |= "error" [1m]) > 0` with no `for:`,
+  grouped by `pod`; one error pages, and a burst fans out per label set.
+  *Check:* a Loki ruler rule alerts on the error-pattern *rate* over a window; a
+  burst produces one alert through Alertmanager, and a single stray error
+  produces none. Loki's baseline config has no ruler today, so the lesson (or
+  the stack) enables it.
   *Source:* own.
 
 ---
@@ -2544,12 +2629,477 @@ Not exercises. Pointers to [kubelings](https://github.com/madhank93/kubelings),
 
 ---
 
+## 29 — Tracing & APM
+`obs-stack`, `db-stack` for `db-spans-and-slow-queries` (+ a second gateway collector for `tail-sampling-needs-the-whole-trace`,
+and Pyroscope 1.14 for the profile step of `apm-triage-drill`)
+
+- **first-span** *(intro)* — a Python service with the OTel SDK installed and no
+  spans of its own; create one by hand, give it attributes, export it over OTLP
+  to Tempo.
+  *Check:* a TraceQL query by span name and attribute value finds the grader's
+  request, and the attributes carry the values that request sent.
+  *Source:* own.
+
+- **span-status-and-errors** *(core)* — the service returns 500s, and every span
+  in Tempo says OK.
+  *First guess:* log the error; the log line never touches the span, so traces
+  still look healthy.
+  *Check:* `{status=error}` count equals the 5xx count over the grader's load, and
+  each failed span carries a `record_exception` event with type and message.
+  *Source:* own.
+
+- **span-kind-and-the-empty-map** *(core)* — checkout calls pricing calls ledger,
+  every span is `INTERNAL`, and the service graph is empty.
+  *First guess:* the servicegraph connector is misconfigured; it is not — it
+  pairs `CLIENT` with `SERVER` spans and finds none.
+  *Check:* service-graph edges checkout→pricing and pricing→ledger exist, with
+  request counts matching the grader's load.
+  *Source:* own.
+
+- **semantic-conventions** *(core)* — spans carry `url` and `httpStatus`, and
+  nobody can group latency by route.
+  *First guess:* rename the fields in the dashboard; every other tool reading the
+  spans still sees ad-hoc names, and raw URLs do not group.
+  *Check:* spans carry `http.route` and `http.response.status_code` — set in the
+  SDK or rewritten by OTTL in the collector — and a per-route query returns
+  bounded groups.
+  *Source:* OpenTelemetry semantic conventions for HTTP.
+
+- **span-name-cardinality** *(deep)* — span names embed the id (`GET /orders/8812`)
+  and spanmetrics series climb with every new order.
+  *First guess:* drop the id attribute; the id lives in the name, so series keep
+  growing.
+  *Check:* span names templated as `GET /orders/{id}`, spanmetrics series stay
+  under budget across a fresh id sweep, and the id survives as an attribute.
+  *Source:* own; module 18's `cardinality-explosion` from the trace side.
+
+- **zero-code-misses-the-queue** *(core)* — `opentelemetry-instrument` traces the
+  HTTP handler and the worker that consumes its job shows nothing.
+  *First guess:* more auto-instrumentation packages; the worker's loop is custom
+  code no instrumentor knows.
+  *Check:* one trace holds the auto-instrumented HTTP span and a manual worker
+  span as its descendant, via the context the SDK already holds.
+  *Source:* own.
+
+- **propagator-mismatch** *(core)* — one service sends B3, the rest W3C
+  `traceparent`, and every request becomes two traces. Unlike module 19's
+  `broken-trace`, there is no async hop: the header is there, in a format the
+  next service does not read.
+  *First guess:* the downstream tracer is broken.
+  *Check:* one trace spans all services for the grader's request, with the
+  propagator set rather than headers copied by hand.
+  *Source:* own; W3C Trace Context and B3.
+
+- **baggage-leaks** *(core)* — tenant id travels in baggage so downstream spans
+  can be tagged, and the same baggage header goes out on a call to a third-party
+  API.
+  *First guess:* stop using baggage; internal spans lose the tenant.
+  *Check:* tenant id present on every internal span and absent from the headers
+  the grader's fake egress endpoint receives.
+  *Source:* own; the W3C Baggage spec's own privacy warning.
+
+- **span-links-for-batches** *(core)* — a consumer processes 50 messages in one
+  batch, and only one producer trace can be its parent.
+  *First guess:* pick the first message's context as parent; the other 49
+  producers lose their downstream.
+  *Check:* the batch span has a span link to each producer trace in the batch,
+  and each producer trace is reachable from it.
+  *Source:* OpenTelemetry specification, span links.
+
+- **n-plus-one-from-a-trace** *(core)* — one request draws 200 DB spans, each
+  under a millisecond. Module 10's `n-plus-one` found it from the database; this
+  finds it from the trace.
+  *First guess:* add an index; no single query is slow.
+  *Check:* the answer names the repeated span and its count per request, read
+  from the trace; after the fix the DB span count is fixed and small whatever the
+  order size, and p95 falls below the stated budget.
+  *Source:* own.
+
+- **critical-path** *(deep)* — a 40-span trace is slow, and the longest span is
+  not the problem.
+  *First guess:* optimise the longest span; it runs in parallel with a longer
+  sequential chain, so the request does not get faster.
+  *Check:* the answer names the sequential chain on the critical path and
+  predicts the saving; after parallelising it, measured latency falls by the
+  predicted amount within tolerance.
+  *Source:* own.
+
+- **clock-skew-in-traces** *(deep)* — child spans start before their parent, but
+  only across hosts.
+  *First guess:* a bug in context propagation or span timing code.
+  *Check:* the answer names the host clock offset as the cause, with the
+  measured offset; the host clock is fixed (chrony offset under the stated bound)
+  and children nest inside parents — span timestamps rewritten in the
+  collector do not pass.
+  *Source:* own; the trace-side view of module 01's `clock-skew`.
+
+- **otlp-grpc-vs-http** *(intro)* — an exporter set to `http/protobuf` aimed at
+  port 4317, and nothing arrives.
+  *Check:* spans arrive in Tempo with the exporter's protocol and port agreeing
+  (gRPC on 4317, HTTP on 4318), no proxy in between; the answer states which
+  port speaks which protocol.
+  *Source:* own.
+
+- **head-sampling-hides-errors** *(core)* — 1% head sampling, and the error the
+  customer reported is not in any trace.
+  *First guess:* sample 100%; the trace volume blows the storage budget.
+  *Check:* `tail_sampling` keeps every error trace, every trace over 500 ms and
+  1% of the rest; the grader's injected errors are all findable and stored
+  volume is under budget.
+  *Source:* own.
+
+- **tail-sampling-needs-the-whole-trace** *(deep)* — two gateway collectors each
+  see half of every trace, and tail sampling decides on fragments.
+  *First guess:* raise `decision_wait`; waiting longer does not bring the other
+  half to this collector.
+  *Check:* a `loadbalancing` exporter routes by trace ID, and every sampled trace
+  in Tempo is complete.
+  *Source:* own.
+
+- **parent-based-sampling** *(core)* — a downstream service samples on its own
+  ratio, and Tempo fills with orphan fragments.
+  *First guess:* raise the downstream ratio; fragments persist in the other
+  direction.
+  *Check:* the downstream sampler is `ParentBased`, and no stored trace is
+  partial across the grader's load.
+  *Source:* OpenTelemetry specification, sampling.
+
+- **collector-memory-limiter** *(core)* — the collector is OOM-killed on every
+  traffic burst.
+  *First guess:* give it more memory; the next burst is bigger.
+  *Check:* `memory_limiter` first and `batch` last in the pipeline; under the
+  grader's burst the collector refuses data with backpressure and stays up.
+  *Source:* own.
+
+- **red-from-spans** *(core)* — a service has traces and no metrics.
+  *Check:* the spanmetrics connector produces rate, errors and duration per route,
+  and the counts match the load generator's within 2%.
+  *Source:* own.
+
+- **service-map** *(core)* — something downstream is slow; which call?
+  *First guess:* the slowest service on a per-service latency graph, which also
+  counts the time its own callees take.
+  *Check:* servicegraph connector edges present, and the answer names the
+  bottleneck edge with the metric that proves it.
+  *Source:* own.
+
+- **db-spans-and-slow-queries** *(core)* — p99 sits in a database call, and the
+  service runs a dozen queries. Needs `db-stack` alongside `obs-stack`.
+  *First guess:* tune the slowest-looking query from the code.
+  *Check:* the query is identified from `db.query.text` (`db.statement` on older
+  SDKs) on the slow spans and
+  matched in `pg_stat_statements`; after the fix, that span's time drops by the
+  stated amount.
+  *Source:* own.
+
+- **exceptions-grouped** *(core)* — 10,000 error events, and the on-call thinks
+  it is an outage of everything.
+  *First guess:* group by message; messages embed ids, so every event is unique.
+  *Check:* grouping the spans' exception events by `exception.type` and the top
+  frame of `exception.stacktrace` (a TraceQL query or a script over Tempo's
+  search API; Tempo has no issue grouping) gives the right count of distinct
+  bugs, and the answer ranks them by event count.
+  *Source:* own.
+
+- **apm-triage-drill** *(deep · drill)* — checkout p99 doubled; the cause is one of
+  five, drawn at random each run: an N+1 in pricing, ledger's connection pool
+  shrunk to two, a CPU-hot regex in checkout, a retry storm on a timed-out
+  downstream, a lock held across an HTTP call. Found by service map, spanmetrics,
+  an exemplar trace and a profile. Needs Pyroscope; profiling itself is module 30's.
+  *First guess:* restart checkout or scale it out.
+  *Check:* the seeded cause is fixed where it lives, not restarted away; p99 back
+  under budget; `triage.md` names cause, the evidence at each step, and a
+  detection signal with a threshold.
+  *Source:* own; the module's tools as one repeatable triage order.
+
+- **rum-versus-server-time** *(architect)* — server p99 is 80 ms, users report 4 s.
+  *Check:* from the supplied browser timings, the answer explains what RUM
+  measures that server spans cannot — network, TLS, render, third-party
+  scripts — names where the 4 s goes, and says what to instrument. Rubric-graded;
+  "the server is fast" fails.
+  *Source:* own; W3C Navigation Timing.
+
+- **agent-versus-gateway** *(architect)* — collector topology for a fleet: agent
+  per host, gateway tier, or both.
+  *Check:* the answer places tail sampling, redaction, batching and retry in a
+  tier and justifies each — tail sampling needs the whole trace, redaction
+  belongs before data leaves the trust boundary. Rubric-graded.
+  *Source:* own.
+
+- **observability-cost-budget** *(architect)* — a fleet's traces, logs and metrics
+  cost three times the budget.
+  *Check:* the answer chooses sampling rates, retention and cardinality limits
+  per signal, shows the arithmetic landing under the stated budget, and names
+  what each cut stops you answering. Rubric-graded.
+  *Source:* own.
+
+- **instrumentation-standard** *(architect)* — every team instruments differently.
+  *Check:* the standard defines required attributes, semantic conventions,
+  ownership of shared instrumentation, and a review gate that fails a service
+  missing them. Rubric-graded; a standard nothing enforces fails.
+  *Source:* own.
+
+- **vendor-to-otel-migration** *(architect)* — move a fleet from a vendor agent to
+  OpenTelemetry.
+  *Check:* the plan dual-ships without a visibility gap, states how parity is
+  measured before cut-over, and how alerts and dashboards move. Rubric-graded;
+  a big-bang switch fails.
+  *Source:* own.
+
+---
+
+## 30 — Profiling, eBPF & Low-Level Debugging
+`linux-box` (privileged) · profiling entries on `obs-stack` + Pyroscope · `debug-a-distroless-container` on `none`
+
+Sandbox additions: `linux-box` gains `libbpf-tools`, `linux-perf`, `strace`,
+`ltrace`, `gdb` and `py-spy`; `obs-stack` gains a Pyroscope service. bcc is not
+an option — the `*-bpfcc` tools fail to compile against this kernel's headers —
+so every tool named here is a libbpf-tools CO-RE binary or a bpftrace `.bt` script.
+
+- **bpftrace-one-liners** *(intro)* — a busy box and four questions: which process
+  makes the most syscalls, who opens which files under `/etc`, which process
+  reads the most bytes, and what the slowest `read` took.
+  *Check:* each answer matches the ground truth the grader seeded (a known
+  process, file set and byte count), and the grader re-runs the saved one-liners
+  against a fresh seed and gets that seed's answers.
+  *Source:* Brendan Gregg's BPF Performance Tools, chapter 5.
+  *Sandbox:* runner kernels fire `syscalls:sys_enter_*` on CPU 0 only, so the
+  saved one-liners must use `raw_syscalls:sys_enter` or kprobes; the lesson
+  teaches the per-syscall tracepoints too and says why they fail there.
+
+- **profile-in-production** *(core)* — CPU sits at 85% in production and a local
+  load test with the same build idles at 20%. A continuous profile is already
+  being pushed to Pyroscope.
+  *First guess:* reproduce it locally — the hot path depends on one tenant's
+  input shape that the load test never sends.
+  *Check:* the hot function is named from the production profile, and after the
+  fix the same traffic replay costs at least the stated percentage less CPU.
+  Builds on module 20's `flame-graph`, which profiles a box you are allowed to load.
+  *Source:* own.
+
+- **differential-flame-graph** *(core)* — v2 is 30% slower than v1 and its diff
+  touches 40 files.
+  *First guess:* read both flame graphs side by side; the regression is a
+  widened frame two levels down and looks like noise.
+  *Check:* the top regression from Pyroscope's diff view is named, and reverting
+  that one change brings v2 back within 5% of v1 on the same benchmark.
+  *Source:* own; Brendan Gregg's differential flame graphs.
+
+- **off-cpu-time** *(deep)* — requests take 900 ms and the service uses 5% CPU.
+  *First guess:* the on-CPU flame graph from module 20's `flame-graph` — it shows
+  5% of nothing, because the time is spent waiting.
+  *Check:* a wall-clock profile (`pyroscope.configure(oncpu=False)`) or
+  libbpf-tools `offcputime` names the lock or I/O wait, and p50 drops below the
+  stated budget after the fix.
+  *Source:* Brendan Gregg's off-CPU analysis.
+
+- **heap-growth** *(deep)* — RSS climbs 40 MB an hour across a soak and never
+  comes back.
+  *First guess:* restart nightly, or blame the page cache — module 03's
+  `page-cache-versus-rss` rules that out here; the growth is anonymous memory.
+  *Check:* libbpf-tools `memleak` names the leaking allocation site; across a
+  second soak with the same PID (no restart or worker recycling), RSS stays flat
+  within tolerance and `memleak`'s outstanding bytes at that site stop growing.
+  *Source:* own.
+  *Sandbox:* runs on `linux-box`, not Pyroscope: the Python Pyroscope SDK has no
+  heap profile. `memleak` is verified on the box.
+
+- **span-profiles** *(deep)* — a trace in Tempo shows `price-quote` taking 600 ms
+  and nothing below it.
+  *First guess:* add more spans until the slow one is found — the slow code is a
+  loop inside one function, and spans do not go below functions.
+  *Check:* the profile linked to that span names the function, and the span
+  drops under budget after the fix. Module 19's `exemplars` goes metric to
+  trace; this goes trace to profile.
+  *Source:* own.
+  *Sandbox:* span-to-profile linking is per-language in the Pyroscope SDKs;
+  unprobed on aarch64 — probe before choosing the service's language.
+
+- **profiler-overhead** *(core)* — continuous profiling at 1000 Hz was turned on
+  and throughput fell 15%.
+  *First guess:* turn the profiler off, which loses the production profiles.
+  *Check:* a sample rate is chosen and justified, overhead is measured with
+  profiler on versus off under module 20's `benchmark-traps` controls and is
+  under 2%, and the profile still names the known hot function.
+  *Source:* own.
+
+- **execsnoop-short-lived** *(core)* — load average 4, and `top` shows nothing
+  above 2%.
+  *First guess:* `top`/`htop` — a script forks 300 processes a second and each
+  one is gone before a refresh.
+  *Check:* `execsnoop` output names the parent, and the fork rate read from
+  `/proc/stat`'s `processes` counter falls under the stated ceiling after the
+  loop is fixed — killing the parent once does not pass, it is restarted by a timer.
+  *Source:* Brendan Gregg's BPF Performance Tools.
+  *Sandbox:* `execsnoop` hangs off `syscalls:sys_enter_execve`, which misses
+  events on runner kernels; the grader counts `processes`, never the tool's output.
+
+- **opensnoop-wrong-config** *(core)* — the config was edited, the service
+  restarted, and the setting did not change.
+  *First guess:* the edit has a typo; edit it again — the service reads a
+  different path, found earlier in its search order.
+  *Check:* the real path is named from `opensnoop` or `strace -e openat`, and the
+  service's observed behaviour changes once the fix lands at that path.
+  *Source:* own.
+  *Sandbox:* `opensnoop` uses `syscalls:sys_enter_openat`; the grader checks the
+  service's behaviour, not a trace.
+
+- **biolatency-bimodal** *(deep)* — `iostat` average await is 3 ms and 1% of
+  writes take 200 ms.
+  *First guess:* the average is fine, so the disk is fine — module 03's
+  `iostat-await-versus-util` reads averages; this one needs the distribution.
+  *Check:* the `biolatency` histogram's second mode is identified by its range,
+  its cause (a periodic fsync burst from a neighbouring writer) is named, and the
+  second mode is gone in a fresh histogram after the fix.
+  *Source:* Brendan Gregg's BPF Performance Tools; builds on module 03's
+  `fsync-and-the-lie`.
+
+- **runqlat-hidden-saturation** *(deep)* — box CPU at 60%, and p99 is 40 ms when
+  the handler takes 2 ms.
+  *First guess:* raise the cgroup CPU quota — `nr_throttled` is zero, so this is
+  not module 03's `cgroup-cpu-throttling`; the service is pinned to two CPUs a
+  batch job also uses, while the rest sit idle.
+  *Check:* `runqlat` p99 for the service's threads is quoted before and after,
+  and drops under the stated bound after the cpuset/affinity fix.
+  *Source:* Brendan Gregg's BPF Performance Tools.
+  *Sandbox:* vCPU count differs between hosts, so the scenario pins explicit
+  CPUs and needs at least four.
+
+- **tcp-retransmits** *(core)* — one client's calls to one upstream are
+  intermittently slow; everyone else is fine.
+  *First guess:* `ping` the upstream — average RTT looks normal with 3% loss.
+  *Check:* `tcpretrans.bt` (with `tcplife` for the connection's lifetime) names
+  the peer, the induced `netem` loss on that path is found and removed, and the
+  `TcpRetransSegs` counter stays flat across a second run.
+  *Source:* Brendan Gregg's BPF Performance Tools.
+  *Sandbox:* libbpf-tools has no `tcpretrans`; use bpftrace's shipped `.bt`.
+
+- **uprobe-a-function** *(deep)* — one function in a running C service is
+  suspected of being slow, and a redeploy needs a change window.
+  *First guess:* add timing logs and redeploy — not allowed, and it moves the
+  timing being measured.
+  *Check:* a bpftrace uprobe/uretprobe histogram reports the function's latency
+  matching the delay the grader injected at random, and the service's PID and
+  start time are unchanged.
+  *Source:* own.
+  *Sandbox:* the target is C, not Go — a uretprobe on a goroutine stack can
+  crash the process.
+
+- **ebpf-auto-instrumentation** *(core · blocked)* — a legacy service with no SDK
+  and no one willing to add one; Beyla should give RED metrics and spans from
+  the kernel.
+  *Check:* RED metrics and server spans for the service appear in `obs-stack`
+  without a code change, and match a request count the grader drives.
+  *Source:* own.
+  *Blocked:* Beyla 2.5 does not load on aarch64 — its uprobe programs fail the
+  verifier and it cannot parse Go symbol sections. CI runners are x86_64 but
+  local development is arm64, and a lesson has to pass on both. Unblocked by a
+  Beyla release that loads on arm64 (re-probe) or an x86_64-only host policy.
+
+- **detect-a-reverse-shell** *(core)* — the box runs a cron job that shells out
+  every minute, and someone has started a shell whose stdin is a TCP socket.
+  *First guess:* alert on every `execve` of `sh` — cron fires it constantly.
+  *Check:* the student's bpftrace rule fires on the grader's reverse shell and
+  stays silent across normal cron runs and an SSH login. Module 07's
+  `trace-who-changed-it` records writes after the fact; this one detects live.
+  *Source:* own.
+  *Sandbox:* the rule hangs off `sched:sched_process_exec`, not
+  `syscalls:sys_enter_execve`, which misses events on runner kernels.
+
+- **ebpf-in-production** *(architect)* — the team wants eBPF agents on the whole
+  fleet. Write the adoption policy.
+  *Check:* a rubric requiring the verifier's limits, CO-RE and BTF availability
+  across the fleet's kernels, measured overhead, the privileges each agent needs
+  (`CAP_BPF`/`CAP_PERFMON` versus privileged), and a rollback plan — each backed
+  by evidence, with this box's own as admissible: bcc fails to compile against
+  its headers, and Beyla's programs fail its verifier on arm64.
+  *Source:* own.
+
+- **hubble-flows** *(core · blocked)* — a pod's requests fail and the network
+  policy looks right; Hubble shows the dropped flow and the verdict.
+  *Check:* the dropped flow is named from Hubble with its policy verdict, and
+  the policy fix lets it through without opening the namespace.
+  *Source:* own.
+  *Blocked:* needs a Cilium-on-Kubernetes sandbox, which nothing here provides.
+  Belongs in kubelings; see module 28.
+
+- **strace-the-silent-exit** *(core)* — a tool exits 1 and prints nothing.
+  Unlike module 01's `systemd-unit-failure`, there is no journal line either.
+  *First guess:* `chmod 777` the directories it might touch.
+  *Check:* the failing syscall and its errno (`EACCES` or `ENOENT`) are named
+  from `strace -f`, the real cause is fixed, and no path the tool touches is
+  world-writable afterwards.
+  *Source:* own.
+
+- **slow-startup-strace** *(core)* — the service takes 10 s to start and then
+  runs fine.
+  *First guess:* the service is slow to initialise, so raise the start timeout.
+  *Check:* `strace -f -T -c` shows 5 s DNS timeouts, the resolver cause is fixed
+  (not a zero timeout), and startup is under 1 s with the dead nameserver still
+  unreachable.
+  *Source:* own.
+
+- **py-spy-the-hang** *(core)* — a Python worker stops processing at 0% CPU
+  every few hours.
+  *First guess:* restart it — it works again until the next unlucky interleaving.
+  *Check:* a `py-spy dump` from the live process shows two threads holding each
+  other's lock, and after the lock order is fixed a stress run completes the
+  stated iteration count without hanging. Module 01's `blocked-on-a-pipe` waits
+  in the kernel; this one waits in the interpreter.
+  *Source:* own.
+
+- **core-dump-postmortem** *(core)* — a C service crash-loops on one input, and
+  restarts leave no trace.
+  *First guess:* add logging and wait for the next crash.
+  *Check:* a core is captured wherever this host's `core_pattern` sends it, the
+  `gdb` backtrace frame (function and line) is named, and the service survives
+  the same input after the fix.
+  *Source:* own.
+  *Sandbox:* `core_pattern` is host-global; the lesson must not change it and
+  has to work with a pattern it did not set, including a pipe to a handler.
+
+- **perf-top-system-time** *(deep)* — 70% of CPU is system time and the
+  application's own profile is flat.
+  *First guess:* the kernel is slow, so tune a sysctl.
+  *Check:* `perf` with kernel stacks names the syscall path (a one-byte-write
+  storm), and the process's `stime` from `/proc` drops by the stated factor
+  after the fix.
+  *Source:* Brendan Gregg's Systems Performance.
+  *Sandbox:* ARM64 lacks some hardware events; grade on `cpu-clock` and software
+  events only.
+
+- **debug-a-distroless-container** *(core)* — a distroless container answers
+  health checks and drops real traffic, and there is no shell in the image.
+  *First guess:* rebuild the image with a shell, which changes what is being
+  debugged.
+  *Check:* the cause is found from a tools image sharing the target's namespaces
+  (`docker run --pid=container:X --network=container:X`), the fix lands in
+  config, and the target's image digest is unchanged. Module 09 has no lesson
+  on this.
+  *Source:* own.
+
+- **d-state-and-wchan** *(deep)* — a reader is stuck, `kill -9` does nothing, and
+  load average climbs by one per stuck task.
+  *First guess:* the process is hung like module 01's `blocked-on-a-pipe` — but
+  that one sleeps in `S` and dies to a signal; this one is in `D`.
+  *Check:* `/proc/<pid>/stack` and `wchan` from the live task name the I/O wait,
+  the answer says why the signal is not delivered, and the task exits once the
+  blocked device resumes.
+  *Source:* own; the D-state half rescoped out of module 01.
+  *Sandbox:* unprobed. The cgroup freezer yields `S`, not `D` (module 01's
+  rescoping note). Candidate: `dmsetup suspend` on module 03's dm volume; probe
+  that a reader lands in `D`. If it does not, this is blocked on an NFS server
+  in `netlab` — and module 04's promised `d-state-and-the-wedged-mount`, which
+  has no entry, should be folded into this one.
+
+---
+
 ## Sandboxes this inventory requires
 
 | Stack | State | Serves |
 |---|---|---|
 | `linux-box` | built | 01, 02, 15 |
-| `linux-box` (privileged profile) | **to build** | 03, 07 — loop devices, `SYS_ADMIN`, AppArmor, auditd |
+| `linux-box` (privileged profile) | **to build** | 03, 07, 30 — loop devices, `SYS_ADMIN`, AppArmor, auditd; for 30: libbpf-tools, `linux-perf`, `strace`, `ltrace`, `gdb`, `py-spy` |
 | `none` (scratch) | built | 08, 09 |
 | `ci-stack` | built | 11, 12, 16, 25, 26 |
 | `chaos-stack` | built | 20, 21 |
@@ -2557,7 +3107,7 @@ Not exercises. Pointers to [kubelings](https://github.com/madhank93/kubelings),
 | `web-stack` | built | 06 — nginx, Caddy, two upstreams, a cache |
 | `db-stack` | built | 10 — Postgres primary/replica, pgbouncer, Redis, a seeded 10M-row table, an LSM sidecar |
 | `iac-stack` | **to build** | 13, 14, 17 — MinIO, floci, docker provider target |
-| `obs-stack` | built | 18, 19, 20, 24, 25, 26 — Prometheus, Grafana, Loki, Tempo, OTel, Vector, OpenSearch |
+| `obs-stack` | built | 18, 19, 20, 24, 25, 26, 29, 30 — Prometheus, Grafana, Loki, Tempo, OTel, Vector, OpenSearch; to add: Pyroscope, a second gateway Collector, `blackbox_exporter`, `pushgateway`, Mimir (18's `remote-write-and-ha-pairs` only) |
 | `ha-stack` | **to build** | 22, 23, 24 — HAProxy, keepalived, Postgres primary/replica, etcd |
 
 `db-stack` and `ha-stack` both run Postgres. They stay separate: `db-stack` is
@@ -2589,6 +3139,9 @@ contract test before the next starts.
 11. **iac-stack + 13, 14, 16, 15, 17**.
 12. **ha-stack + 22, 23**.
 13. **24, 25, 26, 27** — practice, measurement, platform, capstone.
+14. **obs-stack additions + 29, privileged-profile additions + 30** — Pyroscope
+    and a second gateway Collector first; 30's eBPF entries need the
+    privileged profile with libbpf-tools, perf and the debuggers installed.
 
 ## Where the ideas come from
 
@@ -2599,7 +3152,8 @@ contract test before the next starts.
   Capital 2012, AWS S3 2017, Facebook BGP 2021, event-stream 2018. Linked and
   summarised in the student's own reading; the sandbox reconstruction is always a
   simplification, never a facsimile.
-- **Brendan Gregg** — the 60-second checklist and USE, for modules 01, 03 and 18.
+- **Brendan Gregg** — the 60-second checklist and USE, for modules 01, 03 and 18; the BPF
+  performance tools for 30.
 - **Google SRE Workbook** — SLI/SLO/error-budget and multi-burn-rate alerting
   shape module 24's checks.
 - **Gil Tene on coordinated omission** — the argument module 20 makes measurable.
