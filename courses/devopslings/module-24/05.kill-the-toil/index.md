@@ -93,7 +93,11 @@ tasks:
       q() { psql -qtAX -c "$1" 2>/dev/null || echo "?"; }
       week() {  # week: seed a fresh week, set STALE/OLD and the log marker MARK
         STALE=$((20 + RANDOM % 30)); OLD=$((30 + RANDOM % 40))
-        MARK=$(wc -l < "$log" 2>/dev/null || echo 0)
+        # Empty the last week first, and let a run already in flight log it,
+        # so every line after MARK reports this week's rows only.
+        psql -qX -v stale=0 -v old=0 -f "$seed" >/dev/null
+        sleep 2
+        MARK=0; [ ! -f "$log" ] || MARK=$(wc -l < "$log")
         psql -qX -v stale="$STALE" -v old="$OLD" -f "$seed" >/dev/null
       }
       clean() {  # clean: true once this week's leftovers are gone

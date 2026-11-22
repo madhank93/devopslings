@@ -137,10 +137,12 @@ tasks:
 
       e = slow[0]
       tid, value = e["labels"]["trace_id"], float(e["value"])
+      # Tempo answers once any span of a trace has arrived; the root is
+      # exported last, so wait for it before judging which order this is.
       ss = []
-      for _ in range(10):
+      for _ in range(20):
           ss = spans(tid)
-          if ss:
+          if any(s["name"] == "POST /checkout" for s in ss):
               break
           time.sleep(1)
       if not ss:

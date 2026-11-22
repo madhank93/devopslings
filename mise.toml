@@ -71,6 +71,7 @@ run = [
   "mise install pipx",
   "mise install",
   "go build ./...",
+  "go build -o bin/devopslings ./cmd/devopslings",
   "go test -short ./...",
   "./bin/devopslings doctor",
 ]

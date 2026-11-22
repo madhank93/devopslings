@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Reference solution — used by the contract test, not by students.
 #
-# Sweep the pool, then keep the size with the lowest booking p99 among those
-# with no late bookings that sell within 5% of the best rate. Past that size
+# Sweep the pool, then keep the size with the fewest late bookings, then the
+# lowest booking p99, among those that sell within 10% of the best rate. Past that size
 # the extra backends only share the CPU, and a booking holding a show's row is
 # descheduled while the bookings behind it wait. Runs on the host with cwd =
 # sandboxes/db-stack.
@@ -21,8 +21,8 @@ for n in 4 8 12 16 24 48; do
   bash "$lesson/files/load.sh" 8 >> answers/pool-sizing.txt
 done
 best=$(jq -s '(map(.bookings_per_s) | max) as $top
-  | map(select(.booking_errors == 0 and .bookings_per_s >= 0.95 * $top))
-  | (min_by(.booking_p99_ms) // {pool_size: 16}) | .pool_size' answers/pool-sizing.txt)
+  | map(select(.bookings_per_s >= 0.9 * $top))
+  | min_by([.booking_errors, .booking_p99_ms]) | .pool_size' answers/pool-sizing.txt)
 setpool "$best"
 cat answers/pool-sizing.txt
 echo "chose pool_size=$best"

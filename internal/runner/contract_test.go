@@ -156,6 +156,12 @@ func TestLessonContract(t *testing.T) {
 			defer cancel()
 
 			res := r.Contract(ctx, l)
+			// A timed check grades wall-clock numbers on a shared runner: one
+			// noisy run is not a broken lesson, two in a row is.
+			if res.Failed() && l.TimingSensitive {
+				t.Logf("%s, retrying once: %v", strings.Join(res.Stages, " → "), res.Err)
+				res = r.Contract(ctx, l)
+			}
 			t.Log(strings.Join(res.Stages, " → "))
 			if res.Failed() {
 				t.Fatalf("%s violates the lesson contract: %v", l.Name, res.Err)

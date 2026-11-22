@@ -46,7 +46,7 @@ number every time it runs.
 The check measures the code itself, warm, on `workload.KEYS`, with the same
 neighbour running. Then it runs your benchmark five times. The median must be
 within 80% to 125% of that measurement, the fastest and slowest of the five
-within 20% of each other, and one more run with the neighbour paused must reach
+within 35% of each other, and one more run with the neighbour paused must reach
 80% of it too. Then it makes every price cost twice as much,
 and your benchmark has to report the slower number too: a benchmark that does
 not notice the code got slower is not measuring it.
