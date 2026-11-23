@@ -6,7 +6,7 @@
 set -euo pipefail
 . /usr/local/lib/obs.sh
 
-for d in prometheus alertmanager grafana apps queries otel vector answers; do
+for d in prometheus prometheus-2 prometheus-3 alertmanager blackbox loki-rules grafana apps queries otel vector answers portal; do
   rm -rf "/obs/$d"
   [ -e "/opt/obs-baseline/$d" ] && cp -a "/opt/obs-baseline/$d" "/obs/$d"
 done
@@ -19,3 +19,4 @@ chmod -R a+rX /obs
 obs_reload >/dev/null
 obs_expire_silences
 sink_reset
+curl -s --max-time 10 -X PUT "$PUSHGW/api/v1/admin/wipe" >/dev/null || true

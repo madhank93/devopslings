@@ -1,5 +1,6 @@
-# Loki, single process, filesystem storage. Read-only infrastructure: lessons
-# change what is sent to Loki, not Loki itself.
+# Loki, single process, filesystem storage, with the ruler on. Read-only
+# infrastructure: lessons change what is sent to Loki and the rules under
+# /obs/loki-rules, not Loki itself.
 auth_enabled: false
 
 server:
@@ -53,3 +54,20 @@ query_range:
 
 analytics:
   reporting_enabled: false
+
+# Rules live in the shared volume so a lesson can write them: every *.yaml
+# under /obs/loki-rules/fake/ (the tenant when auth is off). Short intervals so
+# a rule change and its alert land in seconds.
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /obs/loki-rules
+  rule_path: /loki/rules-temp
+  alertmanager_url: http://alertmanager:9093
+  enable_api: true
+  evaluation_interval: 5s
+  poll_interval: 5s
+  ring:
+    kvstore:
+      store: inmemory
