@@ -14,6 +14,11 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir prometheus-client==0.21.1 \
       opentelemetry-sdk==1.38.0 opentelemetry-exporter-otlp-proto-http==1.38.0 pyyaml==6.0.2
+# Module 29: zero-code instrumentation of a Flask app, the B3 propagator, and
+# the gRPC exporter beside the HTTP one. Versions pinned to match the SDK.
+RUN pip install --no-cache-dir flask==3.1.1 opentelemetry-distro==0.59b0 \
+      opentelemetry-instrumentation-flask==0.59b0 opentelemetry-instrumentation-urllib==0.59b0 \
+      opentelemetry-propagator-b3==1.38.0 opentelemetry-exporter-otlp-proto-grpc==1.38.0
 COPY --from=prom /bin/promtool /usr/local/bin/promtool
 COPY --from=am /bin/amtool /usr/local/bin/amtool
 COPY --from=logcli /usr/bin/logcli /usr/local/bin/logcli
