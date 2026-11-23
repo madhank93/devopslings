@@ -25,6 +25,7 @@ COPY --from=logcli /usr/bin/logcli /usr/local/bin/logcli
 COPY --from=vector /usr/bin/vector /usr/local/bin/vector
 COPY --from=otelcol /otelcol-contrib /usr/local/bin/otelcol-contrib
 COPY tools/obs.sh /usr/local/lib/obs.sh
+COPY hostclock/ /usr/local/lib/python3.12/site-packages/
 COPY tools/ /usr/local/bin/
 COPY baseline/ /opt/obs-baseline/
 ENV PYTHONUNBUFFERED=1 \
