@@ -68,6 +68,20 @@ RUN mkdir -p /srv/mirror && cd /srv/mirror \
     && echo "deb [trusted=yes] copy:/srv/mirror ./" > /etc/apt/sources.list.d/mirror.list \
     && rm -rf /var/lib/apt/lists/*
 
+# Module 30's tracers and debuggers. bcc's *-bpfcc tools fail to compile
+# against current kernels' headers, so eBPF comes from libbpf-tools (CO-RE,
+# shipped as foo-libbpf; linked to the plain names the books use) and bpftrace.
+# gcc builds the C services that lessons uprobe and post-mortem. systemd-coredump
+# is left out on purpose: its sysctl.d entry would rewrite the host-global
+# kernel.core_pattern from inside this privileged box.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libbpf-tools linux-perf strace ltrace gdb gcc libc6-dev make dmsetup \
+    && rm -rf /var/lib/apt/lists/* \
+    && for f in /usr/sbin/*-libbpf; do ln -s "$f" "${f%-libbpf}"; done \
+    && python3 -m venv /opt/py-spy \
+    && /opt/py-spy/bin/pip install --no-cache-dir py-spy==0.4.0 \
+    && ln -s /opt/py-spy/bin/py-spy /usr/local/bin/py-spy
+
 # systemd in a container should not try to manage hardware, the network, or
 # logins. Masking these keeps boot fast and the journal readable — an unmasked
 # box floods the journal with failures that have nothing to do with the lesson,
