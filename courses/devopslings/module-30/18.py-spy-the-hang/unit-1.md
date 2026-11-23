@@ -39,7 +39,7 @@ py-spy dump --pid "$(systemctl show -p MainPID --value settle-worker.service)"
 ```
 Thread 0x7f3a1c6f0700 (idle): "settler"
     settle_one (worker.py:28)
-    loop (worker.py:51)
+    loop (worker.py:48)
     ...
 ```
 
