@@ -37,7 +37,8 @@ the verifier changes between versions and architectures. Beyla 2.5's uprobe
 programs pass it on x86_64 and fail it on arm64.
 
 **What it needs to load: privileges.** Before 5.8, loading a tracing program
-needs `CAP_SYS_ADMIN` — in practice, a privileged container. Kernel 5.8 split out
+needs `CAP_SYS_ADMIN` — one capability, but the broadest there is, and the step
+before a fully privileged container. Kernel 5.8 split out
 `CAP_BPF` (load programs, create maps) and `CAP_PERFMON` (attach to tracepoints,
 kprobes and perf events), so on 5.8 and later an agent can run with those two
 capabilities and nothing else.
@@ -62,14 +63,16 @@ Fill in every field of `/root/answers/ebpf-policy.md`.
 
 ## What you're being graded on
 
-- for each group, whether a CO-RE agent loads as shipped, and whether its
-  container needs `CAP_BPF`+`CAP_PERFMON` or a privileged container
+- for each group, whether a CO-RE agent loads as shipped, and the least its
+  container needs to load programs: `CAP_BPF`+`CAP_PERFMON`, `CAP_SYS_ADMIN`, or
+  a privileged container
 - this box's kernel release, and whether it has BTF, with where you looked
 - a verdict on netmon and on Beyla, with the reason
 - a limit the verifier enforces, and what the rollout does when it rejects a
   program on some kernel
 - the overhead measured on this box: `syscall-bench` without and with the
-  stand-in agent, and the slowdown
+  stand-in agent, and the slowdown. The grader runs both measurements too, and
+  your rates have to be in the same range as its own
 - what triggers a rollback, and how the agents are removed
 
 <details>
@@ -105,7 +108,7 @@ benchmark ran. It needs tracefs: `mount -t tracefs tracefs /sys/kernel/tracing`.
 ```
 web: core=yes privilege=caps
 edge: core=yes privilege=caps
-batch: core=no privilege=privileged
+batch: core=no privilege=sys_admin
 ci: core=no privilege=caps
 box-kernel: <uname -r>
 box-btf: yes — /sys/kernel/btf/vmlinux exists
@@ -121,8 +124,8 @@ rollback: if measured overhead exceeds 2% CPU or p99 regresses, the daemonset is
 - **Deciding CO-RE by version.** `ci` runs 5.15, newer than anything CO-RE
   needs, and was built without BTF. The agent fails to load there.
 - **Privileged everywhere.** It works, and it hands every agent container full
-  root on the host where two capabilities would do. Only `batch`, on 5.4, has no
-  narrower option.
+  root on the host where two capabilities would do. Only `batch`, on 5.4, needs
+  more: `CAP_SYS_ADMIN`, which is still less than `--privileged`.
 - **bcc because it already works on someone's laptop.** It compiles against the
   headers of each host it lands on; every kernel update is a new chance to fail.
 - **Beyla approved fleet-wide.** The edge group is arm64, where it does not load.

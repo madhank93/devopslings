@@ -82,8 +82,9 @@ tasks:
       cat > /root/answers/ebpf-policy.md <<'TXT'
       # eBPF adoption policy. One line per field; replace every ?.
 
-      # Per group: can a CO-RE agent load as shipped (core=yes|no), and what the
-      # agent's container needs to load programs (privilege=caps|privileged).
+      # Per group: can a CO-RE agent load as shipped (core=yes|no), and the least
+      # the agent's container needs to load programs (privilege=caps|sys_admin|privileged):
+      # caps = CAP_BPF+CAP_PERFMON, sys_admin = CAP_SYS_ADMIN added, privileged = --privileged.
       web: core=? privilege=?
       edge: core=? privilege=?
       batch: core=? privilege=?
@@ -144,14 +145,14 @@ tasks:
           return v
 
       # ---- per group: CO-RE needs BTF; CAP_BPF/CAP_PERFMON exist from 5.8 ----
-      truth = {"web": ("yes", "caps"), "edge": ("yes", "caps"),
-               "batch": ("no", "privileged"), "ci": ("no", "caps")}
+      truth = {"web": ("yes", {"caps"}), "edge": ("yes", {"caps"}),
+               "batch": ("no", {"sys_admin", "privileged"}), "ci": ("no", {"caps"})}
       for g, (core, priv) in truth.items():
           v = filled(g).lower()
           c = re.search(r"\bcore\s*=\s*(\w+)", v)
-          p = re.search(r"\bprivilege\s*=\s*(\w+)", v)
+          p = re.search(r"\bprivilege\s*=\s*([\w-]+)", v)
           if not c or not p:
-              no(f"{g} needs core=yes|no and privilege=caps|privileged.")
+              no(f"{g} needs core=yes|no and privilege=caps|sys_admin|privileged.")
           if c.group(1) != core:
               if core == "yes":
                   no(f"{g} says core={c.group(1)}. Its kernel was built with BTF, and BTF is",
@@ -162,14 +163,14 @@ tasks:
                      "for libbpf to relocate against. The version does not decide it.")
               no(f"{g} says core=yes. Its kernel was built without BTF, so a CO-RE binary",
                  "has no type information to relocate against there.")
-          if p.group(1) != priv:
-              if priv == "caps":
+          if p.group(1) not in priv:
+              if priv == {"caps"}:
                   no(f"{g} says privilege={p.group(1)}. Its kernel is 5.8 or later, which split",
                      "CAP_BPF and CAP_PERFMON out of CAP_SYS_ADMIN; a tracing agent needs those",
-                     "two, not a privileged container.")
-              no(f"{g} says privilege=caps. CAP_BPF and CAP_PERFMON arrived in 5.8; on {g}'s",
-                 "5.4 kernel loading a program needs CAP_SYS_ADMIN, which is what a",
-                 "privileged container grants. Say so, so the security team can weigh it.")
+                     "two, not CAP_SYS_ADMIN or a privileged container.")
+              no(f"{g} says privilege={p.group(1)}. CAP_BPF and CAP_PERFMON arrived in 5.8; on",
+                 f"{g}'s 5.4 kernel loading a program needs CAP_SYS_ADMIN (sys_admin). Say so,",
+                 "so the security team can weigh it.")
 
       # ---- this box ---------------------------------------------------------
       if filled("box-kernel") != platform.release():
@@ -240,11 +241,37 @@ tasks:
       real = (off - on) / off * 100
       if abs(real - pct) > 2:
           no(f"overhead says percent={pct:g}, and off={off:.0f} on={on:.0f} is a {real:.1f}% slowdown.")
-      r = subprocess.run(["syscall-bench", "1"], capture_output=True, text=True)
-      m = re.match(r"\s*([0-9]+)", r.stdout)
-      if m and not (float(m.group(1)) / 3 <= off <= float(m.group(1)) * 3):
-          no(f"overhead's off={off:g}, and syscall-bench on this box just ran at",
-             f"{m.group(1)} syscalls/s. Measure here, with syscall-bench.")
+      def bench():
+          r = subprocess.run(["syscall-bench", "1"], capture_output=True, text=True)
+          m = re.match(r"\s*([0-9]+)", r.stdout)
+          return float(m.group(1)) if m else None
+      g_off = bench()
+      if g_off and not (g_off / 3 <= off <= g_off * 3):
+          no(f"overhead's off={off:.0f}, and syscall-bench on this box just ran at",
+             f"{g_off:.0f} syscalls/s. Measure here, with syscall-bench.")
+      # The grader attaches the stand-in agent itself, so `on` is a measurement.
+      agent = subprocess.Popen(
+          ["bpftrace", "-e", "tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }"],
+          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+      attached = False
+      for line in agent.stdout:
+          if "Attaching" in line:
+              attached = True
+              break
+      g_on = bench() if attached else None
+      agent.send_signal(2)
+      try:
+          agent.communicate(timeout=10)
+      except subprocess.TimeoutExpired:
+          agent.kill()
+      if g_on and not (g_on / 2 <= on <= g_on * 2):
+          no(f"overhead's on={on:.0f}, and syscall-bench with the stand-in agent attached",
+             f"just ran at {g_on:.0f} syscalls/s. Measure with the agent attached.")
+      if g_off and g_on:
+          g_pct = (g_off - g_on) / g_off * 100
+          if abs(g_pct - pct) > 12:
+              no(f"overhead says {pct:g}%; the grader just measured {g_pct:.0f}% with the same",
+                 "benchmark and agent. Measure off and on back to back, on this box.")
       if pct < 5:
           no(f"overhead says {pct:g}%. A program on every syscall costs far more than that",
              "on a syscall-only benchmark — check the agent was attached while the",

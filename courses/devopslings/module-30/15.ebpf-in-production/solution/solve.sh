@@ -19,7 +19,7 @@ pct=$(awk -v a="$off" -v b="$on" 'BEGIN { printf "%.1f", (a - b) / a * 100 }')
 cat > /root/answers/ebpf-policy.md <<TXT
 web: core=yes privilege=caps
 edge: core=yes privilege=caps
-batch: core=no privilege=privileged
+batch: core=no privilege=sys_admin
 ci: core=no privilege=caps
 box-kernel: $(uname -r)
 box-btf: yes — /sys/kernel/btf/vmlinux exists
