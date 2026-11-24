@@ -6,10 +6,17 @@ AM=${AM:-http://alertmanager:9093}
 SINK=${SINK:-http://sink:8080}
 LOKI=${LOKI:-http://loki:3100}
 TEMPO=${TEMPO:-http://tempo:3200}
+PROM2=${PROM2:-http://prometheus-2:9090}
+PROM3=${PROM3:-http://prometheus-3:9090}
+MIMIR=${MIMIR:-http://mimir:9009}
+PUSHGW=${PUSHGW:-http://pushgateway:9091}
+BLACKBOX=${BLACKBOX:-http://blackbox:9115}
+PYROSCOPE=${PYROSCOPE:-http://pyroscope:4040}
 
-# The tracing apps idle until a lesson starts them, so module 18 runs without
-# their traffic.
-OBS_IDLE_APPS="checkout broker fulfil ledger billing"
+# These idle until a lesson starts them: the tracing apps, so module 18 runs
+# without their traffic, and the servers and apps only some lessons use, so
+# the others do not pay for their memory.
+OBS_IDLE_APPS="checkout broker fulfil ledger billing collector-2 prometheus-2 prometheus-3 mimir portal nightly lab"
 
 # Raw JSON of an instant query.
 prom_query() {
@@ -57,7 +64,12 @@ obs_reload() {
   elif [ "$(printf '%s' "$out" | tail -1)" != 200 ]; then
     printf 'alertmanager refused the reload: %s\n' "$(printf '%s' "$out" | head -n -1)"; rc=1
   fi
-  [ "$rc" = 0 ] && echo "reloaded prometheus and alertmanager"
+  if ! out=$(curl -s --max-time 20 -X POST "$BLACKBOX/-/reload" -w '\n%{http_code}'); then
+    echo "blackbox_exporter unreachable"; rc=1
+  elif [ "$(printf '%s' "$out" | tail -1)" != 200 ]; then
+    printf 'blackbox_exporter rejected /obs/blackbox/blackbox.yml: %s\n' "$(printf '%s' "$out" | head -n -1)"; rc=1
+  fi
+  [ "$rc" = 0 ] && echo "reloaded prometheus, alertmanager and blackbox_exporter"
   return "$rc"
 }
 
