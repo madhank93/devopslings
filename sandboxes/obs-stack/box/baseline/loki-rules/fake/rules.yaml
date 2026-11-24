@@ -1,0 +1,5 @@
+# Loki ruler rules, in Prometheus rule-file format with LogQL expressions.
+# Loki runs without auth, so its tenant is "fake" and every *.yaml in this
+# directory is loaded. The ruler re-reads the directory every 5 seconds and
+# sends alerts to Alertmanager.
+groups: []

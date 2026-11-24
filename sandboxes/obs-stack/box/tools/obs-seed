@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# Seed the shared /obs volume from the image on first start, then idle as the
-# workbench. A volume that is already seeded is left alone: it holds the
-# student's work, and only `compose down -v` or obs-reset replaces it.
+# Seed the shared /obs volume from the image, then idle as the workbench.
+# A seeded volume holds the student's work and is left alone, except when the
+# image's baseline changed since: then the read-only infrastructure configs
+# (/obs/stack) are replaced and files new to the baseline are added, without
+# overwriting anything that exists. `compose down -v` or obs-reset replaces it.
 set -eu
 . /usr/local/lib/obs.sh
-if [ ! -e /obs/.seeded ]; then
-  cp -a /opt/obs-baseline/. /obs/
+version=$(cd /opt/obs-baseline && find . -type f -print0 | sort -z | xargs -0 md5sum | md5sum | cut -d' ' -f1)
+if [ "$(cat /obs/.seeded 2>/dev/null)" != "$version" ]; then
+  rm -rf /obs/stack
+  cp -an /opt/obs-baseline/. /obs/
   mkdir -p /obs/run /obs/logs
   for a in $OBS_IDLE_APPS; do app_down "$a"; done
   chmod -R a+rX /obs
-  touch /obs/.seeded
+  echo "$version" > /obs/.seeded
 fi
 exec sleep infinity
