@@ -145,7 +145,7 @@ tasks:
         exit 1
       fi
       body=$(curl -fsS -m 3 http://127.0.0.1:18430/quote 2>/dev/null || true)
-      if [ "$(jq -r '.cents' <<<"$body" 2>/dev/null || true)" != 1299 ]; then
+      if ! grep -Eq '"cents": *1299([^0-9]|$)' <<<"$body"; then
         echo "not yet: http://127.0.0.1:18430/quote still fails. Docker delivers published traffic to the"
         echo "         container's eth0 address, and a socket bound to loopback never sees it."
         echo "         Change the listen address in the config volume and restart the container."

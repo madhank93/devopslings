@@ -220,8 +220,22 @@ tasks:
         exit 1
       fi
 
-      # Replay the input that crashed it, behind and ahead of a normal one.
+      # The binary itself must survive the input, so a unit that clears the
+      # request before starting cannot stand in for a fix.
       systemctl stop tariffd.service
+      rm -f /var/spool/tariffd/inbox/* /var/spool/tariffd/done/q-1043*
+      install -o tariffd -g tariffd -m 0644 /var/lib/devopslings/q-1043.req /var/spool/tariffd/inbox/q-1043.req
+      rc=0
+      ( cd /var/lib/tariffd && timeout 3 setpriv --reuid tariffd --regid tariffd --clear-groups \
+          /usr/local/bin/tariffd >/dev/null 2>&1 ) 2>/dev/null || rc=$?
+      if [ "$rc" != 124 ]; then
+        echo "not yet: /usr/local/bin/tariffd, run by itself with Q-1043 queued, exits with status $rc"
+        echo "         instead of staying up. Keeping the request away from the service hides the crash;"
+        echo "         the program has to handle a request with no region= line."
+        exit 1
+      fi
+
+      # Replay the input that crashed it, behind and ahead of a normal one.
       systemctl reset-failed tariffd.service 2>/dev/null || true
       rm -f /var/spool/tariffd/inbox/* /var/spool/tariffd/done/q-1043* /var/spool/tariffd/done/q-1050*
       install -o tariffd -g tariffd -m 0644 /var/lib/devopslings/q-1043.req /var/spool/tariffd/inbox/q-1043.req

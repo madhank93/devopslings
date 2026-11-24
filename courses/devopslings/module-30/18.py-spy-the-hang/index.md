@@ -166,6 +166,48 @@ tasks:
         echo "not yet: /opt/settle/worker.py is missing. Reset the lesson to get it back."
         exit 1
       fi
+      # Lock order is read from one call of each step, so narrowing the race
+      # window (dropping journal(), adding sleeps) cannot hide an inversion.
+      order=$(timeout 30 python3 - <<'CHK' 2>&1 || true
+      import importlib.util, threading
+      spec = importlib.util.spec_from_file_location("worker", "/opt/settle/worker.py")
+      w = importlib.util.module_from_spec(spec)
+      spec.loader.exec_module(w)
+      held, pairs = threading.local(), set()
+
+      class Tracked:
+          def __init__(self, name, inner):
+              self.name, self.inner = name, inner
+          def acquire(self, *a, **k):
+              stack = held.__dict__.setdefault("stack", [])
+              pairs.update((h, self.name) for h in stack)
+              ok = self.inner.acquire(*a, **k)
+              if ok:
+                  stack.append(self.name)
+              return ok
+          def release(self):
+              held.stack.remove(self.name)
+              self.inner.release()
+          def __enter__(self):
+              return self.acquire()
+          def __exit__(self, *exc):
+              self.release()
+
+      for name in ("ledger_lock", "fees_lock"):
+          if hasattr(w, name):
+              setattr(w, name, Tracked(name, getattr(w, name)))
+      for step in ("settle_one", "reconcile_one"):
+          if hasattr(w, step):
+              getattr(w, step)()
+      print("inverted" if {("ledger_lock", "fees_lock"), ("fees_lock", "ledger_lock")} <= pairs else "ok")
+      CHK
+      )
+      if [ "$(tail -1 <<<"$order")" = inverted ]; then
+        echo "not yet: settle_one still takes ledger_lock then fees_lock while reconcile_one takes them the"
+        echo "         other way round. A shorter window makes the deadlock rarer, not impossible."
+        exit 1
+      fi
+
       # The service's own pacing hides the race for seconds at a time; with no
       # pause between rounds, the original deadlocks within a few hundred.
       out=$(timeout 60 python3 /opt/settle/worker.py --iterations 2000 2>&1) && rc=0 || rc=$?
