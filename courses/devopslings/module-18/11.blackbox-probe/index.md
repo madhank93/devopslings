@@ -165,12 +165,16 @@ tasks:
       touch /obs/run/portal.fault
       p=$(wait_page 90)
       probe=$(ok_now)
+      pending=$(prom_query 'ALERTS{alertstate="pending"}' | jq -r '[.data.result[].metric.alertname] | unique | join(", ")' 2>/dev/null || true)
       rm -f /obs/run/portal.fault
       if [ -z "$p" ]; then
         if [ "$probe" = 1 ]; then
           echo "not yet: portal served its error page with status 200 for 90 seconds, and the probe"
           echo "still passed. A status check cannot tell the error page from the form; the module"
           echo "has to assert on what the page says (fail_if_body_not_matches_regexp)."
+        elif [ -n "$pending" ]; then
+          echo "not yet: the probe failed (probe_success 0) for 90 seconds, and $pending was still"
+          echo "pending. A login page that has been broken for a minute is already news; shorten its for:."
         else
           echo "not yet: the probe failed (probe_success 0) for 90 seconds, and nothing paged."
           echo "Add an alert on the probe's result."
@@ -190,9 +194,13 @@ tasks:
       cert 7
       p=$(wait_page 90)
       probe=$(ok_now)
+      pending=$(prom_query 'ALERTS{alertstate="pending"}' | jq -r '[.data.result[].metric.alertname] | unique | join(", ")' 2>/dev/null || true)
       cert 365; short_cert=
       if [ -z "$p" ]; then
-        if [ "$(prom_count "probe_ssl_earliest_cert_expiry{job=\"$job\"}")" = 0 ]; then
+        if [ -n "$pending" ]; then
+          echo "not yet: the certificate expires in 7 days, nothing paged, and $pending was still pending."
+          echo "Expiry is days away, not seconds; a for: longer than a minute or so only delays the page."
+        elif [ "$(prom_count "probe_ssl_earliest_cert_expiry{job=\"$job\"}")" = 0 ]; then
           echo "not yet: the certificate expires in 7 days and nothing paged. The probe reports no"
           echo "probe_ssl_earliest_cert_expiry: is it probing https://?"
         else
