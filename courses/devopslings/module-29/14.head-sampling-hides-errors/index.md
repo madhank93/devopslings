@@ -201,7 +201,7 @@ tasks:
       . /usr/local/lib/obs.sh
       collector_settle || exit 1
       python3 - <<'PY'
-      import json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
+      import json, os, random, re, sys, time, urllib.error, urllib.parse, urllib.request
 
       TEMPO = "http://tempo:3200"
       BUDGET = 0.05   # stored traces, as a share of all orders
@@ -235,8 +235,9 @@ tasks:
                   return sum(float(m.group(1)) for m in re.finditer(
                       r'^otelcol_receiver_accepted_spans(?:_total)?\{[^}]*receiver="otlp"[^}]*\}\s+(\S+)',
                       r.read().decode(), re.M))
-          except OSError:
-              return 0.0
+          except OSError as e:
+              no(f"the Collector's metrics on :8888 did not answer ({e}). The end of /obs/logs/collector.log:",
+                 *tail("collector"))
 
       def started(app):
           try:
@@ -248,11 +249,13 @@ tasks:
       # .started still holds the previous start.
       time.sleep(1)
       time.sleep(max(0, max(started(a) for a in ("checkout", "ledger", "collector")) + 4 - time.time()))
-      tag = os.urandom(3).hex()
+      # Probe ids look like the customers' order ids, so nothing but the
+      # outcome sets them apart.
+      ID = {i: f"ord-{n}" for i, n in enumerate(random.sample(range(10**7, 10**8), ERRORS + SLOW))}
       start, n0, s0 = int(time.time()), orders(), accepted()
 
       def place(i, **kw):
-          body = json.dumps(dict(order_id=f"probe-{tag}-{i}", **kw)).encode()
+          body = json.dumps(dict(order_id=ID[i], **kw)).encode()
           try:
               urllib.request.urlopen(urllib.request.Request("http://checkout:8080/checkout", data=body,
                                                             headers={"Content-Type": "application/json"}), timeout=10).read()
@@ -267,7 +270,7 @@ tasks:
                 if (i < ERRORS and i % 2) or i >= ERRORS + 2}
       FAULTS = "/obs/run/ledger.faults"
       with open(FAULTS, "w") as f:
-          f.writelines(f"probe-{tag}-{i} {k}\n" for i, k in HIDDEN.items())
+          f.writelines(f"{ID[i]} {k}\n" for i, k in HIDDEN.items())
       try:
           for i in range(ERRORS + SLOW):
               if i in HIDDEN:
@@ -289,15 +292,17 @@ tasks:
 
       def probes():
           found = set()
-          for t in search(f'{{span.order.id=~"probe-{tag}-.*"}}', 100):
+          index = {v: i for i, v in ID.items()}
+          for t in search(f'{{span.order.id=~"{"|".join(ID.values())}"}}', 100):
               for ss in t.get("spanSets", []) or [t.get("spanSet", {})]:
                   for s in ss.get("spans", []):
                       for a in s.get("attributes", []):
                           if a["key"] == "order.id":
-                              found.add(int(a["value"]["stringValue"].rsplit("-", 1)[1]))
+                              if a["value"].get("stringValue") in index:
+                                  found.add(index[a["value"]["stringValue"]])
           return found
 
-      # Tail sampling holds each trace for its decision_wait (30s by default) before it reaches Tempo.
+      # Tail sampling holds each trace for its decision_wait before it reaches Tempo.
       deadline = time.time() + 90
       while True:
           got = probes()
@@ -311,27 +316,27 @@ tasks:
       sent = (s1 - s0) / max(placed, 1)
       missed = errs + slow
       if missed and sent < 1.0 and all(i in HIDDEN for i in missed):
-          no(f"{len(missed)} of the orders ledger failed or stalled are in no trace (order probe-{tag}-{missed[0]}),",
+          no(f"{len(missed)} of the orders ledger failed or stalled are in no trace (order {ID[missed[0]]}),",
              "while every order whose body said 'declined' or 'slow' is: checkout keeps a trace by what",
              "the request says when it starts, and a failure further down says nothing there. The",
-             f"Collector received {sent:.2f} spans per order, where a whole order is two.")
+             f"Collector received {sent:.2f} spans per order, where a whole order is three.")
       if errs:
           if sent < 1.0:
               no(f"{len(errs)} of the {ERRORS} declined orders the check placed are in no trace (order",
-                 f"probe-{tag}-{errs[0]}). The Collector received {sent:.2f} spans per order, where a whole",
-                 "order is two: checkout still drops most traces when the request starts, before anyone",
+                 f"{ID[errs[0]]}). The Collector received {sent:.2f} spans per order, where a whole",
+                 "order is three: checkout still drops most traces when the request starts, before anyone",
                  "knows it will fail, and nothing downstream can keep what was never sent.")
           no(f"{len(errs)} of the {ERRORS} declined orders the check placed are in no trace (order",
-             f"probe-{tag}-{errs[0]}), although every span reached the Collector. Its traces pipeline",
+             f"{ID[errs[0]]}), although every span reached the Collector. Its traces pipeline",
              "has to keep every trace with an error in it.")
       if slow:
           if sent < 1.0:
               no(f"{len(slow)} of the {SLOW} orders the check made take 600ms are in no trace (order",
-                 f"probe-{tag}-{slow[0]}). The Collector received {sent:.2f} spans per order, where a whole",
-                 "order is two: checkout drops most traces when the request starts, before anyone knows",
+                 f"{ID[slow[0]]}). The Collector received {sent:.2f} spans per order, where a whole",
+                 "order is three: checkout drops most traces when the request starts, before anyone knows",
                  "it will be slow.")
           no(f"{len(slow)} of the {SLOW} orders the check made take 600ms are in no trace (order",
-             f"probe-{tag}-{slow[0]}). Every trace over 500ms has to be kept.")
+             f"{ID[slow[0]]}). Every trace over 500ms has to be kept.")
 
       kept = search('{resource.service.name="checkout" && name="POST /checkout"}')
       ours = [t for t in kept if t.get("durationMs", 0) < 500]
@@ -340,8 +345,8 @@ tasks:
           no(f"Tempo stored {len(kept)}{'+' if len(kept) >= 3000 else ''} checkout traces for the {placed} orders placed",
              f"while the check ran: {share:.0%} of the customers' orders. The budget is {BUDGET:.0%}: errors,",
              "slow traces, and about 1% of the rest.")
-      errs_bg = len(search('{resource.service.name="checkout" && status=error}'))
-      rest = len(ours) - errs_bg
+      err_ids = {t["traceID"] for t in search('{resource.service.name="checkout" && status=error}')}
+      rest = sum(1 for t in ours if t["traceID"] not in err_ids)
       if rest < 1:
           no(f"of the {placed} orders placed while the check ran, Tempo kept the errors and the slow",
              "ones and none of the rest. A baseline of ordinary traces is what tells you what normal",
