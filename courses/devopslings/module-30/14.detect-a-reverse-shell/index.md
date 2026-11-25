@@ -137,7 +137,13 @@ tasks:
       rm -f /run/nologin
       systemctl start ssh.service
       sshp() { ssh -i /root/.ssh/probe_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR "$@"; }
-      for _ in $(seq 20); do sshp probe-ops@127.0.0.1 true 2>/dev/null && break; sleep 0.5; done
+      for _ in $(seq 20); do sshp probe-ops@127.0.0.1 true >/dev/null 2>&1 && break; sleep 0.5; done
+      if ! err=$(sshp probe-ops@127.0.0.1 true 2>&1 < /dev/null); then
+        echo "not yet: the grader could not log in over SSH as probe-ops, so it cannot"
+        echo "         check the SSH case. ssh said:"
+        printf '%s\n' "$err" | tail -n 4 | sed 's/^/         /'
+        exit 1
+      fi
 
       out=$(mktemp)
       bpftrace "$w" > "$out" 2>&1 &
@@ -174,9 +180,20 @@ tasks:
         exit 1
       fi
 
+      # ---- quiet: interactive shells on a pipe and on /dev/null ------------
+      n=$(lines)
+      echo exit | timeout 5 bash -i > /dev/null 2>&1 || true
+      timeout 5 sh -i < /dev/null > /dev/null 2>&1 || true
+      if [ "$(new_since "$n")" -gt 0 ]; then
+        echo "not yet: your rule fired on bash -i reading a pipe and sh -i reading"
+        echo "         /dev/null. -i is how an operator asks for a prompt; it says"
+        echo "         nothing about where the shell's input comes from. Look at fd 0."
+        exit 1
+      fi
+
       # ---- quiet: SSH logins, with and without a terminal ------------------
       n=$(lines)
-      sshp -T probe-ops@127.0.0.1 'id >/dev/null' < /dev/null
+      sshp -T probe-ops@127.0.0.1 'id >/dev/null' < /dev/null || true
       sshp -tt probe-ops@127.0.0.1 'exit' < /dev/null > /dev/null 2>&1 || true
       if [ "$(new_since "$n")" -gt 0 ]; then
         echo "not yet: your rule fired on an SSH login:"
@@ -232,16 +249,17 @@ tasks:
       s = socket.create_connection(('127.0.0.1', $lp))
       for fd in (0, 1, 2):
           os.dup2(s.fileno(), fd)
-      os.execv('/bin/sh', ['sh', '-i'])
+      os.execv('/bin/sh', ['sh'])
       " 2>/dev/null || true
       if [ "$(new_since "$n")" -lt 1 ]; then
-        echo "not yet: the grader started sh -i from python with a TCP socket dup'ed"
-        echo "         onto fd 0 and your rule printed nothing. It is the same shape as"
-        echo "         the bash one: a shell exec'd with a network socket as stdin."
+        echo "not yet: the grader started a plain sh (no -i) from python with a TCP"
+        echo "         socket dup'ed onto fd 0, and your rule printed nothing. Reverse"
+        echo "         shells do not need -i; the network socket on stdin is the signal."
         cpu0_note
         exit 1
       fi
 
       echo "PASS — the rule caught both reverse shells, and stayed quiet for cron"
       echo "       for SSH logins with and without a terminal, and for a shell on a"
-      echo "       unix socket."
+      echo "       unix socket,"
+      echo "       and for interactive shells reading a pipe or /dev/null."

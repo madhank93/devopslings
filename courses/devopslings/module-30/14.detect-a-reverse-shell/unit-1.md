@@ -47,8 +47,10 @@ peer: <the address:port its socket is connected to>
   - logs in over SSH with a terminal and without one — **nothing** printed
   - starts the cron job's shell with a unix socket as stdin — **nothing**
     printed
-  - starts `bash -i` on a TCP connection, and `sh -i` exec'd from Python with a
-    TCP socket on fd 0 — **a line for each**
+  - runs `bash -i` reading a pipe and `sh -i` reading `/dev/null` — **nothing**
+    printed
+  - starts `bash -i` on a TCP connection, and a plain `sh` (no `-i`) exec'd
+    from Python with a TCP socket on fd 0 — **a line for each**
 
 <details>
 <summary>Hint 1 — what is a process's stdin</summary>
