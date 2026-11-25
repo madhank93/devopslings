@@ -49,6 +49,43 @@ tasks:
       PY
       )
       echo "$ticket" > /obs/data/ticket
+      cat > /obs/apps/shopdb.py <<'DRIVER'
+      """shopdb — the client for the shop database, which runs on another host:
+      every statement is a round trip that costs about a millisecond on the
+      network, whatever the query. Part of the environment, not of checkout.
+      While /obs/run/shopdb.count exists, each statement appends its trace id
+      there: the database's own count of the queries a request made.
+      """
+      import os
+      import sqlite3
+      import time
+
+      from opentelemetry import trace
+
+      COUNT = "/obs/run/shopdb.count"
+
+
+      class Cursor(sqlite3.Cursor):
+          def execute(self, *args):
+              time.sleep(0.001)
+              if os.path.exists(COUNT):
+                  with open(COUNT, "a") as f:
+                      f.write(f"{trace.get_current_span().get_span_context().trace_id:032x}\n")
+              return super().execute(*args)
+
+
+      class Connection(sqlite3.Connection):
+          def cursor(self, factory=Cursor):
+              return super().cursor(factory)
+
+          def execute(self, *args):
+              return self.cursor().execute(*args)
+
+
+      def connect():
+          return sqlite3.connect("file:/obs/data/shop.db?mode=ro", uri=True, factory=Connection)
+      DRIVER
+      cp /obs/apps/shopdb.py /obs/data/.shopdb.py
       cat > /obs/apps/checkout.py <<'PY'
       """checkout — the order page API on :8080. GET /orders/<id> returns the
       order with every line item. Data lives in the shop database.
@@ -56,7 +93,6 @@ tasks:
       """
       import json
       import random
-      import sqlite3
       import threading
       import time
       import urllib.request
@@ -67,6 +103,8 @@ tasks:
       from opentelemetry.sdk.resources import Resource
       from opentelemetry.sdk.trace import TracerProvider
       from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+      import shopdb
 
       provider = TracerProvider(resource=Resource.create({"service.name": "checkout"}))
       provider.add_span_processor(BatchSpanProcessor(
@@ -79,18 +117,15 @@ tasks:
 
       def query(sql, args=()):
           """One round trip to the shop database, as a CLIENT span named after
-          the operation and table. The database runs on another host: every
-          round trip costs about a millisecond on the network, whatever the query.
-          """
+          the operation and table."""
           if not hasattr(local, "db"):
-              local.db = sqlite3.connect("file:/obs/data/shop.db?mode=ro", uri=True)
+              local.db = shopdb.connect()
           words = sql.split()
           table = words[words.index("FROM") + 1] if "FROM" in words else "?"
           with tracer.start_as_current_span(f"{words[0]} shop.{table}", kind=trace.SpanKind.CLIENT) as span:
               span.set_attribute("db.system.name", "sqlite")
               span.set_attribute("db.namespace", "shop")
               span.set_attribute("db.query.text", sql)
-              time.sleep(0.001)
               return local.db.execute(sql, args).fetchall()
 
 
@@ -156,13 +191,14 @@ tasks:
       echo "  curl -s -o /dev/null -w '%{time_total}s\\n' http://checkout:8080/orders/$ticket"
       echo "Its traces in Tempo:"
       echo "  curl -s 'http://tempo:3200/api/search?q={span.order.id=\"$ticket\"}&limit=5' | jq '.traces[].traceID'"
-      echo "Your answer: /obs/answers/n-plus-one.txt. Source: /obs/apps/checkout.py."
+      echo "Your answer: /obs/answers/n-plus-one.txt. Source: /obs/apps/checkout.py (shopdb.py is the"
+      echo "database client: the network to the database, not part of the fix)."
 
   verify_done:
     timeout_seconds: 150
     run: |
       python3 - <<'PY'
-      import json, os, re, sqlite3, sys, time, urllib.error, urllib.request
+      import json, os, re, shutil, sqlite3, sys, time, urllib.error, urllib.request
 
       TEMPO = "http://tempo:3200"
       ANSWER = "/obs/answers/n-plus-one.txt"
@@ -224,8 +260,13 @@ tasks:
           except (OSError, ValueError):
               return 0
 
-      # A fresh start empties any in-process cache, so the spans counted are the
-      # queries an order page really makes.
+      # shopdb stands for the network to the database; the check counts queries
+      # through it, so it goes back to the lesson's copy before checkout restarts.
+      # A fresh start also empties any in-process cache.
+      try:
+          shutil.copy("/obs/data/.shopdb.py", "/obs/apps/shopdb.py")
+      except OSError as e:
+          no(f"the lesson's copy of shopdb.py is gone ({e}). Reset the lesson.")
       open("/obs/run/checkout.restart", "w").close()
       # supervise restarts an edited app within half a second; until then
       # .started still holds the previous start.
@@ -244,13 +285,20 @@ tasks:
           if len(body.get("items", [])) != sizes[order]:
               no(f"GET /orders/{order} returned {len(body.get('items', []))} items; the order has {sizes[order]}.",
                  "The page has to list every line item.")
-          return (time.monotonic() - t0) * 1000
+          return (time.monotonic() - t0) * 1000, body
 
       by_size = sorted(sizes, key=sizes.get)
       sample = [by_size[0], by_size[len(by_size) // 3], by_size[2 * len(by_size) // 3], by_size[-2], by_size[-1]]
       traced = {o: os.urandom(16).hex() for o in sample}
-      for o, tid in traced.items():
-          fetch(o, tid)
+      COUNT = "/obs/run/shopdb.count"
+      open(COUNT, "w").close()
+      try:
+          for o, tid in traced.items():
+              fetch(o, tid)
+          logged = open(COUNT).read().split()
+      finally:
+          os.remove(COUNT)
+      queries = {o: logged.count(tid) for o, tid in traced.items()}
 
       def db_spans(tid):
           deadline = time.time() + 20
@@ -272,27 +320,53 @@ tasks:
               time.sleep(2)
 
       counts = {o: len(db_spans(tid)) for o, tid in traced.items()}
-      desc = ", ".join(f"{sizes[o]} items: {counts[o]}" for o in sample)
-      if min(counts.values()) == 0:
-          no(f"the check's requests drew no database span at all ({desc}). Every order page has to",
-             "come from the database; a cache or a removed span hides the queries instead of fixing them.")
-      if any(counts[a] > counts[b] for a, b in zip(sample, sample[1:])):
-          no(f"a bigger order drew fewer database spans than a smaller one ({desc}): a cache answers",
+      desc = ", ".join(f"{sizes[o]} items: {queries[o]} queries/{counts[o]} spans" for o in sample)
+      if min(queries.values()) == 0:
+          no(f"some of the check's requests made no query through shopdb ({desc}). Every order page",
+             "has to come from the shop database through shopdb.connect(); a cache or a connection of",
+             "your own hides the queries instead of fixing them.")
+      if any(queries[a] > queries[b] for a, b in zip(sample, sample[1:])):
+          no(f"a bigger order made fewer queries than a smaller one ({desc}): a cache answers",
              "some lines and the database the rest. Every order page has to come from the database;",
              "fetch the lines and their products in one query.")
-      if max(counts.values()) != min(counts.values()):
-          no(f"database spans per request still grow with the order ({desc}). One query per line",
-             "item is still there.")
-      if max(counts.values()) > 3:
-          no(f"every request draws {max(counts.values())} database spans ({desc}). It no longer grows,",
-             "but an order page needs at most three queries.")
+      if max(queries.values()) != min(queries.values()):
+          if max(counts.values()) == min(counts.values()):
+              no(f"queries per request still grow with the order ({desc}), but the database spans do",
+                 "not: those queries run outside query(), untraced. The N+1 is still there; the trace",
+                 "just stopped showing it.")
+          no(f"queries per request still grow with the order ({desc}). One query per line item is",
+             "still there.")
+      if max(queries.values()) > 3:
+          no(f"every request makes {max(queries.values())} queries ({desc}). It no longer grows, but an",
+             "order page needs at most three.")
+      if counts != queries:
+          no(f"the database saw more queries than the trace shows ({desc}). Run every query through",
+             "query(), so the trace shows it.")
+
+      # A cache filled at startup draws no queries in a request; a price
+      # changed after the restart shows whether the page reads the database.
+      pid, old = db.execute("SELECT p.id, p.price_cents FROM order_items i JOIN products p ON p.id = i.product_id"
+                            " WHERE i.order_id = ? LIMIT 1", (ticket,)).fetchone()
+      rw = sqlite3.connect("/obs/data/shop.db", timeout=10)
+      rw.execute("UPDATE products SET price_cents = ? WHERE id = ?", (old + 1, pid))
+      rw.commit()
+      try:
+          _, body = fetch(ticket)
+      finally:
+          rw.execute("UPDATE products SET price_cents = ? WHERE id = ?", (old, pid))
+          rw.commit()
+      sku = f"SKU-{pid:05d}"
+      shown = [i.get("price_cents") for i in body["items"] if i.get("sku") == sku]
+      if shown != [old + 1]:
+          no(f"order {ticket}'s page shows {sku} at {shown} cents after its price changed to {old + 1} in",
+             "the database: the page comes from a copy loaded earlier, not from the database.")
 
       big = by_size[-5:]
-      times = sorted(fetch(big[i % 5]) for i in range(40))
+      times = sorted(fetch(big[i % 5])[0] for i in range(40))
       p95 = times[int(len(times) * 0.95) - 1]
       if p95 > BUDGET_MS:
           no(f"p95 over 40 requests for the five biggest orders is {p95:.0f}ms; the budget is {BUDGET_MS}ms.",
-             f"Database spans per request: {desc}.")
+             f"Per request: {desc}.")
       print(f"PASS — '{span}' ran {k} times for order {ticket}. Now every order page takes {counts[sample[0]]}")
       print(f"database round trips whatever its size, and p95 for the biggest orders is {p95:.0f}ms.")
       PY
