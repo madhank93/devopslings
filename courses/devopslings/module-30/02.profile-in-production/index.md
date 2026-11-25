@@ -148,6 +148,7 @@ tasks:
       print(json.dumps({"cpu_s": round(cpu, 3), "digest": hashlib.sha256(json.dumps(out).encode()).hexdigest()}))
       PY
       cp /obs/pricing/pricing.py /obs/run/pricing.orig.py
+      (cd /obs/pricing && sha256sum replay.py orders.py) > /obs/run/pricing.sums
       chmod -R a+rX /obs/pricing
 
       for _ in $(seq 1 60); do curl -fs -m 2 "$PYROSCOPE/ready" >/dev/null 2>&1 && break; sleep 1; done
@@ -207,6 +208,11 @@ tasks:
       if hot != "normalize_lines":
           no(f"hot_function={hot}. Read the production profile (service_name=pricing) top-down from",
              "price_order and name its widest child.")
+
+      if subprocess.run("cd /obs/pricing && sha256sum -c --quiet /obs/run/pricing.sums", shell=True,
+                        capture_output=True).returncode != 0:
+          no("/obs/pricing/replay.py or orders.py has changed. They are the production replay the check",
+             "measures with; the fix belongs in pricing.py.")
 
       def replay(path):
           r = subprocess.run(["python3", "/obs/pricing/replay.py", path], capture_output=True, text=True, timeout=120)

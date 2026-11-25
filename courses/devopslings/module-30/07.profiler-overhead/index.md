@@ -110,6 +110,7 @@ tasks:
       sample_rate = 1000
       INI
       chmod -R a+rX /obs/quotes
+      (cd /obs/quotes && sha256sum service.py) > /obs/run/quotes.sums
 
       for _ in $(seq 1 60); do curl -fs -m 2 "$PYROSCOPE/ready" >/dev/null 2>&1 && break; sleep 1; done
       # The service's container is limited to one CPU; taskset stands in for that limit.
@@ -161,6 +162,11 @@ tasks:
       if claimed >= 2:
           no(f"overhead_percent={claimed}: by your own measurement this rate costs 2% or more.")
 
+      if subprocess.run("cd /obs/quotes && sha256sum -c --quiet /obs/run/quotes.sums", shell=True,
+                        capture_output=True).returncode != 0:
+          no("/obs/quotes/service.py has changed. The rate is the knob, in profiling.ini; the check",
+             "measures the service as shipped.")
+
       r = subprocess.run("taskset -c 0 python3 /obs/quotes/service.py --bench 5", shell=True,
                          capture_output=True, text=True, timeout=60)
       try:
@@ -171,13 +177,18 @@ tasks:
       if cost >= 2:
           no(f"at {rate} samples a second the profiler takes {cost}% of the CPU from a service that has",
              "one. Each sample walks every thread's stack; the cost is per sample.")
+      if abs(claimed - cost) > 1:
+          no(f"overhead_percent={claimed}, and this check measured {cost}% at {rate} Hz. Measure on against",
+             "off at the rate you chose, alternating, and write what you measured.")
 
-      # The profile has to stay useful: enough samples since the change to name the hot path.
+      # The profile has to stay useful: enough samples in the first 25 s after the change to
+      # name the hot path. A fixed window, so uptime cannot make up for a rate too low.
+      # Pyroscope receives a profile up to ~15 s after it is taken.
       started = int(open("/obs/run/quotes.started").read())
-      time.sleep(max(0, started + 25 - time.time()))
+      time.sleep(max(0, started + 40 - time.time()))
       q = 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="quotes"}'
       url = "http://pyroscope:4040/pyroscope/render?" + urllib.parse.urlencode(
-          {"query": q, "from": str(started), "until": "now", "format": "json"})
+          {"query": q, "from": str(started), "until": str(started + 25), "format": "json"})
       fb = json.load(urllib.request.urlopen(url, timeout=15))["flamebearer"]
       # Ticks are CPU nanoseconds; each sample stands for 1/rate seconds of it.
       names, total, width = fb["names"], round(fb["numTicks"] * rate / 1e9), {}
@@ -186,9 +197,9 @@ tasks:
               n = names[level[i + 3]]
               width[n] = width.get(n, 0) + level[i + 1]
       share = 100 * width.get("risk_score", 0) / fb["numTicks"] if fb["numTicks"] else 0
-      print(f"Pyroscope since the last restart: {total} samples, risk_score in {share:.0f}% of them")
+      print(f"Pyroscope, first 25 s after the last restart: {total} samples, risk_score in {share:.0f}% of them")
       if total < 100:
-          no(f"Pyroscope has {total} samples of quotes since it restarted on this config. At that rate a",
+          no(f"Pyroscope has {total} samples of quotes in the 25 s after it restarted on this config. At that rate a",
              "profile cannot tell a 5% function from noise; the hot path has to stay visible.")
       if share < 50:
           no(f"risk_score, the known hot function, is in only {share:.0f}% of the samples Pyroscope holds.")

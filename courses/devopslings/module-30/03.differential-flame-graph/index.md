@@ -334,6 +334,8 @@ tasks:
       PY
       chmod -R a+rX /obs/catalog
       cp -a /obs/catalog/v1 /obs/run/catalog-v1.orig
+      cp -a /obs/catalog/v2 /obs/run/catalog-v2.orig
+      cp /obs/catalog/bench.py /obs/run/catalog-bench.py
 
       for _ in $(seq 1 60); do curl -fs -m 2 "$PYROSCOPE/ready" >/dev/null 2>&1 && break; sleep 1; done
       for v in v1 v2; do
@@ -396,14 +398,18 @@ tasks:
           no("/obs/catalog/v1 has changed. v1 is the baseline the release is measured against: bring v2",
              "level with it, not it level with v2.")
 
-      changed = subprocess.run("diff -rq -x __pycache__ /obs/catalog/v1 /obs/catalog/v2 | wc -l",
-                               shell=True, capture_output=True, text=True).stdout.strip()
-      if int(changed or 0) < 39:
-          no(f"only {changed} files now differ between v1 and v2, of the forty in the release. Revert the",
-             "one change that costs the time; the other thirty-nine are features someone shipped.")
+      # The fix is a revert inside the release: every other file must stay as v2 shipped it.
+      drift = [l for l in subprocess.run("diff -rq -x __pycache__ /obs/run/catalog-v2.orig /obs/catalog/v2",
+                                         shell=True, capture_output=True, text=True).stdout.splitlines()
+               if not l.startswith("Files /obs/run/catalog-v2.orig/money.py ")]
+      if drift:
+          names = sorted({l.split()[1].replace("/obs/run/catalog-v2.orig/", "") if l.startswith("Files")
+                          else l.split(": ")[-1] for l in drift})
+          no(f"v2 changed outside money.py: {', '.join(names[:5])}. Revert the one change that costs",
+             "the time; the rest of the release is features someone shipped, and they stay as they are.")
 
       def bench(d):
-          r = subprocess.run(["python3", "/obs/catalog/bench.py", d, "2"], capture_output=True, text=True, timeout=60)
+          r = subprocess.run(["python3", "/obs/run/catalog-bench.py", d, "2"], capture_output=True, text=True, timeout=60)
           if r.returncode != 0:
               no(f"{d} does not run under bench.py:", *r.stderr.strip().splitlines()[-3:])
           return json.loads(r.stdout.strip().splitlines()[-1])["pages_per_cpu_s"]
@@ -418,6 +424,6 @@ tasks:
           no(f"v2 renders {v2:.0f} pages per CPU second against v1's {v1:.0f}: {100 * (1 - v2 / v1):.0f}% slower,",
              "and it needs to be within 5%.")
       print(f"PASS — {fn} was the regression; v2 now renders {v2:.0f} pages per CPU second against")
-      print(f"       v1's {v1:.0f}, with {changed} of the release's 40 files still changed.")
+      print(f"       v1's {v1:.0f}, with the rest of the release untouched.")
       PY
 ---

@@ -74,8 +74,9 @@ measure when it is quiet.
 
 Your measured overhead must be under 2%. The check runs the service on one
 CPU at your rate and measures the profiler threads' share of its CPU, which
-must be under 2%. Then it reads Pyroscope's profile of the service since it
-restarted on your config: at least 100 samples, with the known hot function,
+must be under 2% and within one point of the overhead you wrote down. Then it
+reads Pyroscope's profile of the first 25 seconds after the service restarted
+on your config: at least 100 samples, with the known hot function,
 `risk_score`, in at least half of them.
 
 <details>

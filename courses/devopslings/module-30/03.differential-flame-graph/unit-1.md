@@ -60,8 +60,8 @@ plain flame graph that reads as noise. In the diff it is the darkest red.
 
 ## What you're being graded on
 
-The check reads your answer, confirms that v1 is untouched and that at least
-39 of the 40 changed files still differ from it, then benchmarks v1 and v2 three times each, alternating,
+The check reads your answer, confirms that v1 is untouched and that v2 still
+matches the release everywhere except the one file you reverted, then benchmarks v1 and v2 three times each, alternating,
 two CPU-seconds a run. v2's median must be at least 95% of v1's.
 
 <details>

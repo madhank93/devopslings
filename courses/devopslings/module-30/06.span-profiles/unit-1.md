@@ -61,7 +61,9 @@ The check reads your answer and prices a few sample quotes with your
 `quoter.py` and with the original: the prices must match. Then it queries
 Tempo for the `price-quote` spans since `quoter` last restarted: every one
 must carry `pyroscope.profile.id` and still price twelve riders, and their
-90th percentile must be under 100 ms.
+90th percentile must be under 100 ms. It also runs one CPU-heavy span through
+your `quoter.py`'s tracing setup and asks Pyroscope for that span's profile:
+the id has to lead to real samples.
 
 <details>
 <summary>Hint 1 — making the link</summary>

@@ -8,4 +8,5 @@
 set -euo pipefail
 mkdir -p /obs/answers
 sed -i 's/^sample_rate = .*/sample_rate = 50/' /obs/quotes/profiling.ini
-printf 'sample_rate=50\noverhead_percent=0.9\n' > /obs/answers/overhead.txt
+cost=$(taskset -c 0 python3 /obs/quotes/service.py --bench 5 | jq -r .profiler_cpu_percent)
+printf 'sample_rate=50\noverhead_percent=%s\n' "$cost" > /obs/answers/overhead.txt

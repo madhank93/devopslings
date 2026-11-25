@@ -119,7 +119,7 @@ tasks:
     timeout_seconds: 180
     run: |
       python3 - <<'PY'
-      import ast, json, sys, time, urllib.parse, urllib.request
+      import ast, json, subprocess, sys, textwrap, time, urllib.parse, urllib.request
 
       def no(*lines):
           print("not yet: " + lines[0])
@@ -192,6 +192,45 @@ tasks:
           no(f"{len(allq) - len(linked)} of the {len(allq)} latest price-quote spans carry no pyroscope.profile.id,",
              "so nothing links them to a profile. pyroscope-otel's PyroscopeSpanProcessor, added to",
              "quoter's TracerProvider, marks each root span and labels the samples taken during it.")
+      # The id must lead to samples: run quoter's own setup, burn CPU in one root span of its
+      # tracer, and ask Pyroscope for that span's profile.
+      probe = r'''
+      import ast, json, time, pyroscope
+      from opentelemetry import trace
+      tree = ast.parse(open("/obs/quoter/quoter.py").read())
+      tree.body = [n for n in tree.body if not isinstance(n, ast.While)]
+      exec(compile(tree, "/obs/quoter/quoter.py", "exec"), {"__name__": "quoter_check"})
+      with trace.get_tracer("verify").start_as_current_span("profile-link-check") as span:
+          t0 = time.process_time()
+          while time.process_time() - t0 < 2:
+              sum(i * i for i in range(10000))
+      trace.get_tracer_provider().shutdown()
+      pyroscope.shutdown()
+      print(json.dumps({"id": span.attributes.get("pyroscope.profile.id")}))
+      '''
+      r = subprocess.run(["python3", "-c", textwrap.dedent(probe)], capture_output=True, text=True, timeout=60)
+      try:
+          pid = json.loads(r.stdout.strip().splitlines()[-1])["id"]
+      except (IndexError, ValueError, KeyError):
+          no("/obs/quoter/quoter.py fails when this check runs its tracing setup:", *r.stderr.strip().splitlines()[-3:])
+      if not pid:
+          no("a root span started from quoter's TracerProvider gets no pyroscope.profile.id. Setting the",
+             "attribute by hand in price_quote links nothing; the span processor sets it on every root span.")
+      body = json.dumps({"profileTypeID": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
+                         "labelSelector": '{service_name="quoter"}', "spanSelector": [pid],
+                         "start": int(time.time() - 120) * 1000, "end": int(time.time() + 60) * 1000}).encode()
+      ticks, deadline = 0, time.time() + 30
+      while not ticks and time.time() < deadline:
+          req = urllib.request.Request("http://pyroscope:4040/querier.v1.QuerierService/SelectMergeSpanProfile",
+                                       data=body, headers={"Content-Type": "application/json"})
+          ticks = int(json.load(urllib.request.urlopen(req, timeout=15)).get("flamegraph", {}).get("total", 0))
+          if not ticks:
+              time.sleep(3)
+      if not ticks:
+          no(f"a 2-second span this check ran through quoter's setup has pyroscope.profile.id={pid}, and",
+             "Pyroscope holds no samples for it. The id only links a profile if the samples taken during",
+             "the span are labelled with it, which PyroscopeSpanProcessor does.")
+
       full = search('{resource.service.name="quoter" && name="price-quote" && span.quote.riders = 12}', since)
       if len(full) < len(allq):
           no(f"{len(allq) - len(full)} of the {len(allq)} latest price-quote spans priced fewer than 12 riders.",
