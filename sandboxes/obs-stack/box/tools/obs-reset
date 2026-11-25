@@ -12,6 +12,11 @@ for d in prometheus prometheus-2 prometheus-3 alertmanager blackbox loki-rules g
 done
 rm -f /obs/run/*.down /obs/run/*.restart /obs/run/*.fault /obs/run/*.slow
 for a in $OBS_IDLE_APPS; do app_down "$a"; done
+# Supervisors a lesson's init started in the box (`setsid supervise NAME ...`).
+# Baseline apps run in their own containers, where PID 1 is their supervisor.
+if grep -q obs-seed /proc/1/cmdline; then
+  pkill -TERM -f '^bash /usr/local/bin/supervise ' || true
+fi
 mkdir -p /obs/answers /obs/otel/out
 chmod -R a+rwX /obs/otel/out
 chmod -R a+rX /obs
