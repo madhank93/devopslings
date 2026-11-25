@@ -327,8 +327,9 @@ services:
     command: ["-config.file=/obs/stack/tempo.yaml"]
     volumes:
       - obs:/obs:ro
+    # tmpfs pages count toward mem_limit; retention in tempo.yaml bounds them.
     tmpfs:
-      - /var/tempo:uid=10001,gid=10001
+      - /var/tempo:uid=10001,gid=10001,size=600m
     ports:
       - "13200:3200"
     depends_on:
@@ -339,7 +340,8 @@ services:
       interval: 2s
       timeout: 3s
       retries: 60
-    mem_limit: 512m
+    restart: unless-stopped
+    mem_limit: 1g
 
   # One lesson's index lives here. No healthcheck, so `up --wait` does not hold
   # every other lesson for its start; that lesson waits for it instead.
