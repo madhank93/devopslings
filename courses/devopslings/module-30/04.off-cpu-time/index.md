@@ -211,7 +211,7 @@ tasks:
       fi
       sleep 1
 
-      res=$(python3 - <<'PY'
+      res=$(python3 - <<'PY' 2>&1 || true
       import re, time, urllib.request
       lat, versions = [], []
       feed0 = int(urllib.request.urlopen("http://127.0.0.1:8099/served").read())
@@ -233,6 +233,12 @@ tasks:
       )
       if [ "$res" = down ]; then
         echo "not yet: quotes stopped answering on 127.0.0.1:8096 while being timed."
+        exit 1
+      fi
+      if ! printf '%s' "$res" | grep -Eqx '[0-9]+ [0-9]+ -?[0-9]+ [01]'; then
+        echo "not yet: the grader could not time quotes; this is the grader, not your"
+        echo "         fix. Run verify again. It said:"
+        printf '%s\n' "$res" | tail -n 4 | sed 's/^/         /'
         exit 1
       fi
       read -r slowest distinct fetched badbody <<EOF
@@ -289,7 +295,8 @@ tasks:
       if [ "${locks:-0}" -lt 1 ]; then
         echo "not yet: handle_quote no longer takes a lock before reading rates, while"
         echo "         the refresh thread writes them. That removes the wait by racing"
-        echo "         the copy. Keep the lock in handle_quote; take it out of the fetch."
+        echo "         the copy. Keep rates_lock in handle_quote; take it out of the"
+        echo "         fetch. (A lock-free swap is also correct; this check expects the mutex.)"
         exit 1
       fi
 

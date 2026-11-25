@@ -170,8 +170,8 @@ of their `read`s returning ends tailer's timing. `curtask->pid` is the
 kernel's own thread ID, read straight from the task, and tells threads apart
 in any namespace. On a plain host `tid` works too.
 
-`tailer` reads a pipe two bytes at a time, so most of its reads return in
-microseconds. Once a second the writer pauses, and one read waits the whole
+`tailer` reads a pipe whose writer sends two bytes at a time, so most of its
+reads return in microseconds. Once a second the writer pauses, and one read waits the whole
 pause. An average would bury it under a hundred fast reads; `max()` and
 `hist()` do not.
 

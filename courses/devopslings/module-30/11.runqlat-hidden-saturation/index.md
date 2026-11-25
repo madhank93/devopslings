@@ -146,8 +146,17 @@ tasks:
         echo "not yet: after-p99-ms ($a) is not below before-p99-ms ($b)."
         exit 1
       fi
-      if ! printf '%s' "$(field cause)" | grep -Eq '\b(cpu|core)s?\b|affinit|pinn|cpuset|share'; then
-        echo "not yet: cause says '$(field cause)'. Say which CPUs quote-api may run"
+      c=$(field cause)
+      if printf '%s' "$c" | grep -Eq 'quota|throttl|limit'; then
+        echo "not yet: cause says '$c'. quote-api's nr_throttled is 0: no quota holds"
+        echo "         it back. It waits in a queue. Say which CPUs it may run on, and"
+        echo "         what else runs there."
+        exit 1
+      fi
+      if ! printf '%s' "$c" | grep -Eq 'affinit|pinn|cpuset|taskset' &&
+         ! { printf '%s' "$c" | grep -Eq '\b(cpu|core)s?\b' &&
+             printf '%s' "$c" | grep -Eq 'reindex|batch|neighbou?r'; }; then
+        echo "not yet: cause says '${c:-nothing}'. Say which CPUs quote-api may run"
         echo "         on, and what else runs there."
         exit 1
       fi
@@ -241,6 +250,13 @@ tasks:
       PY
       kill -INT "$bt" 2>/dev/null || true
       wait "$bt" 2>/dev/null || true
+      if ! grep -q '^ready' "$out"; then
+        echo "not yet: the grader could not trace the run queue; this is the grader,"
+        echo "         not your fix. Run verify again. bpftrace said:"
+        sed 's/^/         /' "$out" | head -n 8
+        rm -f "$out"
+        exit 1
+      fi
       total=$(sed -n 's/^@total: *//p' "$out"); slow=$(sed -n 's/^@slow: *//p' "$out")
       : "${total:=0}" "${slow:=0}"
       rm -f "$out"

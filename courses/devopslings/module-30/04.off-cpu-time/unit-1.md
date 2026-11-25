@@ -47,7 +47,9 @@ Rebuild with `make -C /opt/quotes && systemctl restart quotes`.
 - over the same five seconds `rates-feed` is still fetched, and `quotes`
   returns at least three different rate versions — removing the refresh
   removes the wait and the data with it
-- requests still take a lock before they read the rates
+- requests still take a lock before they read the rates. A lock-free swap
+  (double buffer plus an atomic pointer) is also a correct fix, but this check
+  expects the one-mutex fix: keep `rates_lock`, shorten what it covers
 
 <details>
 <summary>Hint 1 — the tool</summary>

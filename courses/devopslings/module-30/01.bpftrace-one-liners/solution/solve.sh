@@ -12,7 +12,7 @@ d=/root/oneliners
 mkdir -p "$d" /root/answers
 
 echo 'tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }' > $d/q1.bt
-echo "tracepoint:raw_syscalls:sys_enter /args->id == $openat && strncmp(str(uptr(args->args[1])), \"/etc/\", 5) == 0/ { printf(\"%s %s\\n\", comm, str(uptr(args->args[1]))); }" > $d/q2.bt
+printf "%s\n" "tracepoint:raw_syscalls:sys_enter /args->id == $openat && strncmp(str(uptr(args->args[1])), \"/etc/\", 5) == 0/ { printf(\"%s %s\\n\", comm, str(uptr(args->args[1]))); }" > $d/q2.bt
 echo "tracepoint:raw_syscalls:sys_exit /args->id == $read && args->ret > 0/ { @[comm] = sum(args->ret); }" > $d/q3.bt
 cat > $d/q4.bt <<BT
 tracepoint:raw_syscalls:sys_enter /args->id == $read && comm == "tailer"/ { @start[curtask->pid] = nsecs; }

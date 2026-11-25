@@ -85,8 +85,10 @@ tasks:
                       time.sleep(slow_ms / 1000.0)
           threading.Thread(target=feed, daemon=True).start()
           fd = os.open(fifo, os.O_RDONLY)
+          # Asks for 1 MiB and gets the 2 bytes in the pipe: summing the size
+          # requested instead of read()'s return value points at tailer.
           while True:
-              os.read(fd, 2)
+              os.read(fd, 1048576)
 
       def idle():
           while True:
@@ -251,6 +253,11 @@ tasks:
         echo "not yet: most-bytes says '${a:-nothing}', and that is not the worker"
         echo "         reading the most. Sum read()'s return value per comm in q3.bt —"
         echo "         the return value, not the size asked for."
+        exit 1
+      fi
+      if field bytes-per-second | grep -Eq '[0-9][[:space:]]*([kmg]i?b?|kilo|mega|giga)\b'; then
+        echo "not yet: bytes-per-second says '$(field bytes-per-second)'. Give a plain"
+        echo "         byte count, with no k/M/MiB unit: 5242880, not 5 MiB."
         exit 1
       fi
       a=$(num "$(field bytes-per-second)")

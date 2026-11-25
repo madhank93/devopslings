@@ -151,7 +151,16 @@ tasks:
       gap_ok=1
       if ! next_rewrite 12 || ! next_rewrite 6; then gap_ok=0; fi
 
-      wait "$bt" 2>/dev/null || true
+      bst=0; wait "$bt" 2>/dev/null || bst=$?
+      # No fork in five seconds leaves no @n line, so a zero count is only
+      # trusted when bpftrace attached and exited on its own.
+      if [ "$bst" != 0 ] || ! grep -q '^Attaching' "$fout"; then
+        echo "not yet: the grader could not count forks (bpftrace exit $bst). This is"
+        echo "         the grader, not your fix; run verify again. bpftrace said:"
+        sed 's/^/         /' "$fout" | head -n 8
+        rm -f "$fout"
+        exit 1
+      fi
       n=$(sed -n 's/^@n: *//p' "$fout")
       rm -f "$fout"
       : "${n:=0}"
