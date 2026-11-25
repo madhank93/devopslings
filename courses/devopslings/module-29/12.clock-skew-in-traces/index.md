@@ -197,7 +197,8 @@ tasks:
       try:
           first = open("/obs/data/clock-skew.trace").read().strip()
       except OSError:
-          no("/obs/data/clock-skew.trace is gone. Reset the lesson.")
+          print("lesson error: /obs/data/clock-skew.trace is gone. Your answer was not graded; reset the lesson.")
+          sys.exit(1)
       deadline = time.time() + 25
       while True:
           spans = trace_spans(first)
@@ -208,7 +209,9 @@ tasks:
               break
           time.sleep(2)
       if not skews:
-          no(f"Tempo no longer has the trace the lesson started with ({first}). Reset the lesson.")
+          print(f"lesson error: Tempo no longer has the trace this lesson recorded at its start ({first}),")
+          print("so the real offset cannot be read. Your answer was not graded; reset the lesson.")
+          sys.exit(1)
       truth = abs(skews[0])
 
       def field(name):
@@ -225,7 +228,7 @@ tasks:
       for k, v in (("cause", cause), ("host", host), ("offset_ms", off)):
           if not v or v == "?":
               no(f"{k} in {ANSWER} is not filled in.")
-      if not re.search(r"\b(clock|clocks|time|ntp|chrony|skew|drift|offset)\b", cause.lower()):
+      if not re.search(r"\b(clocks?|ntp|chronyd?|skew(ed)?|drift(ed|ing)?|time ?sync)\b", cause.lower()):
           no(f"cause is '{cause}'. Spans from one service sit where they should in the same trace, so",
              "context propagation and the span code work. What differs between the hosts?")
       if host != "ledger":
