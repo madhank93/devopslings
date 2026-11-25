@@ -290,13 +290,20 @@ tasks:
       for _ in 1 2 3 4 5; do curl -s -o /dev/null --max-time 2 http://127.0.0.1:8096/ || true; done
       kill -INT "$bt" 2>/dev/null || true
       wait "$bt" 2>/dev/null || true
+      if ! grep -q '^ready' "$lockout"; then
+        echo "not yet: the grader could not trace quotes' lock calls; this is the"
+        echo "         grader, not your fix. Run verify again. bpftrace said:"
+        sed 's/^/         /' "$lockout" | head -n 8
+        rm -f "$lockout"
+        exit 1
+      fi
       locks=$(sed -n 's/^@n: *//p' "$lockout")
       rm -f "$lockout"
       if [ "${locks:-0}" -lt 1 ]; then
         echo "not yet: handle_quote no longer takes a lock before reading rates, while"
         echo "         the refresh thread writes them. That removes the wait by racing"
         echo "         the copy. Keep rates_lock in handle_quote; take it out of the"
-        echo "         fetch. (A lock-free swap is also correct; this check expects the mutex.)"
+        echo "         fetch."
         exit 1
       fi
 

@@ -147,17 +147,18 @@ tasks:
         exit 1
       fi
       c=$(field cause)
-      if printf '%s' "$c" | grep -Eq 'quota|throttl|limit'; then
-        echo "not yet: cause says '$c'. quote-api's nr_throttled is 0: no quota holds"
-        echo "         it back. It waits in a queue. Say which CPUs it may run on, and"
-        echo "         what else runs there."
-        exit 1
-      fi
-      if ! printf '%s' "$c" | grep -Eq 'affinit|pinn|cpuset|taskset' &&
-         ! { printf '%s' "$c" | grep -Eq '\b(cpu|core)s?\b' &&
-             printf '%s' "$c" | grep -Eq 'reindex|batch|neighbou?r'; }; then
+      has() { printf '%s' "$c" | grep -Eq "$1"; }
+      # Pinning names the cause outright; otherwise the CPUs, the batch job and
+      # the fact that they share them must all be there.
+      if ! has 'affinit|pinn|cpuset|taskset' &&
+         ! { has '\b(cpu|core)s?[0-9-]*\b' && has 'reindex|batch|neighbou?r' &&
+             has 'shar[a-z]*|same cpus|saturat[a-z]*|contend[a-z]*|contention'; }; then
         echo "not yet: cause says '${c:-nothing}'. Say which CPUs quote-api may run"
         echo "         on, and what else runs there."
+        if has '\b(quota|throttl[a-z]*|limit[a-z]*|nr_throttled)\b'; then
+          echo "         quote-api's nr_throttled is 0: no quota holds it back. It"
+          echo "         waits in a queue."
+        fi
         exit 1
       fi
 
