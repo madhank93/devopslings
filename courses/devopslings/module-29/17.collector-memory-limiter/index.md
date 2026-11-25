@@ -156,7 +156,13 @@ tasks:
              "memory_limiter is in place, but memory still outran it. Its limit sits too close to",
              "the container's 256MiB, or it checks too rarely for how fast a burst arrives:",
              "spike_limit has to cover what arrives between two checks.")
-      refused = sum(int(n) for n, code in re.findall(r"(\d+) (\d{3})", run.stdout) if code != "200")
+      codes = {code: int(n) for n, code in re.findall(r"(\d+) (\d{3}|no answer)", run.stdout)}
+      refused = selfmetric("otelcol_processor_refused_spans(?:_total)?")
+      other = {c: n for c, n in codes.items() if c not in ("200", "503")}
+      if refused == 0 and other:
+          no("the Collector turned away " + ", ".join(f"{n} with {c}" for c, n in other.items()) + ", and",
+             "memory_limiter refused nothing. Something ahead of it rejected the burst, so the spans were",
+             "never let in at all; memory_limiter answers 503 only while memory is short.")
       if refused == 0:
           dropped = selfmetric("otelcol_exporter_enqueue_failed_spans(?:_total)?")
           if dropped:
@@ -166,6 +172,9 @@ tasks:
           no("the Collector stayed up and accepted the whole burst without refusing anything.",
              "That only means the burst was smaller than its limit; the check needs to see",
              "memory_limiter push back.")
+      if not codes.get("200"):
+          no("memory_limiter refused the whole burst: not one request got a 200. A limiter that",
+             "refuses everything protects the Collector by delivering nothing.")
 
       # Once the burst is over, new spans have to be accepted and reach Tempo.
       tid = "17" + os.urandom(15).hex()
@@ -194,7 +203,7 @@ tasks:
               if time.time() > deadline:
                   no("the Collector accepted a span after the burst and Tempo never got it.")
               time.sleep(3)
-      print(f"PASS — the Collector refused {refused} of the burst's requests with backpressure,")
+      print(f"PASS — memory_limiter refused {refused:g} of the burst's spans with backpressure,")
       print("stayed up through it, and passed new spans on to Tempo afterwards.")
       PY
 ---

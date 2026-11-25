@@ -197,6 +197,11 @@ tasks:
           m = re.fullmatch(r"(\d+)(ms|s|m)", str(v).strip())
           return int(m.group(1)) * {"ms": 0.001, "s": 1, "m": 60}[m.group(2)] if m else 30
 
+      for app, gw in (("checkout", "collector"), ("ledger", "collector-2")):
+          if f'endpoint="http://{gw}:4318/v1/traces"' not in open(f"/obs/apps/{app}.py").read():
+              no(f"{app}.py no longer sends its spans to {gw}. A service does not get to pick the gateway",
+                 "that sees the rest of its trace; the routing belongs in the gateways.")
+
       time.sleep(1.5)
       cfgs, wait = {}, 0
       for c in ("collector", "collector-2"):
@@ -252,11 +257,20 @@ tasks:
           no(f"Tempo stored {len(chk)} checkout traces from a 45s window of roughly {orders:.0f} orders. The",
              "budget is every error trace and one in ten of the rest: keep the sampler.")
 
+      kind = lambda names: {str(n).split("/")[0] for n in names or []}
       for c, cfg in cfgs.items():
-          lb = [k for k in (cfg.get("exporters") or {}) if k.split("/")[0] == "loadbalancing"]
-          if not lb:
-              no(f"{c} has no loadbalancing exporter. Traces are whole today, but whatever made them whole",
-                 "is not routing by trace ID, and the next gateway added splits them again.")
+          pipes = [p or {} for p in ((cfg.get("service") or {}).get("pipelines") or {}).values()]
+          routed = [p for p in pipes if "loadbalancing" in kind(p.get("exporters"))]
+          if not routed:
+              no(f"{c} sends nothing through a loadbalancing exporter. Traces are whole today, but whatever made",
+                 "them whole is not routing by trace ID, and the next gateway added splits them again.")
+          if any("tail_sampling" in kind(p.get("processors")) for p in routed):
+              no(f"{c} tail-samples in the same pipeline that routes by trace ID, so it decides on the half of",
+                 "the trace it was sent before routing. Route first; sample in a second pipeline.")
+          if any("tail_sampling" in kind(p.get("processors")) and "otlp" in (p.get("receivers") or []) for p in pipes):
+              no(f"{c}'s tail_sampling still reads straight from the services' otlp receiver, so it samples",
+                 "whatever half of a trace a service sent it. Sample only what the loadbalancing exporter routed.")
+          lb = [e for p in routed for e in p.get("exporters") or [] if e.split("/")[0] == "loadbalancing"]
           if (cfg["exporters"][lb[0]] or {}).get("routing_key", "traceID") != "traceID":
               no(f"{c}'s loadbalancing exporter routes by {cfg['exporters'][lb[0]].get('routing_key')}, not traceID.")
           res = (cfg["exporters"][lb[0]] or {}).get("resolver") or {}
