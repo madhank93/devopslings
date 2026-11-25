@@ -192,6 +192,13 @@ tasks:
       if key in ("level", "msg", "order_id"):
           no(f"the answer names `{key}`, which is one of the three already required. Name the fourth.")
       orders = [(l, r) for _, l, r in records if "order_id" in r]
+      others = [r for _, _, r in records if "order_id" not in r]
+      if not others:
+          no("every record since dispatch last started carries order_id; the restock lines should not.",
+             "Keep logging restocks, with their own fields and no order_id.")
+      if all(key in r for r in others):
+          no(f"the answer names `{key}`, and every record carries it, the restock lines too.",
+             "A field on every line is the formatter's, not the order's. Name a field of the order itself.")
       lacking = [l for l, r in orders if key not in r]
       if lacking:
           no(f"the answer names `{key}`, and {len(lacking)} of {len(orders)} order records do not carry it, e.g.:",

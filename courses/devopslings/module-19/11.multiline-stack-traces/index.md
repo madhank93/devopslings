@@ -196,9 +196,22 @@ tasks:
 
       truth = {r: written(r) for r in ids}
       lost = [r for r, t in truth.items() if t is None]
+      if lost and all(r in open(LOG).read() for r in lost):
+          no(f"reports wrote {lost[0]} to {LOG}, but not as `<timestamp> … report {lost[0]} failed`.",
+             "The lesson's fix is in how the Collector reads the file; put lab.py back as init wrote it.")
       if lost:
           no(f"reports did not log the failure of {', '.join(lost)} to {LOG}. Is it running?",
              "The end of /obs/logs/lab.log:", *[l.rstrip()[:160] for l in open("/obs/logs/lab.log").readlines()[-4:]])
+
+      # The multiline rule is only exercised by a real traceback, frames through
+      # the ValueError (Python folds the repeated render() frames into one line).
+      for rid, (_, block) in truth.items():
+          rows = block.split("\n")
+          if len(rows) < 8 or rows[1] != "Traceback (most recent call last):" \
+                  or not rows[-1].startswith(f"ValueError: report {rid}:"):
+              no(f"reports no longer writes the traceback for {rid}; its failure record in {LOG} is",
+                 *show(block),
+                 "The lesson's fix is in how the Collector reads the file; put lab.py back as init wrote it.")
 
       # Each record in Loki that mentions the report, once the Collector has
       # flushed: a multiline record is held until the next one starts.

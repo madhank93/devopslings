@@ -135,6 +135,8 @@ tasks:
       t0 = int(time.time()) - 3600
       OUT0, OUT1 = t0 + 600, t0 + 780
       rnd = random.Random()
+      # A reason the init history never showed: the rule has to key on failures, not on one cause.
+      CAUSE = rnd.choice(["card network unreachable", "acquirer returned 503", "3-D Secure service down"])
       pods = [f"payments-{rnd.randrange(16**6):06x}-{c}{rnd.randrange(100, 999)}" for c in "kqx"]
       streams = {p: [] for p in pods}
       events = []
@@ -147,7 +149,7 @@ tasks:
           t = t0 + rnd.uniform(0, 2)
           while t < t0 + 900:
               if OUT0 <= t < OUT1:
-                  rec(t, pod, "error", "payment failed", reason="processor timeout after 5s")
+                  rec(t, pod, "error", "payment failed", reason=CAUSE)
               elif rnd.random() < 0.12:
                   rec(t, pod, "info", "processor returned a retryable error, retried", attempt=2)
               else:
@@ -210,9 +212,13 @@ tasks:
               no(f"in the replay, payments fail on every pod from minute 10 to 13 ({errs} failures), and",
                  f"your rule first pages at {at(late[0][0])}. The page has to go out within two minutes.")
           slow = [f"{r['alert']} has for: {r['for']}" for r in rules if seconds(r.get("for")) >= 180]
+          keyed = [r["alert"] for r in rules if re.search(r"timeout|processor", str(r["expr"]), re.I)]
           no(f"in the replay, payments fail on every pod from minute 10 to 13 ({errs} failures, about",
              f"{errs / 3:.0f} a minute), and your rule never pages.",
-             *([f"{'; '.join(slow)}: the outage is over before the condition has held that long."] if slow else []))
+             *([f"{'; '.join(slow)}: the outage is over before the condition has held that long."] if slow else []),
+             *([f"{', '.join(keyed)} looks for the last outage's cause; this one failed with reason \"{CAUSE}\".",
+                "The next outage will have its own cause: page on failed payments, whatever the reason."]
+               if keyed else []))
       alerts = sorted({(name, show(labels)) for _, name, labels in during})
       if len(alerts) > 1:
           no(f"in the replay, the one outage from minute 10 to 13 pages {len(alerts)} times:",
@@ -238,7 +244,7 @@ tasks:
               body = {"streams": [{"stream": {"service": "payments", "pod": p, "check": live},
                                    "values": [[str(int(now * 1e9)), json.dumps({"level": "error", "msg": "payment failed",
                                                                                  "order_id": f"ord-{rnd.randrange(10**6, 10**7)}",
-                                                                                 "reason": "processor timeout after 5s"})]]}]}
+                                                                                 "reason": CAUSE})]]}]}
               urllib.request.urlopen(urllib.request.Request(f"{LOKI}/loki/api/v1/push", data=json.dumps(body).encode(),
                                                             headers={"Content-Type": "application/json"}), timeout=10).read()
           f = firing()
