@@ -130,7 +130,10 @@ tasks:
       PY
       cat > /obs/apps/ledger.py <<'PY'
       """ledger — records orders. POST /entries on :8080. Its sampler follows
-      the caller's decision."""
+      the caller's decision. Storage faults for given orders come from
+      /obs/run/ledger.faults, one "<order id> fail|stall" per line.
+      """
+      import json
       import time
       from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -139,6 +142,7 @@ tasks:
       from opentelemetry.sdk.resources import Resource
       from opentelemetry.sdk.trace import TracerProvider
       from opentelemetry.sdk.trace.export import BatchSpanProcessor
+      from opentelemetry.trace import Status, StatusCode
 
       provider = TracerProvider(resource=Resource.create({"service.name": "ledger"}))
       provider.add_span_processor(BatchSpanProcessor(
@@ -148,16 +152,35 @@ tasks:
       tracer = trace.get_tracer("ledger")
 
 
+      def fault(order_id):
+          try:
+              for line in open("/obs/run/ledger.faults"):
+                  oid, kind = line.split()
+                  if oid == order_id:
+                      return kind
+          except (OSError, ValueError):
+              pass
+          return None
+
+
       class Handler(BaseHTTPRequestHandler):
           def log_message(self, *a):
               pass
 
           def do_POST(self):
-              self.rfile.read(int(self.headers.get("Content-Length", 0) or 0))
+              try:
+                  order_id = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0) or 0)))["order_id"]
+              except (ValueError, KeyError, TypeError):
+                  order_id = None
+              f = fault(order_id)
               with tracer.start_as_current_span("POST /entries", context=propagate.extract(self.headers),
-                                                kind=trace.SpanKind.SERVER):
+                                                kind=trace.SpanKind.SERVER) as span:
                   time.sleep(0.003)
-              self.send_response(201)
+                  if f == "stall":
+                      time.sleep(0.6)
+                  if f == "fail":
+                      span.set_status(Status(StatusCode.ERROR, "write failed"))
+              self.send_response(500 if f == "fail" else 201)
               self.send_header("Content-Length", "0")
               self.end_headers()
 
@@ -238,9 +261,22 @@ tasks:
           except OSError as e:
               no(f"checkout did not answer ({e}). The end of /obs/logs/checkout.log:", *tail("checkout"))
 
-      for i in range(ERRORS + SLOW):
-          place(i, card="declined") if i < ERRORS else place(i, slow=True)
-          time.sleep(3)
+      # Half the probes carry their outcome in the body; ledger fails or stalls
+      # the rest, which nothing knows when the request starts.
+      HIDDEN = {i: ("fail" if i < ERRORS else "stall") for i in range(ERRORS + SLOW)
+                if (i < ERRORS and i % 2) or i >= ERRORS + 2}
+      FAULTS = "/obs/run/ledger.faults"
+      with open(FAULTS, "w") as f:
+          f.writelines(f"probe-{tag}-{i} {k}\n" for i, k in HIDDEN.items())
+      try:
+          for i in range(ERRORS + SLOW):
+              if i in HIDDEN:
+                  place(i)
+              else:
+                  place(i, card="declined") if i < ERRORS else place(i, slow=True)
+              time.sleep(3)
+      finally:
+          os.remove(FAULTS)
       end, n1, s1 = int(time.time()), orders(), accepted()
       placed = n1 - n0
 
@@ -272,8 +308,14 @@ tasks:
 
       errs = [i for i in range(ERRORS) if i not in got]
       slow = [i for i in range(ERRORS, ERRORS + SLOW) if i not in got]
+      sent = (s1 - s0) / max(placed, 1)
+      missed = errs + slow
+      if missed and sent < 1.0 and all(i in HIDDEN for i in missed):
+          no(f"{len(missed)} of the orders ledger failed or stalled are in no trace (order probe-{tag}-{missed[0]}),",
+             "while every order whose body said 'declined' or 'slow' is: checkout keeps a trace by what",
+             "the request says when it starts, and a failure further down says nothing there. The",
+             f"Collector received {sent:.2f} spans per order, where a whole order is two.")
       if errs:
-          sent = (s1 - s0) / max(placed, 1)
           if sent < 1.0:
               no(f"{len(errs)} of the {ERRORS} declined orders the check placed are in no trace (order",
                  f"probe-{tag}-{errs[0]}). The Collector received {sent:.2f} spans per order, where a whole",
@@ -283,6 +325,11 @@ tasks:
              f"probe-{tag}-{errs[0]}), although every span reached the Collector. Its traces pipeline",
              "has to keep every trace with an error in it.")
       if slow:
+          if sent < 1.0:
+              no(f"{len(slow)} of the {SLOW} orders the check made take 600ms are in no trace (order",
+                 f"probe-{tag}-{slow[0]}). The Collector received {sent:.2f} spans per order, where a whole",
+                 "order is two: checkout drops most traces when the request starts, before anyone knows",
+                 "it will be slow.")
           no(f"{len(slow)} of the {SLOW} orders the check made take 600ms are in no trace (order",
              f"probe-{tag}-{slow[0]}). Every trace over 500ms has to be kept.")
 

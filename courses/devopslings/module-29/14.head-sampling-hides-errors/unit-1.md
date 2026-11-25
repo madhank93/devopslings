@@ -61,8 +61,10 @@ the rest, so the stored volume stays under 5% of orders.
 
 ## What you're being graded on
 
-While checkout's customers keep ordering, the check places 8 declined
-orders and 5 that take 600 ms. Then:
+While checkout's customers keep ordering, the check places 8 orders that
+fail and 5 that take 600 ms. For half of them the body says so (`"card":
+"declined"`, `"slow": true`); for the rest ledger fails or stalls, which
+nothing knows when the request starts. Then:
 
 - all 13 are in Tempo (the check waits up to 90 s for the sampling decision)
 - the checkout traces stored while it ran are at most 5% of the customers'
