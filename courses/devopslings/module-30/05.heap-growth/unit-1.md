@@ -36,8 +36,9 @@ memleak -p "$pid" 10 3
 
 That prints every 10 seconds, three times. An allocation site whose
 outstanding total keeps climbing from one report to the next is the leak. A
-site that is large and steady is just memory in use — the table itself is
-one.
+site that is large and steady is just memory in use. Only allocations made
+after memleak attaches are tracked, so the table, filled at startup, does not
+appear.
 
 The stack reads innermost first: the allocator (`malloc`, `strdup`) at the
 top, then the function that called it, then its caller. The allocation site
