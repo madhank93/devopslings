@@ -136,14 +136,17 @@ tasks:
         echo "         dropping packets — the qdisc — and where it sat."
         exit 1
       fi
-      if ! printf '%s' "$cause" | grep -Eq '\b(fx-rates|namespace|netns|eth0)\b' \
-         && printf '%s' "$cause" | grep -Eq '\b(pay-fx|host)\b'; then
+      # "not the host" / "not pay-fx" rules a place out; drop it before placing.
+      where=$(printf '%s' "$cause" | sed -E 's/\bnot (on |in )?(the )?(host|pay-fx)\b//g')
+      if printf '%s' "$where" | grep -Eq '\bpay-fx\b' \
+         || { printf '%s' "$where" | grep -Eq '\bhost\b' \
+              && ! printf '%s' "$where" | grep -Eq '\b(fx-rates|namespace|netns)\b'; }; then
         echo "not yet: cause says '$cause', but the qdisc was not there —"
         echo "         tc qdisc show dev pay-fx shows no netem. pay-fx is the host end of"
         echo "         the veth; look at the other end, inside the namespace."
         exit 1
       fi
-      if ! printf '%s' "$cause" | grep -Eq '\b(fx-rates|namespace|netns|eth0)\b'; then
+      if ! printf '%s' "$where" | grep -Eq '\b(fx-rates|namespace|netns)\b'; then
         echo "not yet: cause says '$cause' but not where. Name the interface and the"
         echo "         namespace the qdisc was on."
         exit 1
