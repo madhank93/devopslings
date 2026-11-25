@@ -18,6 +18,11 @@ ingester:
   trace_idle_period: 2s
   max_block_duration: 1m
 
+compactor:
+  compaction:
+    # Blocks live on a tmpfs inside the memory limit; drop them before they fill it.
+    block_retention: 6h
+
 storage:
   trace:
     backend: local
