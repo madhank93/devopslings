@@ -253,8 +253,9 @@ tasks:
       agent = subprocess.Popen(
           ["bpftrace", "-e", "tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }"],
           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-      attached = False
+      attached, seen = False, []
       for line in agent.stdout:
+          seen.append(line.rstrip())
           if "Attaching" in line:
               attached = True
               break
@@ -264,14 +265,17 @@ tasks:
           agent.communicate(timeout=10)
       except subprocess.TimeoutExpired:
           agent.kill()
-      if g_on and not (g_on / 2 <= on <= g_on * 2):
+      if not attached or not g_off or not g_on:
+          no("the grader could not measure syscall-bench with and without the stand-in",
+             "agent, so overhead cannot be checked. bpftrace said:",
+             *(seen[-6:] or ["(nothing)"]))
+      if not (g_on / 2 <= on <= g_on * 2):
           no(f"overhead's on={on:.0f}, and syscall-bench with the stand-in agent attached",
              f"just ran at {g_on:.0f} syscalls/s. Measure with the agent attached.")
-      if g_off and g_on:
-          g_pct = (g_off - g_on) / g_off * 100
-          if abs(g_pct - pct) > 12:
-              no(f"overhead says {pct:g}%; the grader just measured {g_pct:.0f}% with the same",
-                 "benchmark and agent. Measure off and on back to back, on this box.")
+      g_pct = (g_off - g_on) / g_off * 100
+      if abs(g_pct - pct) > 12:
+          no(f"overhead says {pct:g}%; the grader just measured {g_pct:.0f}% with the same",
+             "benchmark and agent. Measure off and on back to back, on this box.")
       if pct < 5:
           no(f"overhead says {pct:g}%. A program on every syscall costs far more than that",
              "on a syscall-only benchmark — check the agent was attached while the",
