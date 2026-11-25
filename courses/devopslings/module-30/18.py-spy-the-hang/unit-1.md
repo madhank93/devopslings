@@ -61,11 +61,14 @@ what it already holds.
    reconciler_waits_for=<lock name>
    ```
 
-2. Fix `/opt/settle/worker.py` so it cannot deadlock.
+2. Fix `/opt/settle/worker.py` so it cannot deadlock: make both threads take
+   the two locks in one order. An outer lock around both, or a try-lock that
+   backs off, also prevents this deadlock, but the check expects the lock order.
 
 ## What you're being graded on
 
-The check reads your answer, then stress-tests `/opt/settle/worker.py`: 2000
+The check reads your answer, checks that `settle_one` and `reconcile_one`
+take the locks in the same order, then stress-tests `/opt/settle/worker.py`: 2000
 rounds per thread, back to back, which deadlocks the original within a few
 hundred. Every round must complete, and the reconciler must never catch the
 balances out of step: money that is debited and not yet credited looks
