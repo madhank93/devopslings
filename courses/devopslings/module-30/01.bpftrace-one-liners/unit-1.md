@@ -71,8 +71,8 @@ the way out: `sys_exit`'s `args->ret`. Negative returns are errors.
 <details>
 <summary>Hint 3 — timing one call</summary>
 
-Store `nsecs` in a map keyed by `tid` on enter, subtract on exit, delete the
-key. `max()` keeps the largest.
+Store `nsecs` in a map keyed by the thread (`curtask->pid`) on enter,
+subtract on exit, delete the key. `max()` keeps the largest.
 
 </details>
 
@@ -145,15 +145,16 @@ to get a per-second line.
 **How long the slowest read takes.** Two probes and a map in between:
 
 ```
-tracepoint:raw_syscalls:sys_enter /args->id == 0 && comm == "tailer"/ { @start[tid] = nsecs; }
-tracepoint:raw_syscalls:sys_exit /args->id == 0 && @start[tid]/ { @max_ns = max(nsecs - @start[tid]); delete(@start[tid]); }
+tracepoint:raw_syscalls:sys_enter /args->id == 0 && comm == "tailer"/ { @start[curtask->pid] = nsecs; }
+tracepoint:raw_syscalls:sys_exit /args->id == 0 && @start[curtask->pid]/ { @max_ns = max(nsecs - @start[curtask->pid]); delete(@start[curtask->pid]); }
 END { clear(@start); }
 ```
 
 The exit filter ties an exit to the read that started the clock: the same
-syscall number, on a thread with a pending start time. Leaving out
-`args->id == 0` looks harmless and is not, on this box. `tailer` has a second
-thread that writes to the pipe, and bpftrace running inside a container may
+syscall number, on a thread with a pending start time. `END { clear(@start); }`
+stops bpftrace printing the leftover timestamps when you stop it.
+
+Why `curtask->pid` and not bpftrace's `tid`: inside a container, bpftrace may
 print
 
 ```
@@ -162,11 +163,12 @@ Additional Info - helper: get_ns_current_pid_tgid, retcode: -22
 ```
 
 That is bpftrace failing to translate thread IDs into the container's PID
-namespace. Its `tid` then comes back as the process ID, the same for both
-threads, and the writer's `write` and `nanosleep` exits end the reader's
-timing after a few milliseconds. Matching the exit on the syscall number makes
-the program correct whatever `tid` turns out to be. `END { clear(@start); }` stops bpftrace printing the leftover
-timestamps when you stop it.
+namespace. `tid` and `pid` then come back as 0 for every process outside the
+box, and on some boots for the box's own threads too. Keyed on `tid`, tailer's
+start time then shares key 0 with every other process on the kernel, and any
+of their `read`s returning ends tailer's timing. `curtask->pid` is the
+kernel's own thread ID, read straight from the task, and tells threads apart
+in any namespace. On a plain host `tid` works too.
 
 `tailer` reads a pipe two bytes at a time, so most of its reads return in
 microseconds. Once a second the writer pauses, and one read waits the whole
@@ -198,8 +200,8 @@ tracepoint:raw_syscalls:sys_enter
 tracepoint:raw_syscalls:sys_exit /args->id == 0 && args->ret > 0/ { @[comm] = sum(args->ret); }
 
 # q4.bt
-tracepoint:raw_syscalls:sys_enter /args->id == 0 && comm == "tailer"/ { @start[tid] = nsecs; }
-tracepoint:raw_syscalls:sys_exit /args->id == 0 && @start[tid]/ { @max_ns = max(nsecs - @start[tid]); delete(@start[tid]); }
+tracepoint:raw_syscalls:sys_enter /args->id == 0 && comm == "tailer"/ { @start[curtask->pid] = nsecs; }
+tracepoint:raw_syscalls:sys_exit /args->id == 0 && @start[curtask->pid]/ { @max_ns = max(nsecs - @start[curtask->pid]); delete(@start[curtask->pid]); }
 END { clear(@start); }
 ```
 

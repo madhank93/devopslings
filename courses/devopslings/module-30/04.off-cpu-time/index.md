@@ -262,7 +262,9 @@ tasks:
       fi
       # Requests must still synchronise with the refresher: dropping the lock
       # from handle_quote also removes the wait, by racing the copy. Requests
-      # run on the main thread (tid == pid), so count that thread's lock calls.
+      # run on the main thread, so count that thread's lock calls. bpftrace's
+      # pid/tid can read 0 inside the box; curtask->pid == curtask->tgid holds
+      # for the main thread in any namespace.
       pid=$(systemctl show -P MainPID quotes.service)
       libc=$(awk '/libc\.so\.6$/ {print $6; exit}' "/proc/$pid/maps")
       lockout=$(mktemp)
@@ -271,7 +273,7 @@ tasks:
         uprobe:$libc:pthread_mutex_lock,
         uprobe:$libc:pthread_rwlock_rdlock,
         uprobe:$libc:pthread_spin_lock
-        /pid == $pid && tid == $pid/ { @n = count(); }" > "$lockout" 2>&1 &
+        /comm == \"quotes\" && curtask->pid == curtask->tgid/ { @n = count(); }" > "$lockout" 2>&1 &
       bt=$!
       # BEGIN fires once every probe is attached; "Attaching" prints before that.
       for _ in $(seq 60); do

@@ -374,9 +374,13 @@ tasks:
         echo "         q4.bt; nothing in its output is near that. Its output:"
         tail -n 6 /var/lib/busy/q4.out | sed 's/^/         /'
         echo "         Time read() from enter to exit for comm == \"tailer\" only, and"
-        echo "         keep the largest with max(). Filter the exit on read's syscall"
-        echo "         number too: tailer has a writer thread whose exits would end the"
-        echo "         timing early."
+        echo "         keep the largest with max(), and filter the exit on read's syscall"
+        echo "         number too."
+        if grep -Eq '(^|[^>[:alnum:]_])(tid|pid)\b' "$dir/q4.bt"; then
+          echo "         q4.bt uses bpftrace's tid/pid. Inside this box they can read 0"
+          echo "         (get_ns_current_pid_tgid, retcode: -22), and when tailer's do, any"
+          echo "         process's read ends its timing. Key on curtask->pid instead."
+        fi
         cpu0_note q4
         exit 1
       fi
