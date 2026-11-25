@@ -60,6 +60,9 @@ the whole shape, not the top bucket. Then find whose I/O is in the slow part:
   land in the slow range, while the compactor completes its snapshots on time
 - the compactor's snapshot size and interval are unchanged, neither program is
   edited, and the host-wide `vm.dirty_*` sysctls are untouched
+- the snapshot still lands on the ledger volume, and the volume is still the
+  same direct-I/O loop device — moving the burst somewhere the histogram cannot
+  see it is not a fix
 
 <details>
 <summary>Hint 1 — reading a bimodal histogram</summary>

@@ -191,7 +191,7 @@ tasks:
       import re, sys
       def no(msg):
           print(msg)
-          no(1)
+          sys.exit(1)
       text, plo, phi, vlo = sys.argv[1], *map(int, sys.argv[2:])
       m = re.search(r"([0-9.]+)\s*(?:-|–|->|to)\s*([0-9.]+)\s*(us|usecs?|µs|ms|msecs?)\b", text)
       if not m:
@@ -209,6 +209,9 @@ tasks:
                    "         histogram, past the near-empty buckets." % (fmt(lo), fmt(hi)))
       if lo > phi * 2:
           no("second-mode is %s-%s, above where the slow writes land." % (fmt(lo), fmt(hi)))
+      if hi > phi * 4:
+          no("second-mode is %s-%s: the slow writes stop well below %s. Name the\n"
+                   "         buckets they fill, not a span that covers them." % (fmt(lo), fmt(hi), fmt(hi)))
       if lo < vlo / 2:
           no("second-mode starts at %s, inside the main hump. Name the slow mode's\n"
                    "         own range, from where the gap ends." % fmt(lo))
@@ -230,7 +233,7 @@ tasks:
         fi
         exit 1
       fi
-      if ! printf '%s' "$cause" | grep -Eq '\b(fsync\w*|flush\w*|burst\w*|sync\w*|writeback|snapshots?|batch\w*)\b'; then
+      if ! printf '%s' "$cause" | grep -Eq '\b(fsync\w*|flush\w*|burst\w*|sync\w*|writeback)\b'; then
         echo "not yet: cause names the compactor and not what it does that hurts:"
         echo "         how does its snapshot reach the disk?"
         exit 1
@@ -269,8 +272,23 @@ tasks:
         fi
       done
 
-      # ---- a fresh histogram -------------------------------------------------
+      # ---- the snapshot still lands on the ledger volume, through its queue ---
       dev=$(basename "$(findmnt -no SOURCE /srv/ledger)")
+      if [ -L /srv/ledger/metrics ] || [ -L /srv/ledger/metrics/snapshot ] \
+         || [ "$(stat -c %d /srv/ledger/metrics/snapshot 2>/dev/null)" != "$(stat -c %d /srv/ledger)" ]; then
+        echo "not yet: /srv/ledger/metrics/snapshot is no longer on the ledger volume. Moving"
+        echo "         it to tmpfs or another disk hides the burst from $dev, and a snapshot"
+        echo "         in memory is not durable. It has to stay where it was."
+        exit 1
+      fi
+      if [ "$(cat "/sys/block/$dev/loop/dio" 2>/dev/null)" != 1 ]; then
+        echo "not yet: /srv/ledger is no longer on a direct-I/O loop device ($dev). The"
+        echo "         volume stands in for a disk; turning direct I/O off puts the host's"
+        echo "         page cache in front of it and hides the queue, not the burst."
+        exit 1
+      fi
+
+      # ---- a fresh histogram -------------------------------------------------
       before=$(wc -l < /var/log/metrics-compactor.log 2>/dev/null || echo 0)
       out=$(mktemp)
       timeout -s INT 33 biolatency -d "$dev" > "$out" 2>&1 || true
