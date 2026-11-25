@@ -38,10 +38,10 @@ a clock is not.
 This is module 01's `clock-skew` seen from the trace side. On real hosts the
 fix is time sync: `chronyc tracking` shows the offset, `chronyc makestep`
 steps the clock, and a working NTP source keeps it there. In this lab the
-hosts are emulated: `/obs/hosts/<host>/clock-offset` holds how far a host's
-clock is off, in seconds, and writing `0` there is `chronyc makestep`.
-Measure from a trace before you look there — the answer is graded on the
-trace's number.
+hosts are emulated (`/obs/apps/svc.py`): a host whose time sync broke has an
+`/obs/hosts/<host>/unsynced` file, its clock lives on that host alone, and
+`touch /obs/hosts/<host>/makestep` is `chronyc makestep`. From outside the
+host, the trace is how you measure how far off it is.
 
 Some tracing tools "fix" this display by shifting child spans to fit inside
 their parent, and the Collector can rewrite timestamps too. Both hide the
@@ -52,14 +52,15 @@ and certificate check it touches.
 
 1. In `/obs/answers/clock-skew.txt`: the cause, the host, and the offset you
    measured from a trace, in milliseconds.
-2. Fix the host's clock so its offset is under 1 ms, and leave the other
-   hosts' clocks right.
+2. Step the host's clock back to true, and leave the other hosts' clocks
+   right.
 
 ## What you're being graded on
 
 - `cause` names the clock; `host` is the skewed host; `offset_ms` is within
   150 ms of the real offset (either sign)
-- every host's clock offset is under 1 ms
+- ledger's clock has been stepped, and the other hosts' clocks are left
+  right
 - in a fresh trace through all three services, each cross-host child span
   starts and ends inside its parent
 
@@ -78,7 +79,8 @@ three traces; the number should not move.
 
 A `transform` processor could add seconds to ledger's spans. It would have
 to know the offset, which drifts on a real host, and every other signal
-ledger emits would still be off. The check reads the host's clock.
+ledger emits would still be off. The check asks whether ledger's clock was
+stepped.
 
 </details>
 
@@ -98,7 +100,7 @@ offset_ms: -3217     # your number: ledger span start minus checkout client span
 Step the clock:
 
 ```
-echo 0 > /obs/hosts/ledger/clock-offset
+touch /obs/hosts/ledger/makestep
 ```
 
 New traces nest. Old ones stay wrong: their timestamps were written by a
@@ -111,10 +113,8 @@ also find out why time sync stopped — a blocked UDP 123, a disabled
 - **Debugging propagation.** Parent and trace ids are right; only the times
   are off, and only on one host.
 - **Shifting ledger's spans in the Collector or the SDK.** The traces look
-  fine and the host clock is still wrong; the check reads the clock.
+  fine and the host clock is still wrong.
 - **Setting the other hosts to match ledger.** Spans nest, and now every
   host is wrong.
-- **Getting close.** An offset of 50 ms still puts ledger's span outside a
-  parent that lasts a few milliseconds; the bound is 1 ms.
 
 </details>

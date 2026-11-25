@@ -23,15 +23,14 @@ tasks:
       mkdir -p /obs/data
       . /usr/local/lib/obs.sh
       mkdir -p /obs/hosts/checkout /obs/hosts/ledger /obs/hosts/fulfil /obs/data
-      skew=$(python3 -c 'import random; print(f"-{random.uniform(2.2, 4.8):.3f}")')
-      echo "$skew" > /obs/hosts/ledger/clock-offset
-      echo "$skew" > /obs/data/clock-skew.truth
+      cat /proc/sys/kernel/random/uuid > /obs/hosts/ledger/unsynced
       cat > /obs/apps/svc.py <<'PY'
       """A small traced HTTP service: serve(name, work, calls) answers POST on
       :8080, spends `work` seconds in a child span, then calls each URL in
       `calls` in turn. Spans go to the Collector over OTLP/HTTP.
       """
       import json
+      import os
       import random
       import threading
       import time
@@ -44,8 +43,44 @@ tasks:
       from opentelemetry.sdk.trace import TracerProvider
       from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+      import hostclock
+
+
+      def unsynced_clock(host):
+          """Emulates a host whose time sync broke. While /obs/hosts/<host>/unsynced
+          exists, the host's wall clock is off by a few seconds. The offset lives on
+          the host alone (its own /tmp), so it survives restarts and nothing outside
+          the host can read it. Touching /obs/hosts/<host>/makestep steps the clock
+          back, as `chronyc makestep` does; removing `unsynced` resyncs it too.
+          """
+          flag, step, local = f"/obs/hosts/{host}/unsynced", f"/obs/hosts/{host}/makestep", "/tmp/clock-offset"
+          try:
+              incident = open(flag).read().strip()
+          except OSError:
+              return
+          try:
+              seen = open(local).read().split()[1]
+          except (OSError, IndexError):
+              seen = None
+          if seen != incident:
+              with open(local, "w") as f:
+                  f.write(f"-{random.uniform(2.2, 4.8):.3f} {incident}\n")
+          hostclock._path = local
+          hostclock._state["checked"] = -2.0
+
+          def watch():
+              while True:
+                  if os.path.exists(step) or not os.path.exists(flag):
+                      with open(local, "w") as f:
+                          f.write(f"0 {incident}\n")
+                      return
+                  time.sleep(0.5)
+
+          threading.Thread(target=watch, daemon=True).start()
+
 
       def serve(name, route, work, calls=(), customers=False):
+          unsynced_clock(name)
           provider = TracerProvider(resource=Resource.create({"service.name": name}))
           provider.add_span_processor(BatchSpanProcessor(
               OTLPSpanExporter(endpoint="http://collector:4318/v1/traces"), schedule_delay_millis=500))
@@ -110,6 +145,11 @@ tasks:
       offset_ms: ?   # how far off, in milliseconds, as you measured it from a trace
       TXT
       for a in ledger fulfil checkout; do app_restart "$a"; app_up "$a"; done
+      # The check reads the real offset from this first trace.
+      tid=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')
+      curl -sf --retry 30 --retry-connrefused --retry-all-errors --retry-delay 1 -o /dev/null -X POST -d '{}' -H "traceparent: 00-$tid-$(od -An -tx1 -N8 /dev/urandom | tr -d ' \n')-01" \
+        http://checkout:8080/checkout
+      echo "$tid" > /obs/data/clock-skew.trace
       echo "scenario ready: checkout takes an order every second or so, calls ledger, then fulfil."
       echo "Each app runs on a host of its own name. Spans go through the Collector to Tempo."
       echo "  curl -s 'http://tempo:3200/api/search?q={name=\"POST /checkout\"}&limit=3' | jq -r '.traces[].traceID'"
@@ -138,10 +178,38 @@ tasks:
           except OSError:
               return []
 
+      def trace_spans(tid):
+          spans = []
+          try:
+              with urllib.request.urlopen(f"{TEMPO}/api/traces/{tid}", timeout=10) as r:
+                  for b in json.load(r).get("batches", []):
+                      svc = next((a["value"].get("stringValue") for a in b.get("resource", {}).get("attributes", [])
+                                  if a["key"] == "service.name"), "?")
+                      spans += [dict(s, svc=svc) for ss in b.get("scopeSpans", []) for s in ss.get("spans", [])]
+          except urllib.error.HTTPError as e:
+              if e.code != 404:
+                  no(f"Tempo answered {e.code} for trace {tid}.")
+          except OSError as e:
+              no(f"Tempo did not answer ({e}).")
+          return spans
+
+      # The real offset is the skew in the trace the lesson sent at its start.
       try:
-          truth = abs(float(open("/obs/data/clock-skew.truth").read())) * 1000
-      except (OSError, ValueError):
-          no("/obs/data/clock-skew.truth is gone. Reset the lesson.")
+          first = open("/obs/data/clock-skew.trace").read().strip()
+      except OSError:
+          no("/obs/data/clock-skew.trace is gone. Reset the lesson.")
+      deadline = time.time() + 25
+      while True:
+          spans = trace_spans(first)
+          by_id = {s["spanId"]: s for s in spans}
+          skews = [(int(s["startTimeUnixNano"]) - int(by_id[s["parentSpanId"]]["startTimeUnixNano"])) / 1e6
+                   for s in spans if s["svc"] == "ledger" and by_id.get(s.get("parentSpanId"), {}).get("svc") == "checkout"]
+          if skews or time.time() > deadline:
+              break
+          time.sleep(2)
+      if not skews:
+          no(f"Tempo no longer has the trace the lesson started with ({first}). Reset the lesson.")
+      truth = abs(skews[0])
 
       def field(name):
           try:
@@ -178,13 +246,16 @@ tasks:
               v = float(open(f"/obs/hosts/{h}/clock-offset").read().split()[0]) * 1000
           except (OSError, ValueError, IndexError):
               v = 0.0
+          if abs(v) >= BOUND_MS and h == "ledger":
+              no(f"/obs/hosts/ledger/clock-offset holds {v:+.0f}ms. Adding a second offset on top of a",
+                 "wrong clock does not fix it: step ledger's clock (/obs/hosts/ledger/makestep) and put",
+                 "that file back to 0.")
           if abs(v) >= BOUND_MS:
-              if h == "ledger":
-                  no(f"ledger's host clock is still {v:+.0f}ms off (/obs/hosts/ledger/clock-offset). Whatever",
-                     "the traces show now, every timestamp that host writes — logs, tokens, certificates,",
-                     f"span times — is still wrong. Its offset has to be under {BOUND_MS:.0f}ms.")
-              no(f"{h}'s host clock is now {v:+.0f}ms off. Moving the other hosts to agree with ledger makes",
-                 "the spans nest and every one of those clocks wrong. Put them back to 0.")
+              no(f"{h}'s host clock is now {v:+.0f}ms off (/obs/hosts/{h}/clock-offset). Moving hosts to",
+                 "agree with ledger makes the spans nest and every one of those clocks wrong. Put it back to 0.")
+      if os.path.exists("/obs/hosts/ledger/unsynced") and not os.path.exists("/obs/hosts/ledger/makestep"):
+          no("ledger's host clock has not been stepped. Whatever the traces show, every timestamp that",
+             "host writes — logs, tokens, certificates, span times — is still wrong.")
 
       def started(app):
           try:
@@ -193,8 +264,9 @@ tasks:
               return 0
 
       # supervise restarts an edited app within half a second; until then
-      # .started still holds the previous start.
-      time.sleep(1)
+      # .started still holds the previous start. A stepped clock reaches the
+      # app within 1.5s.
+      time.sleep(2)
       time.sleep(max(0, max(started(a) for a in HOSTS + ("collector",)) + 3 - time.time()))
       tid = os.urandom(16).hex()
       try:
@@ -205,18 +277,7 @@ tasks:
 
       deadline = time.time() + 25
       while True:
-          spans = []
-          try:
-              with urllib.request.urlopen(f"{TEMPO}/api/traces/{tid}", timeout=10) as r:
-                  for b in json.load(r).get("batches", []):
-                      svc = next((a["value"].get("stringValue") for a in b.get("resource", {}).get("attributes", [])
-                                  if a["key"] == "service.name"), "?")
-                      spans += [dict(s, svc=svc) for ss in b.get("scopeSpans", []) for s in ss.get("spans", [])]
-          except urllib.error.HTTPError as e:
-              if e.code != 404:
-                  no(f"Tempo answered {e.code} for trace {tid}.")
-          except OSError as e:
-              no(f"Tempo did not answer ({e}).")
+          spans = trace_spans(tid)
           if {s["svc"] for s in spans} >= set(HOSTS) or time.time() > deadline:
               break
           time.sleep(2)
