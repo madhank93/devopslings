@@ -114,6 +114,15 @@ tasks:
       if not any(kind(p) == "tail_sampling" for p in gp):
           no("gateway.yaml has no tail_sampling processor in its traces pipeline. The budget is every",
              "error trace and 5% of the rest, and only a tail sampler can know a trace had an error.")
+      ts = next(((gw.get("processors") or {}).get(p) or {} for p in gp if kind(p) == "tail_sampling"), {})
+      pols = yaml.safe_dump(ts.get("policies") or [])
+      if not re.search(r"status_code", pols) or "ERROR" not in pols:
+          no("gateway.yaml's tail_sampling has no status_code policy for ERROR. The budget keeps",
+             "every error trace.")
+      pct = [float(x) for x in re.findall(r"sampling_percentage:\s*([\d.]+)", pols)]
+      if "always_sample" in pols or not pct or not all(2 <= x <= 10 for x in pct):
+          no("gateway.yaml's tail_sampling does not keep about 5% of the other traces: the budget",
+             "is every error trace plus 5% of the rest, a probabilistic policy near 5.")
       lb = [e for e in ae if kind(e) == "loadbalancing"]
       if not lb:
           hosts = " ".join(str((agent.get("exporters") or {}).get(e)) for e in ae)
@@ -129,22 +138,36 @@ tasks:
              "every span of a trace on one gateway: route by traceID.")
       static = str(((cfg.get("resolver") or {}).get("static") or {}).get("hostnames"))
       want = [f"gateway-{i}.obs.internal" for i in (1, 2, 3)]
-      if not all(h in static for h in want) and "dns" not in (cfg.get("resolver") or {}):
+      dns = str(((cfg.get("resolver") or {}).get("dns") or {}).get("hostname", ""))
+      if not all(h in static for h in want) and (not dns or "gateway.obs.internal" in dns):
           no("the agents' loadbalancing exporter does not list the three gateways",
              f"({', '.join(want)}). Routing through the load balancer's name puts every trace on",
              "whichever gateway the connection landed on.")
 
       # Redaction: on the host, before anything leaves the PCI segment.
-      def mentions(c, procs, *keys):
-          text = " ".join(yaml.safe_dump((c.get("processors") or {}).get(p)) for p in procs
-                          if kind(p) in ("attributes", "redaction", "transform"))
-          return all(k in text for k in keys)
-      if not mentions(agent, ap, "card_number", "email"):
-          if mentions(gw, gp, "card_number", "email"):
+      KEYS = ("payment.card_number", "user.email")
+      def removes(cfg, key):
+          if kind(cfg[0]) == "attributes":
+              return any(a.get("key") == key and a.get("action") in ("delete", "hash")
+                         for a in (cfg[1].get("actions") or []))
+          if kind(cfg[0]) == "redaction":
+              if any(re.search(str(p), key) for p in cfg[1].get("blocked_key_patterns") or []):
+                  return True
+              return not cfg[1].get("allow_all_keys") and key not in (cfg[1].get("allowed_keys") or [])
+          if kind(cfg[0]) == "transform":
+              return any(key in l and re.search(r"delete_key|delete_matching_keys|SHA\d+|replace_", l)
+                         for l in yaml.safe_dump(cfg[1]).splitlines())
+          return False
+      def mentions(c, procs):
+          cfgs = [(p, (c.get("processors") or {}).get(p) or {}) for p in procs]
+          return all(any(removes(cfg, k) for cfg in cfgs) for k in KEYS)
+      if not mentions(agent, ap):
+          if mentions(gw, gp):
               no("the gateway removes payment.card_number and user.email. The gateways run outside the PCI",
                  "segment, so the card numbers have already left it by the time they are removed.")
           no("agent.yaml does not remove or hash payment.card_number and user.email in its traces",
-             "pipeline (an attributes, redaction or transform processor that names both).")
+             "pipeline: an attributes action that deletes or hashes each, a redaction processor",
+             "whose allowed_keys leaves them out, or a transform statement that deletes or hashes them.")
 
       # Batching in both tiers.
       for name, procs in (("agent.yaml", ap), ("gateway.yaml", gp)):

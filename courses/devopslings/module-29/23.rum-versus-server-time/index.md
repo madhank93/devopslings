@@ -205,7 +205,7 @@ tasks:
       seen = field("rum_sees").lower()
       groups = {
           "the network: DNS, connection set-up and TLS, round trips":
-              r"\b(dns|tcp|tls|ssl|handshakes?|network|rtt|round[- ]trips?|connections?|latency)\b",
+              r"\b(dns|tcp|tls|ssl|handshakes?|network|rtt|round[- ]trips?)\b",
           "what the browser does with the response: parsing, script execution, rendering":
               r"\b(render(ing)?|paint(ing)?|pars(e|ing)|layout|dom|javascript|js|script execution)\b",
           "third-party resources the page loads": r"\b(third[- ]party|3rd[- ]party)\b",
@@ -217,7 +217,7 @@ tasks:
 
       inst = field("instrument").lower()
       if not re.search(r"\b(rum|real[- ]user|browser|web sdk|sdk-trace-web|opentelemetry[- ]js|performanceobserver|"
-                       r"navigation timing|resource timing|web[- ]vitals|lcp|inp|fcp|ttfb)\b", inst):
+                       r"navigation timing|resource timing|web[- ]vitals|lcp|inp|fcp)\b", inst):
           no(f"instrument is '{field('instrument')}'. More server spans cannot see any of this; say what runs",
              "in the browser and reports these timings from every real page view.")
       print(f"PASS — p75 page load {page:.0f}ms: render {phase['render']:.0f}ms, of which the render-blocking")

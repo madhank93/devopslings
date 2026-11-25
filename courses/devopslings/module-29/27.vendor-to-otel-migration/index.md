@@ -243,8 +243,12 @@ tasks:
                        field("parity_metric").lower()):
           no(f"parity_metric is '{field('parity_metric')}'. Name a number both backends can produce, such as",
              "spans per service per hour, or error rate and p99 per route.")
-      if not re.search(r"\d", field("parity_threshold")):
+      pt = re.search(r"\d+(?:\.\d+)?", field("parity_threshold"))
+      if not pt:
           no(f"parity_threshold is '{field('parity_threshold')}'. Parity is a number you can fail, like 1%.")
+      if float(pt.group()) > 10:
+          no(f"parity_threshold is '{field('parity_threshold')}'. Backends that differ by that much are not",
+             "showing the same thing; parity is a few percent at most.")
       w = field("parity_window").lower()
       m = re.search(r"(\d+(?:\.\d+)?)\s*(days?|d\b|weeks?|w\b|hours?|h\b)", w)
       if not m:

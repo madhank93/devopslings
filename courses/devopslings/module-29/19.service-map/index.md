@@ -251,6 +251,20 @@ tasks:
       if not any(x["metric"].get("client") == "checkout" and x["metric"].get("server") == "billing" for x in res):
           no("the metric query returns no series labelled client=\"checkout\", server=\"billing\". Keep",
              "the edge's labels in the result, so it says which call it is about.")
+      # The answer has to be a time: near the edge's real p95 once scaled by the
+      # unit in its name, and longer than billing -> ledger's.
+      scale = 1 if "milli" in metric else 1000
+      def val(c, s):
+          return [float(x["value"][1]) * scale for x in res
+                  if x["metric"].get("client") == c and x["metric"].get("server") == s]
+      cb, bl, true_cb = val("checkout", "billing"), val("billing", "ledger"), p95.get(("checkout", "billing"), 0)
+      if len(cb) != 1 or not (0.25 * true_cb <= cb[0] <= 2 * true_cb):
+          no(f"the metric query returns {', '.join(f'{v / scale:g}' for v in cb)} for checkout -> billing, which",
+             f"is not its latency (p95 is about {true_cb:.0f}ms). A count or a raw bucket shows traffic,",
+             "not time: ask for a quantile of the server-latency histogram, or its _sum over _count.")
+      if bl and not cb[0] > max(bl):
+          no("the metric query has billing -> ledger as slow as checkout -> billing, so it does not",
+             "show where the time goes.")
       print(f"PASS — the service graph has all four edges, and checkout -> billing (p95 {ms(('checkout', 'billing'))})")
       print(f"is the slow call: billing -> ledger answers in {ms(('billing', 'ledger'))}, so the time is billing's own.")
       PY

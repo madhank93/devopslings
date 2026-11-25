@@ -228,6 +228,9 @@ tasks:
           c = counted[b]
           if abs(c - n) > n * 0.03:
               t, fn = b.split("|")
+              if c > n:
+                  no(f"{t} in {fn}: your count, {c}, is above the {n} events Tempo holds for it. Some",
+                     "events were counted more than once, for example by two searches that overlap.")
               no(f"{t} in {fn}: your count, {c}, is more than 3% from the number of events Tempo",
                  "holds for it. A search returns 20 traces unless you ask for more (limit=), and one",
                  "span per trace unless you ask for more (spss=).")

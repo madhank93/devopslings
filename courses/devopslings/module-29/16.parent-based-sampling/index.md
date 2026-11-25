@@ -149,8 +149,16 @@ tasks:
           except OSError as e:
               no(f"Tempo did not answer a search ({e}).")
 
+      def tail(path):
+          try:
+              return open(path, errors="replace").readlines()[-3:]
+          except OSError:
+              return ["(no log)"]
+
       time.sleep(1.5)
       since = max(started("checkout"), started("ledger")) + 3
+      # A short window keeps both searches under Tempo's 500-trace limit.
+      since = max(since, int(time.time()) - 30)
       time.sleep(max(0, since + 25 - time.time()))
       until = int(time.time()) - 5
 
@@ -159,7 +167,7 @@ tasks:
       if len(chk) < 5:
           no(f"Tempo holds {len(chk)} checkout traces from the last {until - since}s; checkout traces",
              "about one order in five, so there should be a dozen or more. Is it running? The end of",
-             "/obs/logs/checkout.log:", *["  " + l.rstrip()[:200] for l in open("/obs/logs/checkout.log").readlines()[-3:]])
+             "/obs/logs/checkout.log:", *["  " + l.rstrip()[:200] for l in tail("/obs/logs/checkout.log")])
       orphans = [t for t in led if t.get("rootServiceName") != "checkout"]
       if orphans:
           no(f"{len(orphans)} of the {len(led)} traces with a ledger span in them have no checkout span",

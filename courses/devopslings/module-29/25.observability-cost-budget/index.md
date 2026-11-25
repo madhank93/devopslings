@@ -152,6 +152,11 @@ tasks:
       if series < 1200000:
           no(f"max_series is {series:,.0f}. The fleet has 1,200,000 series that dashboards and alerts",
              "use (REQUIREMENTS.md, 4); a limit under that drops some of them at random.")
+      if 1320000 < series < 3000000:
+          no(f"max_series is {series:,.0f}. That only fits if user_id is dropped, and then the fleet has",
+             "1,200,000 series; with user_id kept it has 3,000,000, and the limit drops the rest at",
+             "random, dashboard and alert series included (REQUIREMENTS.md, 4). Size the limit for",
+             "one or the other.")
 
       # The arithmetic.
       kept = 6000 * (0.02 + 0.98 * pct / 100)

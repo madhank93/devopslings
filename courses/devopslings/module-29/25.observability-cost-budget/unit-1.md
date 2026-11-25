@@ -101,6 +101,8 @@ retention for capacity planning, whichever question the teams ask more.
 - **Metrics under 28 days.** An SLO over a window you cannot see.
 - **A series limit under 1.2M.** The limit drops series at random,
   including ones an alert depends on. Remove the label instead.
+- **A limit between 1.2M and 3M.** With `user_id` still on, the fleet
+  emits 3M series, and the limit drops the excess at random, the same way.
 - **"We lose some visibility."** That is not a question anyone can check
   against. Name the question.
 
