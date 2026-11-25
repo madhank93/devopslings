@@ -85,7 +85,6 @@ tasks:
       def connect():
           return sqlite3.connect("file:/obs/data/shop.db?mode=ro", uri=True, factory=Connection)
       DRIVER
-      cp /obs/apps/shopdb.py /obs/data/.shopdb.py
       cat > /obs/apps/checkout.py <<'PY'
       """checkout — the order page API on :8080. GET /orders/<id> returns the
       order with every line item. Data lives in the shop database.
@@ -197,8 +196,47 @@ tasks:
   verify_done:
     timeout_seconds: 150
     run: |
+      # shopdb stands for the network to the database and counts the queries
+      # the check grades, so the check puts back the lesson's copy (identical
+      # to the one init writes) before it restarts checkout.
+      cat > /obs/apps/shopdb.py <<'DRIVER'
+      """shopdb — the client for the shop database, which runs on another host:
+      every statement is a round trip that costs about a millisecond on the
+      network, whatever the query. Part of the environment, not of checkout.
+      While /obs/run/shopdb.count exists, each statement appends its trace id
+      there: the database's own count of the queries a request made.
+      """
+      import os
+      import sqlite3
+      import time
+
+      from opentelemetry import trace
+
+      COUNT = "/obs/run/shopdb.count"
+
+
+      class Cursor(sqlite3.Cursor):
+          def execute(self, *args):
+              time.sleep(0.001)
+              if os.path.exists(COUNT):
+                  with open(COUNT, "a") as f:
+                      f.write(f"{trace.get_current_span().get_span_context().trace_id:032x}\n")
+              return super().execute(*args)
+
+
+      class Connection(sqlite3.Connection):
+          def cursor(self, factory=Cursor):
+              return super().cursor(factory)
+
+          def execute(self, *args):
+              return self.cursor().execute(*args)
+
+
+      def connect():
+          return sqlite3.connect("file:/obs/data/shop.db?mode=ro", uri=True, factory=Connection)
+      DRIVER
       python3 - <<'PY'
-      import json, os, re, shutil, sqlite3, sys, time, urllib.error, urllib.request
+      import json, os, re, sqlite3, sys, time, urllib.error, urllib.request
 
       TEMPO = "http://tempo:3200"
       ANSWER = "/obs/answers/n-plus-one.txt"
@@ -260,13 +298,26 @@ tasks:
           except (OSError, ValueError):
               return 0
 
-      # shopdb stands for the network to the database; the check counts queries
-      # through it, so it goes back to the lesson's copy before checkout restarts.
-      # A fresh start also empties any in-process cache.
-      try:
-          shutil.copy("/obs/data/.shopdb.py", "/obs/apps/shopdb.py")
-      except OSError as e:
-          no(f"the lesson's copy of shopdb.py is gone ({e}). Reset the lesson.")
+      # Every query has to cross shopdb, the only path to the database host.
+      # Scan checkout and the modules of /obs/apps it imports for a way around it.
+      src = {}
+      todo = ["checkout"]
+      while todo:
+          name = todo.pop()
+          try:
+              src[name] = open(f"/obs/apps/{name}.py").read()
+          except OSError:
+              continue
+          for m in re.finditer(r"^\s*(?:from|import)\s+([A-Za-z_]\w*)", src[name], re.M):
+              if m.group(1) not in src and m.group(1) != "shopdb":
+                  todo.append(m.group(1))
+      for name, text in src.items():
+          if re.search(r"\bsqlite3\b|shop\.db\b", text):
+              no(f"/obs/apps/{name}.py opens the shop database itself (sqlite3 / shop.db) instead of through",
+                 "shopdb.connect(). shopdb is the network to the database host: a connection that skips it",
+                 "skips the round trips the real page pays and the query count the check grades.")
+
+      # A fresh start empties any in-process cache.
       open("/obs/run/checkout.restart", "w").close()
       # supervise restarts an edited app within half a second; until then
       # .started still holds the previous start.
