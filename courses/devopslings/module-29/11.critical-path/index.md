@@ -269,15 +269,23 @@ tasks:
           headers = {"traceparent": f"00-{tid}-{os.urandom(8).hex()}-01"} if tid else {}
           t0 = time.monotonic()
           try:
-              urllib.request.urlopen(urllib.request.Request("http://checkout:8080/checkout", data=b"{}",
-                                                            headers=headers), timeout=10).read()
-          except OSError as e:
+              body = json.load(urllib.request.urlopen(urllib.request.Request(
+                  "http://checkout:8080/checkout", data=b"{}", headers=headers), timeout=10))
+          except (OSError, ValueError) as e:
               no(f"POST /checkout failed ({e}). The end of /obs/logs/checkout.log:", *tail("checkout"))
+          if not isinstance(body, dict) or body.get("recommended") != ["sku-1", "sku-2"]:
+              got = body.get("recommended") if isinstance(body, dict) else body
+              no(f"POST /checkout answered recommended={got!r}; it should still carry the",
+                 "recommendations, ['sku-1', 'sku-2']. The request has to wait for them.")
           return (time.monotonic() - t0) * 1000
 
       for _ in range(4):
           once()
       now = statistics.median(once() for _ in range(15))
+      if now < 280:
+          no(f"POST /checkout now takes {now:.0f}ms, less than the ~300ms recommendations takes on its own:",
+             "the response no longer waits for recommendations. It is the model team's call; leave it on",
+             "the request.")
       tid = os.urandom(16).hex()
       once(tid)
 
