@@ -223,6 +223,12 @@ tasks:
         exit 1
       fi
 
+      if ! kill -0 "$bt" 2>/dev/null; then
+        echo "not yet: bpftrace stopped running $w. Its output:"
+        tail -n 8 "$out" | sed 's/^/         /'
+        exit 1
+      fi
+
       # ---- loud: two reverse shells ----------------------------------------
       lp=$(python3 -c 'import random; print(random.randint(40001, 50000))')
       python3 -c "
