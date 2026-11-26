@@ -236,7 +236,7 @@ tasks:
           return sqlite3.connect("file:/obs/data/shop.db?mode=ro", uri=True, factory=Connection)
       DRIVER
       python3 - <<'PY'
-      import json, os, re, sqlite3, sys, time, urllib.error, urllib.request
+      import ast, json, os, re, sqlite3, sys, time, urllib.error, urllib.request
 
       TEMPO = "http://tempo:3200"
       ANSWER = "/obs/answers/n-plus-one.txt"
@@ -299,20 +299,33 @@ tasks:
               return 0
 
       # Every query has to cross shopdb, the only path to the database host.
-      # Scan checkout and the modules of /obs/apps it imports for a way around it.
-      src = {}
-      todo = ["checkout"]
+      # This scan only words the message for a connection of the student's own;
+      # the gate that catches any way around shopdb is a request with 0 queries.
+      def raw_access(text):
+          try:
+              tree = ast.parse(text)
+          except SyntaxError:
+              return False, []
+          docs = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant)}
+          mods = [a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
+          mods += [n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module]
+          raw = "sqlite3" in mods or any(
+              (isinstance(n, ast.Name) and n.id == "sqlite3")
+              or (isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs and "shop.db" in n.value)
+              for n in ast.walk(tree))
+          return raw, mods
+
+      seen, todo = set(), ["checkout"]
       while todo:
           name = todo.pop()
+          seen.add(name)
           try:
-              src[name] = open(f"/obs/apps/{name}.py").read()
+              text = open(f"/obs/apps/{name}.py", encoding="utf-8", errors="replace").read()
           except OSError:
               continue
-          for m in re.finditer(r"^\s*(?:from|import)\s+([A-Za-z_]\w*)", src[name], re.M):
-              if m.group(1) not in src and m.group(1) != "shopdb":
-                  todo.append(m.group(1))
-      for name, text in src.items():
-          if re.search(r"\bsqlite3\b|shop\.db\b", text):
+          raw, mods = raw_access(text)
+          todo += [m for m in mods if m not in seen and m != "shopdb"]
+          if raw:
               no(f"/obs/apps/{name}.py opens the shop database itself (sqlite3 / shop.db) instead of through",
                  "shopdb.connect(). shopdb is the network to the database host: a connection that skips it",
                  "skips the round trips the real page pays and the query count the check grades.")
