@@ -4,7 +4,8 @@ title: "checkout's p99 doubled overnight"
 
 ## The situation
 
-checkout takes orders, about thirty a second. For each one it validates
+checkout takes orders from its customers (`/obs/apps/lab.py`, in the
+`lab` container), about thirty a second. For each one it validates
 the email, asks **pricing** for a quote, and records the order with
 **ledger**. pricing asks ledger for the prices of the order's items.
 
@@ -63,8 +64,10 @@ paged someone before customers noticed.
 ## What you're being graded on
 
 - `cause` and `service` match this run's seeded cause
-- over the 30 seconds after your last change, checkout's p99 is under
-  150ms, and the cause itself is gone, not diluted
+- the grader places 30 seconds of its own orders, about thirty a second
+  (lab's customers pause meanwhile): their p99 is under 150ms, at most 1%
+  are lost (an order counts when checkout answers with its total and
+  ledger has recorded it), and the cause itself is gone, not diluted
 - `exemplar` is a checkout trace in Tempo that was over budget
 - each evidence line says what the step showed; for a CPU cause, the
   profile names the function

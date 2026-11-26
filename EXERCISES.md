@@ -2803,7 +2803,7 @@ and Pyroscope 1.14 for the profile step of `apm-triage-drill`)
 
 - **apm-triage-drill** *(deep · drill)* — checkout p99 doubled; the cause is one of
   five, drawn at random each run: an N+1 in pricing, ledger's connection pool
-  shrunk to two, a CPU-hot regex in checkout, a retry storm on a timed-out
+  shrunk to one, a CPU-hot regex in checkout, a retry storm on a timed-out
   downstream, a lock held across an HTTP call. Found by service map, spanmetrics,
   an exemplar trace and a profile. Needs Pyroscope; profiling itself is module 30's.
   *First guess:* restart checkout or scale it out.
