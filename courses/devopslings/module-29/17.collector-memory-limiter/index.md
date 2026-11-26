@@ -113,8 +113,9 @@ tasks:
       def selfmetric(name):
           try:
               text = urllib.request.urlopen("http://collector:8888/metrics", timeout=5).read().decode()
-          except OSError:
-              return 0.0
+          except OSError as e:
+              no(f"the check could not read the Collector's own metrics at collector:8888 ({e}).",
+                 "It needs them to see memory_limiter's refusals; leave service.telemetry as it was.")
           return sum(float(m) for m in re.findall(rf"^{name}(?:{{[^}}]*}})? (\S+)", text, re.M))
 
       c = yaml.safe_load(open(CFG)) or {}
@@ -138,17 +139,34 @@ tasks:
               no(f"pipeline {n} runs [{', '.join(ps)}]; batch belongs last, right before the exporter.")
 
       # The check's own burst, from a freshly started Collector.
-      subprocess.run(["bash", "-c", ". /usr/local/lib/obs.sh; app_restart collector; collector_settle"],
-                     check=True, stdout=subprocess.DEVNULL)
+      r = subprocess.run(["bash", "-c", ". /usr/local/lib/obs.sh; app_restart collector; collector_settle"],
+                         capture_output=True, text=True)
+      if r.returncode:
+          out = r.stdout.strip()
+          if out.startswith("not yet"):
+              print(out)
+              sys.exit(1)
+          no("the Collector did not settle after the check restarted it.", *(out or r.stderr).splitlines()[-3:])
       time.sleep(3)
       before, mark = started(), len(log_lines())
-      run = subprocess.run(["/obs/tools/importer", "600"], capture_output=True, text=True)
+      try:
+          run = subprocess.run(["/obs/tools/importer", "600"], capture_output=True, text=True, timeout=60)
+      except subprocess.TimeoutExpired:
+          no("the check's burst of 600 requests did not finish in 60s; it normally takes a few seconds.",
+             "The Collector is holding requests open instead of answering them.")
+      if run.returncode:
+          no("the importer itself failed during the check's burst:", *("  " + l for l in run.stderr.splitlines()[-3:]))
       print("the check's burst: " + run.stdout.strip())
       time.sleep(15)
       deaths = [l for l in log_lines()[mark:] if l.startswith("[supervise] collector exited")]
       if deaths or started() != before:
           limit = next((v for k, v in procs.items() if k.split("/")[0] == "memory_limiter"), None) or {}
-          if (limit.get("limit_mib") or 0) >= 256 or (limit.get("limit_percentage") or 0) >= 100:
+          def num(v):
+              try:
+                  return float(v or 0)
+              except (TypeError, ValueError):
+                  return 0.0
+          if num(limit.get("limit_mib")) >= 256 or num(limit.get("limit_percentage")) >= 100:
               no("the Collector died during the burst. memory_limiter's limit is at or above the",
                  "256MiB the container is allowed, so the kernel kills the process before the",
                  "limiter ever thinks memory is short.")
@@ -156,14 +174,22 @@ tasks:
              "memory_limiter is in place, but memory still outran it. Its limit sits too close to",
              "the container's 256MiB, or it checks too rarely for how fast a burst arrives:",
              "spike_limit has to cover what arrives between two checks.")
-      codes = {code: int(n) for n, code in re.findall(r"(\d+) (\d{3}|no answer)", run.stdout)}
+      codes = {}
+      for n, code in re.findall(r"(\d+) (\d{3}|no answer)", run.stdout):
+          codes[code] = codes.get(code, 0) + int(n)
+      other = {c: n for c, n in codes.items() if c not in ("200", "503", "no answer")}
+      if other:
+          no("the Collector rejected " + ", ".join(f"{n} requests with {c}" for c, n in other.items()) + ".",
+             "Those spans were never let in. memory_limiter answers 503 while memory is short;",
+             "a 4xx comes from something else, such as a receiver limit, turning the burst away.")
+      if codes.get("no answer"):
+          no(f"{codes['no answer']} of the burst's requests got no answer at all: the Collector dropped",
+             "the connection instead of replying, so the importer cannot tell whether to retry.")
       refused = selfmetric("otelcol_processor_refused_spans(?:_total)?")
-      other = {c: n for c, n in codes.items() if c not in ("200", "503")}
-      if refused == 0 and other:
-          no("the Collector turned away " + ", ".join(f"{n} with {c}" for c, n in other.items()) + ", and",
-             "memory_limiter refused nothing. Something ahead of it rejected the burst, so the spans were",
-             "never let in at all; memory_limiter answers 503 only while memory is short.")
       if refused == 0:
+          if codes.get("503"):
+              no(f"the Collector answered 503 to {codes['503']} requests, but memory_limiter's refused-spans",
+                 "counter stayed at 0, so those 503s did not come from memory_limiter.")
           dropped = selfmetric("otelcol_exporter_enqueue_failed_spans(?:_total)?")
           if dropped:
               no(f"the Collector stayed up and answered 200 to every request, then threw away",
@@ -173,8 +199,8 @@ tasks:
              "That only means the burst was smaller than its limit; the check needs to see",
              "memory_limiter push back.")
       if not codes.get("200"):
-          no("memory_limiter refused the whole burst: not one request got a 200. A limiter that",
-             "refuses everything protects the Collector by delivering nothing.")
+          no(f"not one of the burst's requests got a 200 ({codes.get('503', 0)} got 503 from memory_limiter).",
+             "A limiter that refuses everything protects the Collector by delivering nothing.")
 
       # Once the burst is over, new spans have to be accepted and reach Tempo.
       tid = "17" + os.urandom(15).hex()
