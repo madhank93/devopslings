@@ -1,10 +1,10 @@
 ---
 kind: lesson
-title: "A traceback arrives in Loki as thirty lines, and only two of them say which report"
+title: "A traceback arrives in Loki as a dozen-odd lines, and only two of them say which report"
 description: |
   reports renders PDFs on request and logs to a file, which the Collector
   tails into Loki. When a render fails, Python writes one record with the
-  whole traceback in it, and Loki gets thirty separate lines. The one that
+  whole traceback in it, and Loki gets a dozen-odd separate lines. The one that
   names the report and the one that names the error are found; the
   frames in between belong to nobody. Make each traceback one record.
 name: multiline-stack-traces
@@ -204,7 +204,7 @@ tasks:
              "The end of /obs/logs/lab.log:", *[l.rstrip()[:160] for l in open("/obs/logs/lab.log").readlines()[-4:]])
 
       # The multiline rule is only exercised by a real traceback, frames through
-      # the ValueError (Python folds the repeated render() frames into one line).
+      # the ValueError (Python folds the repeated render() frames into a marker line).
       for rid, (_, block) in truth.items():
           rows = block.split("\n")
           if len(rows) < 8 or rows[1] != "Traceback (most recent call last):" \

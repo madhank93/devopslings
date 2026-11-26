@@ -135,8 +135,8 @@ tasks:
       t0 = int(time.time()) - 3600
       OUT0, OUT1 = t0 + 600, t0 + 780
       rnd = random.Random()
-      # A reason the init history never showed: the rule has to key on failures, not on one cause.
-      CAUSE = rnd.choice(["card network unreachable", "acquirer returned 503", "3-D Secure service down"])
+      # The outage's reason varies per run, so a rule must key on failed payments, not on one cause.
+      CAUSE = f"upstream code {rnd.randrange(100, 999)}"
       pods = [f"payments-{rnd.randrange(16**6):06x}-{c}{rnd.randrange(100, 999)}" for c in "kqx"]
       streams = {p: [] for p in pods}
       events = []
@@ -170,6 +170,7 @@ tasks:
 
       STEP = 5
       pages = []   # (fire time, alert name, labels)
+      matched = set()   # alerts whose condition held at some point in the outage
       for r in rules:
           hold = seconds(r.get("for"))
           args = urllib.parse.urlencode({"query": only_this_run(str(r["expr"])), "start": t0, "end": t0 + 900,
@@ -181,6 +182,8 @@ tasks:
           for s in res:
               labels = {k: v for k, v in s["metric"].items() if k != "check"}
               ts = sorted(int(float(v[0])) for v in s["values"])
+              if any(OUT0 <= t < OUT1 for t in ts):
+                  matched.add(r["alert"])
               begin = prev = None
               for t in ts + [None]:
                   if t is not None and prev is not None and t - prev <= STEP:
@@ -211,13 +214,15 @@ tasks:
           if late:
               no(f"in the replay, payments fail on every pod from minute 10 to 13 ({errs} failures), and",
                  f"your rule first pages at {at(late[0][0])}. The page has to go out within two minutes.")
-          slow = [f"{r['alert']} has for: {r['for']}" for r in rules if seconds(r.get("for")) >= 180]
-          keyed = [r["alert"] for r in rules if re.search(r"timeout|processor", str(r["expr"]), re.I)]
+          slow = [f"{r['alert']} has for: {r['for']}" for r in rules
+                  if r["alert"] in matched and seconds(r.get("for")) >= 180]
+          keyed = [r["alert"] for r in rules if r["alert"] not in matched
+                   and re.search(r"\|[=~]|reason|timeout|processor", str(r["expr"]), re.I)]
           no(f"in the replay, payments fail on every pod from minute 10 to 13 ({errs} failures, about",
              f"{errs / 3:.0f} a minute), and your rule never pages.",
              *([f"{'; '.join(slow)}: the outage is over before the condition has held that long."] if slow else []),
-             *([f"{', '.join(keyed)} looks for the last outage's cause; this one failed with reason \"{CAUSE}\".",
-                "The next outage will have its own cause: page on failed payments, whatever the reason."]
+             *([f"The condition of {', '.join(keyed)} never held in the outage, whose failures read reason \"{CAUSE}\".",
+                "A rule that looks for one cause misses the next outage: page on failed payments, whatever the reason."]
                if keyed else []))
       alerts = sorted({(name, show(labels)) for _, name, labels in during})
       if len(alerts) > 1:

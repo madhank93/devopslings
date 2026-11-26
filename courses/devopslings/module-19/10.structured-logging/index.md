@@ -204,6 +204,18 @@ tasks:
           no(f"the answer names `{key}`, and {len(lacking)} of {len(orders)} order records do not carry it, e.g.:",
              f"  {lacking[0][:160]}",
              "A stable key is one you can rely on: every order record has it, under that name.")
+      # Fields the formatter could stamp on any record: the level again, a
+      # constant (logger, service), or the time. None of them describes the order.
+      vals = [str(r[key]) for _, r in orders]
+      if all(v.lower() == str(r.get("level", "")).lower() for v, (_, r) in zip(vals, orders)):
+          no(f"the answer names `{key}`, and on every order record it holds the same value as level.",
+             "That is the level again, not a field of the order. Name one that describes the order.")
+      if len(set(vals)) == 1:
+          no(f"the answer names `{key}`, and it is `{vals[0]}` on every order record. A field that never",
+             "changes is the logger's, not the order's. Name one that describes the order.")
+      if all(re.search(r"\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2}|^\d{10}", v) for v in vals):
+          no(f"the answer names `{key}`, which holds the time the record was written, e.g. `{vals[0]}`.",
+             "The formatter stamps that on any record. Name a field that describes the order.")
 
       q = f'{{service="dispatch"}} | json | order_id="{ORDER}"'
       got = query(q, start, end)
