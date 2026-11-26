@@ -229,15 +229,23 @@ tasks:
           except (OSError, ValueError, KeyError) as e:
               no(f"checkout did not answer GET /stats ({e}). The end of /obs/logs/checkout.log:", *tail("checkout"))
 
+      def lesson_error(*lines):
+          print("lesson error: " + lines[0])
+          for l in lines[1:]:
+              print(l)
+          sys.exit(1)
+
       def accepted():
           try:
               with urllib.request.urlopen("http://collector:8888/metrics", timeout=10) as r:
-                  return sum(float(m.group(1)) for m in re.finditer(
+                  vals = [float(m.group(1)) for m in re.finditer(
                       r'^otelcol_receiver_accepted_spans(?:_total)?\{[^}]*receiver="otlp"[^}]*\}\s+(\S+)',
-                      r.read().decode(), re.M))
+                      r.read().decode(), re.M)]
           except OSError as e:
-              no(f"the Collector's metrics on :8888 did not answer ({e}). The end of /obs/logs/collector.log:",
-                 *tail("collector"))
+              lesson_error(f"the Collector's metrics on :8888 did not answer ({e}). The end of",
+                           "/obs/logs/collector.log:", *tail("collector"))
+          # The series appears with the first span the receiver accepts.
+          return sum(vals) if vals else None
 
       def started(app):
           try:
@@ -252,7 +260,7 @@ tasks:
       # Probe ids look like the customers' order ids, so nothing but the
       # outcome sets them apart.
       ID = {i: f"ord-{n}" for i, n in enumerate(random.sample(range(10**7, 10**8), ERRORS + SLOW))}
-      start, n0, s0 = int(time.time()), orders(), accepted()
+      start, n0, s0 = int(time.time()), orders(), accepted() or 0.0
 
       def place(i, **kw):
           body = json.dumps(dict(order_id=ID[i], **kw)).encode()
@@ -313,6 +321,12 @@ tasks:
 
       errs = [i for i in range(ERRORS) if i not in got]
       slow = [i for i in range(ERRORS, ERRORS + SLOW) if i not in got]
+      if s1 is None:
+          if search('{resource.service.name="checkout"}', 1):
+              lesson_error("the Collector's metrics on :8888 have no accepted-spans series for its otlp receiver,",
+                           "though spans reach Tempo, so the check cannot count the spans it receives. Keep the",
+                           "otlp receiver and its telemetry on :8888 as they were.")
+          s1 = 0.0
       sent = (s1 - s0) / max(placed, 1)
       missed = errs + slow
       if missed and sent < 1.0 and all(i in HIDDEN for i in missed):
