@@ -363,7 +363,7 @@ tasks:
     timeout_seconds: 180
     run: |
       python3 - <<'PY'
-      import json, subprocess, sys
+      import json, subprocess, sys, textwrap
 
       def no(*lines):
           print("not yet: " + lines[0])
@@ -405,19 +405,54 @@ tasks:
       if drift:
           names = sorted({l.split()[1].replace("/obs/run/catalog-v2.orig/", "") if l.startswith("Files")
                           else l.split(": ")[-1] for l in drift})
-          no(f"v2 changed outside money.py: {', '.join(names[:5])}. Revert the one change that costs",
-             "the time; the rest of the release is features someone shipped, and they stay as they are.")
+          it = "it" if len(names) == 1 else "them"
+          no(f"v2 changed outside money.py: {', '.join(names[:5])}. Restore {it} as the release shipped",
+             f"{it} (the originals: /obs/run/catalog-v2.orig); the fix is in money.py alone.")
+
+      # Faster must not mean different: v2's prices have to render exactly as v1's.
+      grid = r'''
+      import json, sys
+      sys.path.insert(0, sys.argv[1])
+      from currencies import CURRENCIES
+      from money import format_price
+      print(json.dumps({f"{c} {n}": format_price(n, c) for c in sorted(x["code"] for x in CURRENCIES)
+                        for n in (0, 1, 99, 100, 4000, 12345, 25000, 123456789)}))
+      '''
+      def prices(d):
+          try:
+              r = subprocess.run(["python3", "-c", textwrap.dedent(grid), d], capture_output=True, text=True, timeout=30)
+          except subprocess.TimeoutExpired:
+              no(f"{d}/money.py takes over 30 s to format a few hundred sample prices.")
+          try:
+              return json.loads(r.stdout.strip().splitlines()[-1])
+          except (IndexError, ValueError):
+              no(f"{d}/money.py fails when this check formats sample prices:", *r.stderr.strip().splitlines()[-3:])
+      want, got = prices("/obs/run/catalog-v1.orig"), prices("/obs/catalog/v2")
+      wrong = [k for k in want if got.get(k) != want[k]]
+      if wrong:
+          k = wrong[0]
+          c, n = k.split()
+          no(f"v2 formats prices differently from v1: format_price({n}, \"{c}\") gives {got.get(k)!r}, v1 gives",
+             f"{want[k]!r} ({len(wrong)} of {len(want)} sample prices differ). Make it fast without changing its output.")
 
       def bench(d):
-          r = subprocess.run(["python3", "/obs/run/catalog-bench.py", d, "2"], capture_output=True, text=True, timeout=60)
-          if r.returncode != 0:
+          try:
+              r = subprocess.run(["python3", "/obs/run/catalog-bench.py", d, "2"], capture_output=True, text=True, timeout=60)
+              return json.loads(r.stdout.strip().splitlines()[-1])["pages_per_cpu_s"]
+          except subprocess.TimeoutExpired:
+              no(f"{d} took over a minute on a two-second benchmark.")
+          except (IndexError, ValueError, KeyError):
               no(f"{d} does not run under bench.py:", *r.stderr.strip().splitlines()[-3:])
-          return json.loads(r.stdout.strip().splitlines()[-1])["pages_per_cpu_s"]
 
-      runs = {"v1": [], "v2": []}
-      for _ in range(3):
-          for v in ("v1", "v2"):
-              runs[v].append(bench(f"/obs/catalog/{v}"))
+      # The traffic loops share the CPU with the benchmark; pause them while it runs.
+      subprocess.run("pkill -STOP -f '^python3 /obs/catalog/serve.py'", shell=True)
+      try:
+          runs = {"v1": [], "v2": []}
+          for _ in range(3):
+              for v in ("v1", "v2"):
+                  runs[v].append(bench(f"/obs/catalog/{v}"))
+      finally:
+          subprocess.run("pkill -CONT -f '^python3 /obs/catalog/serve.py'", shell=True)
       v1, v2 = sorted(runs["v1"])[1], sorted(runs["v2"])[1]
       print(f"this check benchmarked each version three times, alternating: v1 {v1:.0f}, v2 {v2:.0f} pages per CPU second")
       if v2 < 0.95 * v1:

@@ -116,7 +116,7 @@ tasks:
       echo "  {resource.service.name=\"quoter\" && name=\"price-quote\"}). The code: /obs/quoter/quoter.py"
 
   verify_done:
-    timeout_seconds: 180
+    timeout_seconds: 300
     run: |
       python3 - <<'PY'
       import ast, json, subprocess, sys, textwrap, time, urllib.parse, urllib.request
@@ -168,10 +168,16 @@ tasks:
           no(f"quoter prices the same quotes differently now: {mine} against {orig} before.",
              "The table is slow to build, not wrong; make it cheaper without changing what it holds.")
 
+      def fetch(req, what):
+          try:
+              return json.load(urllib.request.urlopen(req, timeout=15)) or {}
+          except (OSError, ValueError) as e:
+              no(f"{what} did not answer this check's query: {e}")
+
       def search(q, since):
           url = "http://tempo:3200/api/search?" + urllib.parse.urlencode(
-              {"q": q, "start": since, "end": int(time.time()) + 1, "limit": 50})
-          return json.load(urllib.request.urlopen(url, timeout=15)).get("traces", [])
+              {"q": q, "start": since, "end": int(time.time()) + 1, "limit": 50, "spss": 1})
+          return fetch(url, "Tempo").get("traces") or []
 
       started = int(open("/obs/run/quoter.started").read())
       since = started + 3
@@ -192,6 +198,16 @@ tasks:
           no(f"{len(allq) - len(linked)} of the {len(allq)} latest price-quote spans carry no pyroscope.profile.id,",
              "so nothing links them to a profile. pyroscope-otel's PyroscopeSpanProcessor, added to",
              "quoter's TracerProvider, marks each root span and labels the samples taken during it.")
+      # PyroscopeSpanProcessor uses the span's own id as its profile id, and labels the samples
+      # with it. Any other value on a real span points at a profile nobody recorded.
+      sel = search('{resource.service.name="quoter" && name="price-quote"} | select(span.pyroscope.profile.id)', since)
+      for t in sel:
+          for sp in (sp for ss in t.get("spanSets") or [] for sp in ss.get("spans") or []):
+              got = next((a["value"].get("stringValue", "") for a in sp.get("attributes") or []
+                          if a.get("key") == "pyroscope.profile.id"), "")
+              if got.lstrip("0") != sp.get("spanID", "").lstrip("0"):
+                  no(f"price-quote span {sp.get('spanID')} carries pyroscope.profile.id={got!r}, not its own span id.",
+                     "The profile samples are labelled with the span id; an id set by hand links to nothing.")
       # The id must lead to samples: run quoter's own setup, burn CPU in one root span of its
       # tracer, and ask Pyroscope for that span's profile.
       probe = r'''
@@ -208,7 +224,10 @@ tasks:
       pyroscope.shutdown()
       print(json.dumps({"id": span.attributes.get("pyroscope.profile.id")}))
       '''
-      r = subprocess.run(["python3", "-c", textwrap.dedent(probe)], capture_output=True, text=True, timeout=60)
+      try:
+          r = subprocess.run(["python3", "-c", textwrap.dedent(probe)], capture_output=True, text=True, timeout=40)
+      except subprocess.TimeoutExpired:
+          no("a 2-second span run through quoter's tracing setup took over 40 s to finish and flush.")
       try:
           pid = json.loads(r.stdout.strip().splitlines()[-1])["id"]
       except (IndexError, ValueError, KeyError):
@@ -219,17 +238,17 @@ tasks:
       body = json.dumps({"profileTypeID": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
                          "labelSelector": '{service_name="quoter"}', "spanSelector": [pid],
                          "start": int(time.time() - 120) * 1000, "end": int(time.time() + 60) * 1000}).encode()
-      ticks, deadline = 0, time.time() + 30
+      ticks, deadline = 0, time.time() + 60
       while not ticks and time.time() < deadline:
           req = urllib.request.Request("http://pyroscope:4040/querier.v1.QuerierService/SelectMergeSpanProfile",
                                        data=body, headers={"Content-Type": "application/json"})
-          ticks = int(json.load(urllib.request.urlopen(req, timeout=15)).get("flamegraph", {}).get("total", 0))
+          ticks = int((fetch(req, "Pyroscope").get("flamegraph") or {}).get("total") or 0)
           if not ticks:
               time.sleep(3)
       if not ticks:
           no(f"a 2-second span this check ran through quoter's setup has pyroscope.profile.id={pid}, and",
-             "Pyroscope holds no samples for it. The id only links a profile if the samples taken during",
-             "the span are labelled with it, which PyroscopeSpanProcessor does.")
+             "after 60 s Pyroscope still holds no samples for it: not ingested, or never labelled. The id",
+             "links a profile only if the samples taken during the span carry it, as PyroscopeSpanProcessor does.")
 
       full = search('{resource.service.name="quoter" && name="price-quote" && span.quote.riders = 12}', since)
       if len(full) < len(allq):

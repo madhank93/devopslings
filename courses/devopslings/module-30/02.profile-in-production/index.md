@@ -215,10 +215,14 @@ tasks:
              "measures with; the fix belongs in pricing.py.")
 
       def replay(path):
-          r = subprocess.run(["python3", "/obs/pricing/replay.py", path], capture_output=True, text=True, timeout=120)
-          if r.returncode != 0:
+          try:
+              r = subprocess.run(["python3", "/obs/pricing/replay.py", path], capture_output=True, text=True, timeout=40)
+          except subprocess.TimeoutExpired:
+              no(f"{path} takes over 40 s on the production replay of 400 orders.")
+          try:
+              return json.loads(r.stdout.strip().splitlines()[-1])
+          except (IndexError, ValueError):
               no(f"{path} fails on the production replay:", *r.stderr.strip().splitlines()[-3:])
-          return json.loads(r.stdout.strip().splitlines()[-1])
 
       orig = [replay("/obs/run/pricing.orig.py") for _ in range(2)]
       mine = [replay("/obs/pricing/pricing.py") for _ in range(2)]

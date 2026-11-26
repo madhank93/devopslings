@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Reference solution — used by the contract test, not by students.
 #
-# The profiler's cost is per sample: at 1000 Hz its threads take ~13% of the
-# one CPU, at 100 Hz ~1.5%, at 50 Hz under 1%. 50 Hz keeps a 5-second window at
-# 250 samples, plenty to rank functions. Throughput on against off, alternated
-# under taskset -c 0, agrees with the per-thread CPU figure.
+# The profiler's cost is per sample, so it scales with the rate. 50 Hz keeps
+# its share of the one CPU well under 2% and still gives enough samples to rank
+# functions. The overhead written down is the one --bench measures.
 set -euo pipefail
 mkdir -p /obs/answers
 sed -i 's/^sample_rate = .*/sample_rate = 50/' /obs/quotes/profiling.ini
