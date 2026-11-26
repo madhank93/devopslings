@@ -301,14 +301,16 @@ tasks:
       # Every query has to cross shopdb, the only path to the database host.
       # This scan only words the message for a connection of the student's own;
       # the gate that catches any way around shopdb is a request with 0 queries.
-      def raw_access(text):
+      def raw_access(name, text):
           try:
               tree = ast.parse(text)
-          except SyntaxError:
-              return False, []
+          except (SyntaxError, ValueError, RecursionError) as e:
+              no(f"/obs/apps/{name}.py does not parse as Python ({e}).")
           docs = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant)}
           mods = [a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
-          mods += [n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module]
+          for n in ast.walk(tree):
+              if isinstance(n, ast.ImportFrom):
+                  mods += [n.module.split(".")[0]] if n.module else [a.name for a in n.names]
           raw = "sqlite3" in mods or any(
               (isinstance(n, ast.Name) and n.id == "sqlite3")
               or (isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs and "shop.db" in n.value)
@@ -323,7 +325,7 @@ tasks:
               text = open(f"/obs/apps/{name}.py", encoding="utf-8", errors="replace").read()
           except OSError:
               continue
-          raw, mods = raw_access(text)
+          raw, mods = raw_access(name, text)
           todo += [m for m in mods if m not in seen and m != "shopdb"]
           if raw:
               no(f"/obs/apps/{name}.py opens the shop database itself (sqlite3 / shop.db) instead of through",
