@@ -17,7 +17,7 @@ sandbox:
 tasks:
   init_scenario:
     init: true
-    timeout_seconds: 120
+    timeout_seconds: 240
     run: |
       obs-reset >/dev/null
       mkdir -p /obs/data
@@ -163,11 +163,17 @@ tasks:
               try:
                   with urllib.request.urlopen(f"http://tempo:3200/api/traces/{tid}", timeout=10) as r:
                       batches = json.load(r).get("batches", [])
-              except OSError:
+              except (OSError, ValueError):
                   continue
-              svcs = {a["value"].get("stringValue") for b in batches
-                      for a in b.get("resource", {}).get("attributes", []) if a["key"] == "service.name"}
-              if {"checkout", "ledger"} <= svcs:
+              spans = {}
+              for b in batches:
+                  svc = next((a["value"].get("stringValue") for a in b.get("resource", {}).get("attributes", [])
+                              if a["key"] == "service.name"), "?")
+                  for ss in b.get("scopeSpans", []):
+                      for sp in ss.get("spans", []):
+                          spans[sp["spanId"]] = (svc, sp.get("parentSpanId"))
+              # The same link the check measures: a ledger span whose parent is checkout's.
+              if any(svc == "ledger" and spans.get(parent, ("",))[0] == "checkout" for svc, parent in spans.values()):
                   open("/obs/data/clock-skew.trace", "w").write(tid + "\n")
                   sys.exit(0)
       sys.exit("no complete trace of POST /checkout reached Tempo")
