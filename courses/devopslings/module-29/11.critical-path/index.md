@@ -248,11 +248,11 @@ tasks:
       if not re.search(r"\bstock\b", chain):
           no(f"chain is '{field('chain')}'. Which spans run one after another, start to end, for most of",
              "the request?")
-      extra = re.findall(r"\b(auth|load|cart|cart_items|price|pricing|tax|shipping|promotions|render|select|post|checkout)\b",
-                         chain)
+      extra = re.findall(r"\b(auth|load cart|price cart|price (?:base|tax|shipping|promotions)|select cart_items"
+                         r"|render|post /checkout)\b", chain)
       if extra:
-          no(f"chain is '{field('chain')}'. {', '.join(sorted(set(extra)))} also take part, a few milliseconds",
-             "in all; running them in parallel saves nothing. Name only the spans that, one after another,",
+          no(f"chain is '{field('chain')}'. {', '.join(sorted(set(extra)))} also take part, tens of",
+             "milliseconds in all; running them in parallel saves nothing. Name only the spans that, one after another,",
              "take most of the request.")
       saving = field("saving_ms")
       try:
