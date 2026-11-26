@@ -84,9 +84,9 @@ tasks:
                       with tracer.start_as_current_span(f"{method} {path}", context=propagate.extract(self.headers),
                                                         kind=trace.SpanKind.SERVER):
                           out, code = json.dumps(fn(query, json.loads(body) if body else None)).encode(), 200
-                  except Exception as e:
+                  except Exception as e:   # ValueError: the request itself is bad
                       print(f"{method} {path} failed: {e!r}", flush=True)
-                      out, code = json.dumps({"error": str(e)}).encode(), 500
+                      out, code = json.dumps({"error": str(e)}).encode(), 400 if isinstance(e, ValueError) else 500
                   self.send_response(code)
                   self.send_header("Content-Type", "application/json")
                   self.send_header("Content-Length", str(len(out)))
@@ -199,7 +199,8 @@ tasks:
 
       def checkout(query, body):
           with tracer.start_as_current_span("validate email"):
-              EMAIL.fullmatch(body["email"])
+              if not EMAIL.fullmatch(body["email"]):
+                  raise ValueError(f"invalid email {{body['email']!r}}")
           total = get_quote(body["skus"], {retry})["total"]
       {record}
           return {{"order": body["order"], "total": total}}
@@ -212,7 +213,7 @@ tasks:
       cat > /obs/apps/lab.py <<'PY'
       """lab — checkout's customers. About thirty a second each place an order;
       one who finds 64 orders already open goes elsewhere."""
-      import json, random, threading, time, urllib.request
+      import json, os, random, threading, time, urllib.request
 
       OPEN = threading.BoundedSemaphore(64)
 
@@ -234,6 +235,9 @@ tasks:
 
       n = 0
       while True:
+          if os.path.exists("/obs/run/lab.down"):   # the grader is placing its own orders
+              time.sleep(0.5)
+              continue
           n += 1
           if OPEN.acquire(blocking=False):
               threading.Thread(target=order, args=(n,), daemon=True).start()
@@ -345,6 +349,8 @@ tasks:
 
       try:
           cause = open(f"{G}/cause").read().strip()
+      except PermissionError:
+          no(f"the scenario's record {G}/cause is unreadable to this check. Reset the lesson.")
       except OSError:
           no("the scenario's record is missing. Reset the lesson.")
       where = {"n-plus-one": "pricing", "pool": "ledger", "regex": "checkout", "retry-storm": "checkout", "lock": "checkout"}
@@ -362,6 +368,8 @@ tasks:
           if field(k) in ("", "?"):
               no(f"{k} in {ANSWER} is not filled in.")
 
+      # cause and service are judged before any evidence, so at most fifteen guesses
+      # find them; the fix and the evidence are what this drill grades.
       said = field("cause").lower()
       if said not in where:
           no(f"cause is '{said}'. It is one of: {', '.join(where)}.")
@@ -375,12 +383,12 @@ tasks:
       # after its last restart. lab's customers pause meanwhile, so the arrival
       # rate is the grader's alone.
       time.sleep(1.5)
+      since = 0
       for app in ("checkout", "fulfil", "ledger"):
           try:
-              int(open(f"/obs/run/{app}.started").read())
+              since = max(since, int(open(f"/obs/run/{app}.started").read()))
           except (OSError, ValueError):
               no(f"{app} has not started: /obs/run/{app}.started is missing. Reset the lesson.")
-      since = max(int(open(f"/obs/run/{a}.started").read()) for a in ("checkout", "fulfil", "ledger"))
       time.sleep(max(0, since + 3 - time.time()))
 
       RATE, SECONDS, OPEN_CAP, TIMEOUT = 30, 30, 64, 5
@@ -388,20 +396,28 @@ tasks:
       orders, threads = [], []
       slots = threading.BoundedSemaphore(OPEN_CAP)
 
+      def order(email, oid=None):
+          skus = [f"sku-{i}" for i in random.sample(range(1, 1000), random.randint(8, 14))]
+          return {"order": f"{run}-{oid or len(orders)}", "email": email, "skus": skus, "total": sum(100 + len(s) for s in skus),
+                  "answer": None, "code": None, "ms": None, "err": ""}
+
       def place(o):
           t0 = time.monotonic()
           try:
-              r = post("http://checkout:8080/checkout", {k: o[k] for k in ("order", "email", "skus")}, TIMEOUT)
-              o["ok"] = r.get("total") == o["total"]
-              if not o["ok"]:
-                  o["err"] = "checkout answered, but not with the order's total"
+              o["answer"] = post("http://checkout:8080/checkout", {k: o[k] for k in ("order", "email", "skus")}, TIMEOUT)
+              o["code"] = 200
           except urllib.error.HTTPError as e:
-              o["err"] = f"HTTP {e.code} {e.read()[:100].decode(errors='replace')}"
+              o["code"], o["err"] = e.code, f"HTTP {e.code} {e.read()[:100].decode(errors='replace')}"
           except Exception as e:
               o["err"] = f"{type(e).__name__}: {e}"[:120]
           finally:
               o["ms"] = (time.monotonic() - t0) * 1000
               slots.release()
+
+      # One customer in five has an address only a loose pattern accepts; checkout
+      # may take or refuse those orders. Every other address must go through.
+      def odd(o):
+          return "!" in o["email"]
 
       open("/obs/run/lab.down", "w").close()
       time.sleep(2.5)
@@ -411,15 +427,12 @@ tasks:
               email = random.choice(["ana", "ben.okafor", "chen.li.93", "dee"]) + "@shop.example"
               if random.random() < 0.2:
                   email = "x" * random.randint(18, 21) + "!@shop.example"
-              skus = [f"sku-{i}" for i in random.sample(range(1, 1000), random.randint(8, 14))]
-              o = {"order": f"{run}-{len(orders)}", "email": email, "skus": skus,
-                   "total": sum(100 + len(s) for s in skus), "ok": False, "ms": None, "err": ""}
-              orders.append(o)
+              orders.append(order(email))
               if slots.acquire(blocking=False):
-                  threads.append(threading.Thread(target=place, args=(o,), daemon=True))
+                  threads.append(threading.Thread(target=place, args=(orders[-1],), daemon=True))
                   threads[-1].start()
               else:
-                  o["err"] = f"turned away: {OPEN_CAP} orders already open"
+                  orders[-1]["err"] = f"turned away: {OPEN_CAP} orders already open"
               time.sleep(random.expovariate(RATE))
           end = time.time()
           for t in threads:
@@ -430,16 +443,12 @@ tasks:
           except OSError:
               pass
 
-      answered = [o for o in orders if o["ok"]]
-      try:
-          book = post("http://ledger:8080/recorded", {"orders": [o["order"] for o in answered]}, 15)
-      except Exception as e:
-          no(f"ledger did not answer POST /recorded ({e}), so which orders it recorded is unknown.",
-             "The end of /obs/logs/ledger.log:", *tail("/obs/logs/ledger.log"))
-      for o in answered:
-          if book.get(o["order"]) != o["total"]:
-              o["ok"] = False
-              o["err"] = "checkout answered, but ledger has no entry for the order at its total"
+      def recorded(ids):
+          try:
+              return post("http://ledger:8080/recorded", {"orders": ids}, 15)
+          except Exception as e:
+              no(f"ledger did not answer POST /recorded ({e}), so which orders it recorded is unknown.",
+                 "The end of /obs/logs/ledger.log:", *tail("/obs/logs/ledger.log"))
 
       ms = sorted(o["ms"] if o["ms"] is not None else float("inf") for o in orders)
       p99 = ms[min(len(ms) - 1, int(len(ms) * 0.99))]
@@ -447,31 +456,105 @@ tasks:
           shown = f"{p99:.0f}ms" if p99 != float("inf") else "unbounded (orders turned away)"
           no(f"checkout's p99 over the grader's {len(orders)} orders is {shown}, over the {BUDGET_MS}ms budget.",
              f"Restarting or adding replicas leaves the {cause} where it is; fix it in {where[cause]}'s code.")
-      failed = [o for o in orders if not o["ok"]]
-      if len(failed) > len(orders) * 0.01:
-          no(f"{len(failed)} of the grader's {len(orders)} orders failed. A fast failure is still a lost order;",
-             "an order counts when checkout answers with its total and ledger has it recorded. The commonest:",
-             *[f"  {n} x {err}" for err, n in collections.Counter(o["err"] for o in failed).most_common(3)])
 
-      # The cause itself gone, not only diluted. Spans from the grader's orders.
-      time.sleep(max(0, end + 6 - time.time()))
+      # An answered order must be in the book at its total, every one of them; an
+      # order with no answer is lost, and a few of those in a thousand are tolerated.
+      answered = [o for o in orders if o["code"] == 200]
+      book = recorded([o["order"] for o in answered])
+      wrong = [o for o in answered if (o["answer"] or {}).get("total") != o["total"] or book.get(o["order"]) != o["total"]]
+      if wrong:
+          w = wrong[0]
+          no(f"{len(wrong)} of the grader's orders were answered as taken but are not in ledger's book at their",
+             f"total. Order {w['order']}: checkout answered {json.dumps(w['answer'])[:80]}, ledger has {book.get(w['order'])}",
+             f"for a total of {w['total']}. An answered order has to be recorded.")
+      lost = [o for o in orders if o["code"] != 200 and not (odd(o) and o["code"] == 400)]
+      if len(lost) > len(orders) * 0.01:
+          no(f"{len(lost)} of the grader's {len(orders)} orders got no answer or an error. A fast failure is still",
+             "a lost order. The commonest:",
+             *[f"  {n} x {err}" for err, n in collections.Counter(o["err"] for o in lost).most_common(3)])
 
       def search(q, spss=3):
-          p = urllib.parse.urlencode({"q": q, "start": int(start), "end": int(end) + 1, "limit": 2000, "spss": spss})
+          p = urllib.parse.urlencode({"q": q, "start": int(start), "end": int(end) + 1, "limit": 5000, "spss": spss})
           try:
               return get(f"{TEMPO}/api/search?{p}").get("traces", [])
-          except OSError as e:
+          except (OSError, ValueError) as e:
               no(f"Tempo did not answer a search ({e}).")
 
+      # Spans reach Tempo a few seconds late; wait until it holds the grader's orders.
+      roots = []
+      while time.time() < end + 40:
+          roots = search('{resource.service.name="checkout" && name="POST /checkout"}')
+          if len(roots) >= 0.95 * len([o for o in orders if o["code"]]):
+              break
+          time.sleep(2)
+      if len(roots) > 1.2 * len(orders):
+          no(f"checkout took {len(roots)} orders while the grader placed {len(orders)}: something else was sending",
+             "orders. lab.py stops while /obs/run/lab.down exists; the grader's rate has to be its own.")
+
+      # The cause itself gone, not only diluted.
       src = {a: open(f"/obs/apps/{f}.py").read() for a, f in (("checkout", "checkout"), ("pricing", "fulfil"), ("ledger", "ledger"))}
+
+      def tree_of(app):
+          try:
+              t = ast.parse(src[app])
+          except SyntaxError as e:
+              no(f"{app}'s source does not parse ({e}).")
+          for n in ast.walk(t):
+              for c in ast.iter_child_nodes(n):
+                  c.parent = n
+          return t
+
+      def consts(t):
+          out = {}
+          for n in t.body:
+              if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+                  try:
+                      out[n.targets[0].id] = ast.literal_eval(n.value)
+                  except (ValueError, TypeError, SyntaxError):
+                      pass
+          return out
+
+      def value(e, known, scope=None):
+          """The literal an expression stands for: a literal, a module constant, or a parameter bound in scope."""
+          if isinstance(e, ast.Name) and scope and e.id in scope:
+              return value(scope[e.id], known)
+          if isinstance(e, ast.Name) and e.id in known:
+              return known[e.id]
+          return ast.literal_eval(e)
+
+      def ancestors(n):
+          while hasattr(n, "parent"):
+              n = n.parent
+              yield n
+
+      def named(n, name):
+          return isinstance(n, ast.Call) and getattr(n.func, "id", getattr(n.func, "attr", None)) == name
+
       if cause == "pool":
-          m = re.search(r"Semaphore\(\s*(\d+)\s*\)", src["ledger"])
-          if not m:
-              no("ledger no longer has a connection pool (a Semaphore of a number of connections). A database",
+          t = tree_of("ledger")
+          pools = [(n.targets[0].id, n.value) for n in t.body if isinstance(n, ast.Assign) and len(n.targets) == 1
+                   and isinstance(n.targets[0], ast.Name) and isinstance(n.value, ast.Call)
+                   and getattr(n.value.func, "attr", getattr(n.value.func, "id", "")).endswith("Semaphore")]
+          if len(pools) != 1 or not pools[0][1].args:
+              no("ledger no longer has one connection pool (a Semaphore of a number of connections). A database",
                  "takes only so many connections at once; size the pool, don't remove it.")
-          if int(m.group(1)) < 16:
-              no(f"ledger's connection pool is {m.group(1)}. At a burst its callers have more requests in flight",
+          name, ctor = pools[0]
+          try:
+              size = int(value(ctor.args[0], consts(t)))
+          except (ValueError, TypeError):
+              no(f"ledger's pool size {ast.unparse(ctor.args[0])} is not a number the grader can read.")
+          if size < 16:
+              no(f"ledger's connection pool is {size}. At a burst its callers have more requests in flight",
                  "than that (pricing's four workers alone take four); size it for them, 16 or more.")
+          if size > 32:
+              no(f"ledger's connection pool is {size}. The database behind it takes only so many connections;",
+                 "a pool far past ledger's concurrent requests moves the queue into the database. 16 to 32.")
+          fns = {n.name: n for n in t.body if isinstance(n, ast.FunctionDef)}
+          for fn in ("prices", "entries"):
+              if fn not in fns or not any(isinstance(n, ast.With) and any(isinstance(i.context_expr, ast.Name) and
+                                          i.context_expr.id == name for i in n.items) for n in ast.walk(fns[fn])):
+                  no(f"ledger's {fn} no longer takes a connection from {name}. Every query holds one while it works;",
+                     "skipping the pool is the same as removing it.")
       if cause == "n-plus-one":
           per = [len(s) for t in search('{resource.service.name="pricing" && kind=client}', spss=100)
                  for s in [[x for ss in t.get("spanSets", []) for x in ss.get("spans", [])]]]
@@ -488,33 +571,67 @@ tasks:
                  "validate the address; fix the pattern, keep the step and its span.")
           if v[int(len(v) * 0.99) - 1] > 2:
               no(f"validate email still takes up to {v[-1]:.0f}ms of CPU on some addresses.")
+          bad, good = order("not an address", "bad"), order("chen.li.93@shop.example", "good")
+          for o in (bad, good):
+              slots.acquire()
+              place(o)
+          if bad["code"] == 200 or bad["order"] in recorded([bad["order"]]):
+              no("checkout took an order for the address 'not an address'. Validation has to refuse what the",
+                 "pattern does not match; a faster pattern, not a skipped check.")
+          if good["code"] != 200:
+              no(f"checkout refused chen.li.93@shop.example ({good['err']}). The pattern has to accept a real address.")
       if cause == "retry-storm":
-          tree, calls, got = ast.parse(src["checkout"]), [], {}
-          for node in ast.walk(tree):
-              if isinstance(node, ast.FunctionDef) and node.name == "get_quote":
-                  params = [a.arg for a in node.args.args]
-                  got.update(zip(params[len(params) - len(node.args.defaults):], node.args.defaults))
-                  got["params"] = params
-              elif isinstance(node, ast.Call) and getattr(node.func, "id", None) == "get_quote":
-                  calls.append(node)
-          try:
-              got.update(zip(got["params"], calls[0].args))
-              got.update((k.arg, k.value) for k in calls[0].keywords)
-              timeout, attempts = float(ast.literal_eval(got["timeout"])), int(ast.literal_eval(got["attempts"]))
-          except (KeyError, IndexError, ValueError, TypeError):
-              no("checkout's get_quote no longer has a timeout and attempts the grader can read. Keep them",
-                 "as numbers, in the call or as get_quote's defaults.")
-          if timeout < 0.1:
-              no(f"checkout still gives pricing {timeout}s to answer a quote, less than pricing takes under",
-                 "load, so a quote in a queue is asked for again while the first is still waiting.")
-          if attempts < 2:
-              no("checkout's get_quote makes a single attempt. With retries off, one dropped connection to",
-                 "pricing loses the order; keep one retry and give pricing long enough to answer.")
-          if attempts > 3:
-              no(f"checkout still tries a quote {attempts} times. Under load each retry is another quote pricing",
-                 "has to serve; one retry is enough.")
-      if cause == "lock" and re.search(r"with\s+LEDGER\s*:", src["checkout"]):
-          no("checkout still holds a process-wide lock across its call to ledger.")
+          t = tree_of("checkout")
+          known = consts(t)
+          gq = next((n for n in t.body if isinstance(n, ast.FunctionDef) and n.name == "get_quote"), None)
+          unreadable = ("checkout's get_quote no longer has the shape the grader reads: one call() to pricing, inside",
+                        "one 'for attempt in range(attempts)' loop, with numbers (or constants) for timeout and attempts.")
+          if gq is None:
+              no(*unreadable)
+          params = [a.arg for a in gq.args.args]
+          defaults = dict(zip(params[len(params) - len(gq.args.defaults):], gq.args.defaults))
+          calls = [n for n in ast.walk(gq) if named(n, "call")]
+          loops = [n for n in ast.walk(gq) if isinstance(n, ast.For) and named(n.iter, "range")]
+          if len(calls) != 1 or len(loops) != 1:
+              no(*unreadable)
+          t_expr = next((k.value for k in calls[0].keywords if k.arg == "timeout"),
+                        calls[0].args[4] if len(calls[0].args) > 4 else ast.Constant(2.0))
+          a_expr = loops[0].iter.args[-1]
+          sites = [n for n in ast.walk(t) if named(n, "get_quote")]
+          if not sites:
+              no(*unreadable)
+          for site in sites:
+              if any(isinstance(a, (ast.For, ast.While)) for a in ancestors(site)):
+                  no("checkout calls get_quote inside a loop: retries on top of get_quote's own retries multiply",
+                     "the quotes pricing has to serve. Retry in one place.")
+              scope = dict(defaults)
+              scope.update(zip(params, site.args))
+              scope.update((k.arg, k.value) for k in site.keywords)
+              try:
+                  timeout, attempts = float(value(t_expr, known, scope)), int(value(a_expr, known, scope))
+              except (ValueError, TypeError, KeyError):
+                  no(*unreadable)
+              if timeout < 0.1:
+                  no(f"checkout still gives pricing {timeout}s to answer a quote, less than pricing takes under",
+                     "load, so a quote in a queue is asked for again while the first is still waiting.")
+              if timeout > 2.0:
+                  no(f"checkout gives pricing {timeout}s to answer a quote. A customer will not wait that long, and",
+                     "a hung pricing holds every order that long; keep it above pricing's latency, at most 2s.")
+              if attempts < 2:
+                  no("checkout's get_quote makes a single attempt. With retries off, one dropped connection to",
+                     "pricing loses the order; keep one retry and give pricing long enough to answer.")
+              if attempts > 3:
+                  no(f"checkout still tries a quote {attempts} times. Under load each retry is another quote pricing",
+                     "has to serve; one retry is enough.")
+      if cause == "lock":
+          t = tree_of("checkout")
+          for c in (n for n in ast.walk(t) if named(n, "call") and any(isinstance(a, ast.Constant) and "ledger" in str(a.value) for a in n.args)):
+              held = [i.context_expr for a in ancestors(c) if isinstance(a, ast.With) for i in a.items
+                      if not named(i.context_expr, "start_as_current_span")]
+              fn = next((a for a in ancestors(c) if isinstance(a, ast.FunctionDef)), None)
+              if held or (fn and any(named(n, "acquire") for n in ast.walk(fn))):
+                  what = ast.unparse(held[0]) if held else "an acquire()"
+                  no(f"checkout still holds a lock ({what}) across its call to ledger, so orders record one at a time.")
 
       # The evidence.
       ex = field("exemplar").lower()
@@ -532,20 +649,40 @@ tasks:
       for k in ("service_map", "spanmetrics", "profile"):
           if len(field(k).split()) < 5:
               no(f"{k} is '{field(k)}'. Say what that step showed, in a sentence.")
+
       q = field("detect")
-      try:
-          r = get(f"{PROM}/api/v1/query", query=q)
-      except urllib.error.HTTPError as e:
-          no(f"Prometheus rejects detect: {json.load(e).get('error')}")
-      except OSError as e:
-          no(f"Prometheus did not answer the detect query ({e}).")
+      def prom(**params):
+          try:
+              return get(f"{PROM}/api/v1/query", query=q, **params)
+          except urllib.error.HTTPError as e:
+              body = e.read().decode(errors="replace")
+              try:
+                  body = json.loads(body).get("error", body)
+              except ValueError:
+                  pass
+              no(f"Prometheus rejects detect: {body[:200]}")
+          except (OSError, ValueError) as e:
+              no(f"Prometheus did not answer the detect query ({e}).")
+      r = prom()
       if not re.search(r"traces_(span_metrics|service_graph)_", q):
           no("detect does not use the span metrics or the service graph, which is where this showed first.")
       if not r["data"]["result"]:
           no("detect returns nothing on the metrics Prometheus has: a query with no series never fires.")
-      if not re.search(r"\d", field("threshold")):
+      m = re.search(r"\d+(\.\d+)?", field("threshold"))
+      if not m:
           no(f"threshold is '{field('threshold')}'. It is a number the detect query crosses.")
+      # While the exemplar was slow, the query has to have been at or over the
+      # threshold, or it would not have paged. No reading then is not held against it.
+      at = min(time.time(), int(root["endTimeUnixNano"]) / 1e9 + 30)
+      try:
+          then = [float(s["value"][1]) for s in prom(time=at)["data"]["result"]]
+      except (KeyError, TypeError, ValueError, IndexError):
+          then = []
+      then = [x for x in then if x == x and x not in (float("inf"), float("-inf"))]
+      if then and max(then) < float(m.group()):
+          no(f"detect read {max(then):.3g} around your exemplar, while checkout was over budget, which is under",
+             f"the threshold {m.group()}: it would not have paged when it mattered.")
       print(f"PASS — {cause} in {where[cause]}, fixed where it lives; p99 {p99:.0f}ms under the {BUDGET_MS}ms budget")
-      print(f"on {len(orders)} orders, {len(failed)} lost, with evidence from each step and a detection signal.")
+      print(f"on {len(orders)} orders ({len(roots)} in Tempo), {len(lost)} lost, with evidence from each step and a detection signal.")
       PY
 ---

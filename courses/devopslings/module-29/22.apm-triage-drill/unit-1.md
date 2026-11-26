@@ -66,13 +66,15 @@ paged someone before customers noticed.
 - `cause` and `service` match this run's seeded cause
 - the grader places 30 seconds of its own orders, about thirty a second
   (lab's customers pause meanwhile): their p99 is under 150ms, at most 1%
-  are lost (an order counts when checkout answers with its total and
-  ledger has recorded it), and the cause itself is gone, not diluted
+  get no answer, every order checkout answers is in ledger's book at its
+  total, and the cause itself is gone, not diluted (a bad address is still
+  refused; pools, timeouts and retries stay in sane bounds)
 - `exemplar` is a checkout trace in Tempo that was over budget
 - each evidence line says what the step showed; for a CPU cause, the
   profile names the function
 - `detect` runs in Prometheus, uses the span metrics or service graph,
-  returns data, and `threshold` is a number
+  returns data, and `threshold` is a number it
+  was at or over while your exemplar was slow
 
 <details>
 <summary>Hint 1 — reading the shape of a slow trace</summary>
