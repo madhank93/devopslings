@@ -117,6 +117,11 @@ tasks:
       ok_now() { prom_val "probe_success{job=\"$job\"}"; }
 
       firing() { prom_count 'ALERTS{alertstate="firing"}'; }
+      # pending_on METRIC — pending alerts whose rule reads that metric.
+      pending_on() {
+        curl -s --max-time 10 "$PROM/api/v1/rules?type=alert" | jq -r --arg m "$1" '[.data.groups[].rules[]
+          | select(.state == "pending" and (.query | contains($m))) | .name] | unique | join(", ")' 2>/dev/null || true
+      }
       paged() {
         sink_all | jq -r '[.[] | select(.payload.status == "firing") | .payload.alerts[]
           | select(.status == "firing") | .labels.alertname] | unique | join(" ")' 2>/dev/null || true
@@ -165,7 +170,7 @@ tasks:
       touch /obs/run/portal.fault
       p=$(wait_page 90)
       probe=$(ok_now)
-      pending=$(prom_query 'ALERTS{alertstate="pending"}' | jq -r '[.data.result[].metric.alertname] | unique | join(", ")' 2>/dev/null || true)
+      pending=$(pending_on probe_success)
       rm -f /obs/run/portal.fault
       if [ -z "$p" ]; then
         if [ "$probe" = 1 ]; then
@@ -194,15 +199,15 @@ tasks:
       cert 7
       p=$(wait_page 90)
       probe=$(ok_now)
-      pending=$(prom_query 'ALERTS{alertstate="pending"}' | jq -r '[.data.result[].metric.alertname] | unique | join(", ")' 2>/dev/null || true)
+      pending=$(pending_on probe_ssl_earliest_cert_expiry)
       cert 365; short_cert=
       if [ -z "$p" ]; then
-        if [ -n "$pending" ]; then
-          echo "not yet: the certificate expires in 7 days, nothing paged, and $pending was still pending."
-          echo "Expiry is days away, not seconds; a for: longer than a minute or so only delays the page."
-        elif [ "$(prom_count "probe_ssl_earliest_cert_expiry{job=\"$job\"}")" = 0 ]; then
+        if [ "$(prom_count "probe_ssl_earliest_cert_expiry{job=\"$job\"}")" = 0 ]; then
           echo "not yet: the certificate expires in 7 days and nothing paged. The probe reports no"
           echo "probe_ssl_earliest_cert_expiry: is it probing https://?"
+        elif [ -n "$pending" ]; then
+          echo "not yet: the certificate expires in 7 days, nothing paged, and $pending was still pending."
+          echo "Expiry is days away, not seconds; a for: longer than a minute or so only delays the page."
         else
           echo "not yet: the certificate expires in 7 days and nothing paged. probe_ssl_earliest_cert_expiry"
           echo "is the expiry as a Unix time; alert when it is less than some days from time()."
