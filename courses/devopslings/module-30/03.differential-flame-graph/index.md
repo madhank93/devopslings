@@ -363,7 +363,7 @@ tasks:
     timeout_seconds: 180
     run: |
       python3 - <<'PY'
-      import json, subprocess, sys, textwrap
+      import json, signal, subprocess, sys, textwrap
 
       def no(*lines):
           print("not yet: " + lines[0])
@@ -403,11 +403,14 @@ tasks:
                                          shell=True, capture_output=True, text=True).stdout.splitlines()
                if not l.startswith("Files /obs/run/catalog-v2.orig/money.py ")]
       if drift:
-          names = sorted({l.split()[1].replace("/obs/run/catalog-v2.orig/", "") if l.startswith("Files")
-                          else l.split(": ")[-1] for l in drift})
-          it = "it" if len(names) == 1 else "them"
-          no(f"v2 changed outside money.py: {', '.join(names[:5])}. Restore {it} as the release shipped",
-             f"{it} (the originals: /obs/run/catalog-v2.orig); the fix is in money.py alone.")
+          changed = sorted({l.split()[1].replace("/obs/run/catalog-v2.orig/", "") for l in drift
+                            if l.startswith("Files")})
+          added = sorted({l.split(": ")[-1] for l in drift if l.startswith("Only in /obs/catalog/v2")})
+          removed = sorted({l.split(": ")[-1] for l in drift if l.startswith("Only in /obs/run/")})
+          what = ([f"changed {', '.join(changed[:5])} (restore from /obs/run/catalog-v2.orig)"] * bool(changed)
+                  + [f"added {', '.join(added[:5])} (remove)"] * bool(added)
+                  + [f"deleted {', '.join(removed[:5])} (restore from /obs/run/catalog-v2.orig)"] * bool(removed))
+          no(f"v2 {'; '.join(what)}.", "The rest of the release stays as it shipped; the fix belongs in money.py alone.")
 
       # Faster must not mean different: v2's prices have to render exactly as v1's.
       grid = r'''
@@ -445,6 +448,8 @@ tasks:
               no(f"{d} does not run under bench.py:", *r.stderr.strip().splitlines()[-3:])
 
       # The traffic loops share the CPU with the benchmark; pause them while it runs.
+      # A harness timeout sends SIGTERM; turn it into SystemExit so the finally resumes the loops.
+      signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
       subprocess.run("pkill -STOP -f '^python3 /obs/catalog/serve.py'", shell=True)
       try:
           runs = {"v1": [], "v2": []}

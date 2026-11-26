@@ -119,7 +119,7 @@ tasks:
     timeout_seconds: 300
     run: |
       python3 - <<'PY'
-      import ast, json, subprocess, sys, textwrap, time, urllib.parse, urllib.request
+      import ast, http.client, json, subprocess, sys, textwrap, time, urllib.parse, urllib.request
 
       def no(*lines):
           print("not yet: " + lines[0])
@@ -171,7 +171,7 @@ tasks:
       def fetch(req, what):
           try:
               return json.load(urllib.request.urlopen(req, timeout=15)) or {}
-          except (OSError, ValueError) as e:
+          except (OSError, ValueError, http.client.HTTPException) as e:
               no(f"{what} did not answer this check's query: {e}")
 
       def search(q, since):
@@ -179,7 +179,11 @@ tasks:
               {"q": q, "start": since, "end": int(time.time()) + 1, "limit": 50, "spss": 1})
           return fetch(url, "Tempo").get("traces") or []
 
-      started = int(open("/obs/run/quoter.started").read())
+      try:
+          started = int(open("/obs/run/quoter.started").read())
+      except (OSError, ValueError):
+          no("quoter is not running under its supervisor (/obs/run/quoter.started is missing or empty).",
+             "It restarts by itself when quoter.py changes; check /obs/logs/quoter.log.")
       since = started + 3
       time.sleep(max(0, since + 2 - time.time()))
       # Tempo makes a trace searchable only once the trace has been idle for a while (~10 s).
@@ -189,10 +193,14 @@ tasks:
           if len(allq) >= 3 or time.time() > deadline:
               break
           time.sleep(3)
+      try:
+          tail = [l.rstrip()[:200] for l in open("/obs/logs/quoter.log").readlines()[-3:]]
+      except OSError:
+          tail = ["(no log)"]
       if len(allq) < 3:
           no(f"Tempo has {len(allq)} price-quote traces since quoter last restarted; it should be one a",
              "second. The end of /obs/logs/quoter.log:",
-             *[l.rstrip()[:200] for l in open("/obs/logs/quoter.log").readlines()[-3:]])
+             *tail)
       linked = search('{resource.service.name="quoter" && name="price-quote" && span.pyroscope.profile.id != nil}', since)
       if len(linked) < len(allq):
           no(f"{len(allq) - len(linked)} of the {len(allq)} latest price-quote spans carry no pyroscope.profile.id,",
@@ -201,13 +209,22 @@ tasks:
       # PyroscopeSpanProcessor uses the span's own id as its profile id, and labels the samples
       # with it. Any other value on a real span points at a profile nobody recorded.
       sel = search('{resource.service.name="quoter" && name="price-quote"} | select(span.pyroscope.profile.id)', since)
+      def norm(h):
+          h = str(h).lower()
+          return (h[2:] if h.startswith("0x") else h).lstrip("0")
+      examined = 0
       for t in sel:
-          for sp in (sp for ss in t.get("spanSets") or [] for sp in ss.get("spans") or []):
+          sets = (t.get("spanSets") or []) + ([t["spanSet"]] if t.get("spanSet") else [])
+          for sp in (sp for ss in sets for sp in ss.get("spans") or []):
+              examined += 1
               got = next((a["value"].get("stringValue", "") for a in sp.get("attributes") or []
                           if a.get("key") == "pyroscope.profile.id"), "")
-              if got.lstrip("0") != sp.get("spanID", "").lstrip("0"):
+              if not got or norm(got) != norm(sp.get("spanID", "")):
                   no(f"price-quote span {sp.get('spanID')} carries pyroscope.profile.id={got!r}, not its own span id.",
                      "The profile samples are labelled with the span id; an id set by hand links to nothing.")
+      if sel and not examined:
+          no(f"Tempo matched {len(sel)} price-quote traces but returned none of their spans, so this check",
+             "cannot read their pyroscope.profile.id. Run the check again.")
       # The id must lead to samples: run quoter's own setup, burn CPU in one root span of its
       # tracer, and ask Pyroscope for that span's profile.
       probe = r'''

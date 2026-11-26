@@ -171,6 +171,9 @@ tasks:
           no("/obs/quotes/service.py has changed. The rate is the knob, in profiling.ini; the check",
              "measures the service as shipped.")
 
+      # The bench shares CPU 0 with the live service on purpose: pausing the service would cut into
+      # the sample window read below. The metric is the profiler threads' own CPU time, which a
+      # busy neighbour delays but does not inflate.
       def bench():
           try:
               r = subprocess.run("taskset -c 0 python3 /obs/quotes/service.py --bench 5", shell=True,
@@ -193,19 +196,25 @@ tasks:
       # The profile has to stay useful: enough samples in the first 25 s after the change to
       # name the hot path. A fixed window, so uptime cannot make up for a rate too low.
       # Profiles reach Pyroscope some seconds after they are taken: read until the count settles.
-      started = int(open("/obs/run/quotes.started").read())
+      try:
+          started = int(open("/obs/run/quotes.started").read())
+      except (OSError, ValueError):
+          no("quotes is not running under its supervisor (/obs/run/quotes.started is missing or empty).",
+             "It restarts by itself when profiling.ini changes; check /obs/logs/quotes.log.")
       q = 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="quotes"}'
       url = "http://pyroscope:4040/pyroscope/render?" + urllib.parse.urlencode(
           {"query": q, "from": str(started), "until": str(started + 25), "format": "json"})
       time.sleep(max(0, started + 30 - time.time()))
-      fb, prev, deadline = {}, -1, started + 90
+      # The SDK uploads about every 10 s: a count is settled once it holds across three polls (15 s).
+      fb, prev, same, deadline = {}, -1, 0, started + 100
       while True:
           try:
               fb = json.load(urllib.request.urlopen(url, timeout=15)).get("flamebearer") or {}
           except (OSError, ValueError):
               fb = {}
           ticks = fb.get("numTicks") or 0
-          settled = ticks and ticks == prev
+          same = same + 1 if ticks == prev else 0
+          settled = ticks and same >= 3
           if settled or time.time() > deadline:
               break
           prev = ticks
@@ -220,7 +229,7 @@ tasks:
       print(f"Pyroscope, first 25 s after the last restart: {total} samples, risk_score in {share:.0f}% of them")
       if total < 100 and not settled:
           no(f"Pyroscope has {total} samples of quotes for the 25 s after it restarted, and the count was",
-             "still changing (or empty) 90 s after the restart: the profiles have not been ingested yet.",
+             "still changing (or empty) 100 s after the restart: the profiles have not been ingested yet.",
              "Check /obs/logs/quotes.log and Pyroscope, then run the check again.")
       if total < 100:
           no(f"Pyroscope has {total} samples of quotes in the 25 s after it restarted on this config. At that rate a",
