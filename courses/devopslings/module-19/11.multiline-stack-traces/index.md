@@ -1,10 +1,10 @@
 ---
 kind: lesson
-title: "A traceback arrives in Loki as a dozen-odd lines, and only two of them say which report"
+title: "A traceback arrives in Loki as a dozen or more lines, and only two of them say which report"
 description: |
   reports renders PDFs on request and logs to a file, which the Collector
   tails into Loki. When a render fails, Python writes one record with the
-  whole traceback in it, and Loki gets a dozen-odd separate lines. The one that
+  whole traceback in it, and Loki gets a dozen or more separate lines. The one that
   names the report and the one that names the error are found; the
   frames in between belong to nobody. Make each traceback one record.
 name: multiline-stack-traces

@@ -136,7 +136,8 @@ tasks:
       OUT0, OUT1 = t0 + 600, t0 + 780
       rnd = random.Random()
       # The outage's reason varies per run, so a rule must key on failed payments, not on one cause.
-      CAUSE = f"upstream code {rnd.randrange(100, 999)}"
+      CAUSE = " ".join("".join(rnd.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(rnd.randint(4, 8)))
+                       for _ in range(3))
       pods = [f"payments-{rnd.randrange(16**6):06x}-{c}{rnd.randrange(100, 999)}" for c in "kqx"]
       streams = {p: [] for p in pods}
       events = []
@@ -179,6 +180,8 @@ tasks:
               res = get(f"{LOKI}/loki/api/v1/query_range?{args}")["data"]["result"]
           except urllib.error.HTTPError as e:
               no(f"Loki cannot evaluate the expression of {r['alert']}:", f"  {e.read().decode(errors='replace').strip()[:300]}")
+          except OSError as e:
+              no(f"Loki did not answer a replay query for {r['alert']} ({e}).")
           for s in res:
               labels = {k: v for k, v in s["metric"].items() if k != "check"}
               ts = sorted(int(float(v[0])) for v in s["values"])
@@ -223,7 +226,11 @@ tasks:
              *([f"{'; '.join(slow)}: the outage is over before the condition has held that long."] if slow else []),
              *([f"The condition of {', '.join(keyed)} never held in the outage, whose failures read reason \"{CAUSE}\".",
                 "A rule that looks for one cause misses the next outage: page on failed payments, whatever the reason."]
-               if keyed else []))
+               if keyed else []),
+             *([f"{', '.join(r['alert'] + ' (for: ' + str(r.get('for') or '0s') + ')' for r in rules if r['alert'] in matched)}"
+                " held during the outage, but never for its whole for: at a stretch; the condition flickers."]
+               if matched and not slow and not keyed else []),
+             *(["None of your rules' conditions held at any point in the outage."] if not matched and not keyed else []))
       alerts = sorted({(name, show(labels)) for _, name, labels in during})
       if len(alerts) > 1:
           no(f"in the replay, the one outage from minute 10 to 13 pages {len(alerts)} times:",

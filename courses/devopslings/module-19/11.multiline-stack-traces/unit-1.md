@@ -1,5 +1,5 @@
 ---
-title: "A traceback arrives in Loki as a dozen-odd lines, and only two of them say which report"
+title: "A traceback arrives in Loki as a dozen or more lines, and only two of them say which report"
 ---
 
 ## The situation
@@ -21,7 +21,7 @@ Traceback (most recent call last):
 ValueError: report r-1f00ab12: section 'totals' has no rows
 ```
 
-That is one record. Python wrote it in one go. In Loki it is a dozen-odd
+That is one record. Python wrote it in one go. In Loki it is a dozen or more
 entries, one per line. Search for the report and you get two of them, the
 header and the last line. The frames in between say nothing about which
 report they belong to.

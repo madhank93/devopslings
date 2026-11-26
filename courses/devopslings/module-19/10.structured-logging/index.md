@@ -189,7 +189,7 @@ tasks:
           no("/obs/answers/structured-logging.txt needs a line `key: <name>`: the one field besides",
              "level, msg and order_id that every order record now carries.")
       key = m.group(1)
-      if key in ("level", "msg", "order_id"):
+      if key.lower() in ("level", "msg", "order_id"):
           no(f"the answer names `{key}`, which is one of the three already required. Name the fourth.")
       orders = [(l, r) for _, l, r in records if "order_id" in r]
       others = [r for _, _, r in records if "order_id" not in r]
@@ -205,7 +205,7 @@ tasks:
              f"  {lacking[0][:160]}",
              "A stable key is one you can rely on: every order record has it, under that name.")
       # Fields the formatter could stamp on any record: the level again, a
-      # constant (logger, service), or the time. None of them describes the order.
+      # constant (logger, service), or a per-record value (time, uuid, counter).
       vals = [str(r[key]) for _, r in orders]
       if all(v.lower() == str(r.get("level", "")).lower() for v, (_, r) in zip(vals, orders)):
           no(f"the answer names `{key}`, and on every order record it holds the same value as level.",
@@ -213,9 +213,12 @@ tasks:
       if len(set(vals)) == 1:
           no(f"the answer names `{key}`, and it is `{vals[0]}` on every order record. A field that never",
              "changes is the logger's, not the order's. Name one that describes the order.")
-      if all(re.search(r"\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2}|^\d{10}", v) for v in vals):
-          no(f"the answer names `{key}`, which holds the time the record was written, e.g. `{vals[0]}`.",
-             "The formatter stamps that on any record. Name a field that describes the order.")
+      if len(orders) >= 10 and len(set(vals)) == len(vals):
+          no(f"the answer names `{key}`, and no two order records share a value of it, e.g. `{vals[0]}`.",
+             "A value new on every line describes the line, not the order. Name one that describes the order.")
+      if all(v == str(r["order_id"]) for v, (_, r) in zip(vals, orders)):
+          no(f"the answer names `{key}`, which holds the same value as order_id on every order record.",
+             "That is order_id again. Name another field of the order.")
 
       q = f'{{service="dispatch"}} | json | order_id="{ORDER}"'
       got = query(q, start, end)
