@@ -163,7 +163,7 @@ tasks:
               try:
                   with urllib.request.urlopen(f"http://tempo:3200/api/traces/{tid}", timeout=10) as r:
                       batches = json.load(r).get("batches", [])
-              except (OSError, ValueError):
+              except (OSError, ValueError, AttributeError):
                   continue
               spans = {}
               for b in batches:

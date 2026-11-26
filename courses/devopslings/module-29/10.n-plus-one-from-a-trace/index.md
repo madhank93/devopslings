@@ -322,7 +322,7 @@ tasks:
           name = todo.pop()
           seen.add(name)
           try:
-              text = open(f"/obs/apps/{name}.py", encoding="utf-8", errors="replace").read()
+              text = open(f"/obs/apps/{name}.py", encoding="utf-8-sig", errors="replace").read()
           except OSError:
               continue
           raw, mods = raw_access(name, text)
