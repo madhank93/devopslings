@@ -139,17 +139,34 @@ tasks:
               no(f"pipeline {n} runs [{', '.join(ps)}]; batch belongs last, right before the exporter.")
 
       # The check's own burst, from a freshly started Collector.
-      subprocess.run(["bash", "-c", ". /usr/local/lib/obs.sh; app_restart collector; collector_settle"],
-                     check=True, stdout=subprocess.DEVNULL)
+      r = subprocess.run(["bash", "-c", ". /usr/local/lib/obs.sh; app_restart collector; collector_settle"],
+                         capture_output=True, text=True)
+      if r.returncode:
+          out = r.stdout.strip()
+          if out.startswith("not yet"):
+              print(out)
+              sys.exit(1)
+          no("the Collector did not settle after the check restarted it.", *(out or r.stderr).splitlines()[-3:])
       time.sleep(3)
       before, mark = started(), len(log_lines())
-      run = subprocess.run(["/obs/tools/importer", "600"], capture_output=True, text=True)
+      try:
+          run = subprocess.run(["/obs/tools/importer", "600"], capture_output=True, text=True, timeout=60)
+      except subprocess.TimeoutExpired:
+          no("the check's burst of 600 requests did not finish in 60s; it normally takes a few seconds.",
+             "The Collector is holding requests open instead of answering them.")
+      if run.returncode:
+          no("the importer itself failed during the check's burst:", *("  " + l for l in run.stderr.splitlines()[-3:]))
       print("the check's burst: " + run.stdout.strip())
       time.sleep(15)
       deaths = [l for l in log_lines()[mark:] if l.startswith("[supervise] collector exited")]
       if deaths or started() != before:
           limit = next((v for k, v in procs.items() if k.split("/")[0] == "memory_limiter"), None) or {}
-          if (limit.get("limit_mib") or 0) >= 256 or (limit.get("limit_percentage") or 0) >= 100:
+          def num(v):
+              try:
+                  return float(v or 0)
+              except (TypeError, ValueError):
+                  return 0.0
+          if num(limit.get("limit_mib")) >= 256 or num(limit.get("limit_percentage")) >= 100:
               no("the Collector died during the burst. memory_limiter's limit is at or above the",
                  "256MiB the container is allowed, so the kernel kills the process before the",
                  "limiter ever thinks memory is short.")
@@ -171,8 +188,8 @@ tasks:
       refused = selfmetric("otelcol_processor_refused_spans(?:_total)?")
       if refused == 0:
           if codes.get("503"):
-              no(f"the Collector answered 503 to {codes['503']} requests, but memory_limiter refused nothing.",
-                 "Those refusals came from further down the pipeline, after the data was already in memory.")
+              no(f"the Collector answered 503 to {codes['503']} requests, but memory_limiter's refused-spans",
+                 "counter stayed at 0, so those 503s did not come from memory_limiter.")
           dropped = selfmetric("otelcol_exporter_enqueue_failed_spans(?:_total)?")
           if dropped:
               no(f"the Collector stayed up and answered 200 to every request, then threw away",

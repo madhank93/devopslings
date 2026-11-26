@@ -194,8 +194,11 @@ tasks:
           return ["  " + l[:250] for l in lines[-3:]] or ["  (nothing)"]
 
       def seconds(v):
-          m = re.fullmatch(r"(\d+)(ms|s|m)", str(v).strip())
-          return int(m.group(1)) * {"ms": 0.001, "s": 1, "m": 60}[m.group(2)] if m else 30
+          v = str(v).strip()
+          if not re.fullmatch(r"(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+", v):
+              return 30
+          unit = {"ns": 1e-9, "us": 1e-6, "µs": 1e-6, "ms": 0.001, "s": 1, "m": 60, "h": 3600}
+          return sum(float(n) * unit[u] for n, u in re.findall(r"(\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)", v))
 
       for app, gw in (("checkout", "collector"), ("ledger", "collector-2")):
           try:
@@ -276,8 +279,13 @@ tasks:
           services = set()
           for name, r in (cfg.get("receivers") or {}).items():
               protos = (r or {}).get("protocols") or {}
-              if (name.split("/")[0] == "otlp" and isinstance(protos, dict) and "http" in protos
-                      and str((protos["http"] or {}).get("endpoint", ":4318")).endswith(":4318")):
+              if name.split("/")[0] != "otlp" or not isinstance(protos, dict) or "http" not in protos:
+                  continue
+              ep = str((protos["http"] or {}).get("endpoint", ":4318"))
+              if "${" in ep:
+                  no(f"{c}'s receiver {name} listens on {ep}. Write the port literally, so the check can tell",
+                     "which receiver the services send to (:4318).")
+              if ep.endswith(":4318"):
                   services.add(name)
           pipes = {n: p or {} for n, p in ((cfg.get("service") or {}).get("pipelines") or {}).items()}
           traces = {n: p for n, p in pipes.items() if n.split("/")[0] == "traces"}
@@ -287,6 +295,11 @@ tasks:
               no(f"{c} sends nothing from the services (its :4318 receiver) through a loadbalancing exporter in a",
                  "traces pipeline. Traces are whole today, but whatever made them whole is not routing by trace",
                  "ID, and the next gateway added splits them again.")
+          for n, p in traces.items():
+              if services & set(p.get("receivers") or []) and n not in routed:
+                  no(f"{c}'s pipeline {n} takes the services' spans and sends them to {', '.join(p.get('exporters') or []) or 'nothing'}",
+                     "without routing by trace ID. Every pipeline fed by the services has to go through the",
+                     "loadbalancing exporter, or the spans it carries are sampled as halves again.")
           for n, p in routed.items():
               if "tail_sampling" in kind(p.get("processors")):
                   no(f"{c}'s pipeline {n} tail-samples and routes by trace ID in one go, so it decides on the half",
@@ -302,13 +315,15 @@ tasks:
               res = ex.get("resolver") or {}
               names = [str(h).rsplit(":", 1)[0] for h in (res.get("static") or {}).get("hostnames") or []]
               if "dns" in res:
-                  names.append(str((res.get("dns") or {}).get("hostname", "")))
+                  names.append(str((res.get("dns") or {}).get("hostname", "")).rsplit(":", 1)[0])
               reached = set().union(*(ips(h) for h in names)) if names else set()
               missing = [g for g, a in gateways.items() if not a & reached]
               if missing:
                   no(f"{c}'s exporter {e} resolves to {', '.join(names) or 'nothing'} and never reaches {', '.join(missing)}.",
                      "A gateway left out samples nothing, and the one left in samples every trace on its own;",
-                     "both have to be targets, so the load is shared by trace ID.")
+                     "both have to be targets, so the load is shared by trace ID."
+                     + (" No single name in this stack resolves to both gateways; list both in a static resolver."
+                        if "dns" in res else ""))
       print(f"PASS — {len(errs)} error traces and {len(chk)} sampled traces in Tempo, every one with checkout")
       print("and ledger in it: both gateways route spans by trace ID before tail sampling.")
       PY
