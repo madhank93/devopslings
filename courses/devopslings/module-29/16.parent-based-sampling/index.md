@@ -173,8 +173,29 @@ tasks:
           no(f"{len(orphans)} of the {len(led)} traces with a ledger span in them have no checkout span",
              f"above it (rootServiceName {orphans[0].get('rootServiceName')!r}). ledger kept spans of",
              "orders checkout chose not to trace: its decision is still its own.")
+      def whole(tid):
+          # ledger's span arrived, or checkout's call to ledger failed: an order
+          # ledger never answered (it was restarting) says nothing of its sampler.
+          try:
+              t = get(f"{TEMPO}/api/traces/{tid}")
+          except OSError:
+              return False
+          for s in (s for b in t.get("batches", []) for ss in b.get("scopeSpans", []) for s in ss.get("spans", [])):
+              if s.get("kind") == "SPAN_KIND_SERVER" and s.get("name") == "POST /entries":
+                  return True
+              if s.get("kind") == "SPAN_KIND_CLIENT" and s.get("status", {}).get("code") == "STATUS_CODE_ERROR":
+                  return True
+          return False
+
       ids = {t["traceID"] for t in led}
       partial = [t for t in chk if t["traceID"] not in ids]
+      # ledger's spans can reach Tempo after the search: re-read before blaming it.
+      deadline = time.time() + 15
+      while partial:
+          partial = [t for t in partial if not whole(t["traceID"])]
+          if not partial or time.time() > deadline:
+              break
+          time.sleep(2)
       if partial:
           no(f"{len(partial)} of the {len(chk)} orders checkout traced have no ledger span in them",
              f"(trace {partial[0]['traceID']}). ledger dropped spans of requests whose caller",
