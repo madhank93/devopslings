@@ -117,10 +117,20 @@ tasks:
       ok_now() { prom_val "probe_success{job=\"$job\"}"; }
 
       firing() { prom_count 'ALERTS{alertstate="firing"}'; }
-      # pending_on METRIC — pending alerts whose rule reads that metric.
+      # pending_on METRIC — pending alerts whose rule reads METRIC, directly or
+      # through a recording rule; "!" when Prometheus' rules API did not answer.
       pending_on() {
-        curl -s --max-time 10 "$PROM/api/v1/rules?type=alert" | jq -r --arg m "$1" '[.data.groups[].rules[]
-          | select(.state == "pending" and (.query | contains($m))) | .name] | unique | join(", ")' 2>/dev/null || true
+        local j
+        j=$(curl -sf --max-time 10 "$PROM/api/v1/rules") || { echo "!"; return; }
+        jq -r --arg m "$1" '[.data.groups[].rules[]] as $r
+          | ([$m] + [$r[] | select(.type == "recording" and (.query | contains($m))) | .name]) as $src
+          | [$r[] | select(.type == "alerting" and .state == "pending")
+             | select(.query as $q | any($src[]; . as $s | $q | contains($s))) | .name]
+          | unique | join(", ")' <<<"$j" 2>/dev/null || echo "!"
+      }
+      rules_down() {
+        echo "not yet: Prometheus' rules API ($PROM/api/v1/rules) did not answer, so the grader cannot"
+        echo "tell whether an alert on the probe was pending. Is Prometheus up? obs-reload reports a bad rule file."
       }
       paged() {
         sink_all | jq -r '[.[] | select(.payload.status == "firing") | .payload.alerts[]
@@ -177,6 +187,8 @@ tasks:
           echo "not yet: portal served its error page with status 200 for 90 seconds, and the probe"
           echo "still passed. A status check cannot tell the error page from the form; the module"
           echo "has to assert on what the page says (fail_if_body_not_matches_regexp)."
+        elif [ "$pending" = "!" ]; then
+          rules_down
         elif [ -n "$pending" ]; then
           echo "not yet: the probe failed (probe_success 0) for 90 seconds, and $pending was still"
           echo "pending. A login page that has been broken for a minute is already news; shorten its for:."
@@ -205,6 +217,8 @@ tasks:
         if [ "$(prom_count "probe_ssl_earliest_cert_expiry{job=\"$job\"}")" = 0 ]; then
           echo "not yet: the certificate expires in 7 days and nothing paged. The probe reports no"
           echo "probe_ssl_earliest_cert_expiry: is it probing https://?"
+        elif [ "$pending" = "!" ]; then
+          rules_down
         elif [ -n "$pending" ]; then
           echo "not yet: the certificate expires in 7 days, nothing paged, and $pending was still pending."
           echo "Expiry is days away, not seconds; a for: longer than a minute or so only delays the page."
