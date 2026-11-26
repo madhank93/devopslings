@@ -121,6 +121,8 @@ tasks:
               no(f"Tempo answered {e.code} ({e}).")
           except OSError as e:
               no(f"Tempo did not answer ({e}).")
+          except ValueError as e:
+              no(f"Tempo answered with something that is not JSON ({e}).")
 
       def spans(trace_id):
           t = tempo(f"/api/traces/{trace_id}")
@@ -183,10 +185,11 @@ tasks:
       ok, short, inline, jobs = 0, [], [], []
       deadline = time.time() + 25
       for tid, sid in traces:
+          until = max(deadline, time.time() + 5)
           while True:
               ss = spans(tid)
               server, below = tree(ss, sid)
-              if any(dur(s) >= JOB for s in below) or time.time() > deadline:
+              if any(dur(s) >= JOB for s in below) or time.time() > until:
                   break
               time.sleep(1)
           if not server:
