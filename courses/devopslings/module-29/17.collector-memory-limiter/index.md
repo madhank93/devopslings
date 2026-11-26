@@ -113,8 +113,9 @@ tasks:
       def selfmetric(name):
           try:
               text = urllib.request.urlopen("http://collector:8888/metrics", timeout=5).read().decode()
-          except OSError:
-              return 0.0
+          except OSError as e:
+              no(f"the check could not read the Collector's own metrics at collector:8888 ({e}).",
+                 "It needs them to see memory_limiter's refusals; leave service.telemetry as it was.")
           return sum(float(m) for m in re.findall(rf"^{name}(?:{{[^}}]*}})? (\S+)", text, re.M))
 
       c = yaml.safe_load(open(CFG)) or {}
@@ -156,14 +157,22 @@ tasks:
              "memory_limiter is in place, but memory still outran it. Its limit sits too close to",
              "the container's 256MiB, or it checks too rarely for how fast a burst arrives:",
              "spike_limit has to cover what arrives between two checks.")
-      codes = {code: int(n) for n, code in re.findall(r"(\d+) (\d{3}|no answer)", run.stdout)}
+      codes = {}
+      for n, code in re.findall(r"(\d+) (\d{3}|no answer)", run.stdout):
+          codes[code] = codes.get(code, 0) + int(n)
+      other = {c: n for c, n in codes.items() if c not in ("200", "503", "no answer")}
+      if other:
+          no("the Collector rejected " + ", ".join(f"{n} requests with {c}" for c, n in other.items()) + ".",
+             "Those spans were never let in. memory_limiter answers 503 while memory is short;",
+             "a 4xx comes from something else, such as a receiver limit, turning the burst away.")
+      if codes.get("no answer"):
+          no(f"{codes['no answer']} of the burst's requests got no answer at all: the Collector dropped",
+             "the connection instead of replying, so the importer cannot tell whether to retry.")
       refused = selfmetric("otelcol_processor_refused_spans(?:_total)?")
-      other = {c: n for c, n in codes.items() if c not in ("200", "503")}
-      if refused == 0 and other:
-          no("the Collector turned away " + ", ".join(f"{n} with {c}" for c, n in other.items()) + ", and",
-             "memory_limiter refused nothing. Something ahead of it rejected the burst, so the spans were",
-             "never let in at all; memory_limiter answers 503 only while memory is short.")
       if refused == 0:
+          if codes.get("503"):
+              no(f"the Collector answered 503 to {codes['503']} requests, but memory_limiter refused nothing.",
+                 "Those refusals came from further down the pipeline, after the data was already in memory.")
           dropped = selfmetric("otelcol_exporter_enqueue_failed_spans(?:_total)?")
           if dropped:
               no(f"the Collector stayed up and answered 200 to every request, then threw away",
@@ -173,8 +182,8 @@ tasks:
              "That only means the burst was smaller than its limit; the check needs to see",
              "memory_limiter push back.")
       if not codes.get("200"):
-          no("memory_limiter refused the whole burst: not one request got a 200. A limiter that",
-             "refuses everything protects the Collector by delivering nothing.")
+          no(f"not one of the burst's requests got a 200 ({codes.get('503', 0)} got 503 from memory_limiter).",
+             "A limiter that refuses everything protects the Collector by delivering nothing.")
 
       # Once the burst is over, new spans have to be accepted and reach Tempo.
       tid = "17" + os.urandom(15).hex()

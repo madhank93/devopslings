@@ -165,7 +165,7 @@ tasks:
     timeout_seconds: 240
     run: |
       python3 - <<'PY'
-      import json, re, sys, time, urllib.parse, urllib.request
+      import json, re, socket, sys, time, urllib.parse, urllib.request
       import yaml
 
       TEMPO = "http://tempo:3200"
@@ -198,9 +198,14 @@ tasks:
           return int(m.group(1)) * {"ms": 0.001, "s": 1, "m": 60}[m.group(2)] if m else 30
 
       for app, gw in (("checkout", "collector"), ("ledger", "collector-2")):
-          if f'endpoint="http://{gw}:4318/v1/traces"' not in open(f"/obs/apps/{app}.py").read():
-              no(f"{app}.py no longer sends its spans to {gw}. A service does not get to pick the gateway",
-                 "that sees the rest of its trace; the routing belongs in the gateways.")
+          try:
+              code = "\n".join(l.split("#")[0] for l in open(f"/obs/apps/{app}.py"))
+          except OSError:
+              no(f"/obs/apps/{app}.py is missing. Reset the lesson to get it back.")
+          eps = re.findall(r"""endpoint\s*=\s*["']([^"']+)["']""", code)
+          if eps != [f"http://{gw}:4318/v1/traces"]:
+              no(f"{app}.py sends its spans to {', '.join(eps) or 'no endpoint'}, not {gw}. A service does not get",
+                 "to pick the gateway that sees the rest of its trace; the routing belongs in the gateways.")
 
       time.sleep(1.5)
       cfgs, wait = {}, 0
@@ -258,26 +263,52 @@ tasks:
              "budget is every error trace and one in ten of the rest: keep the sampler.")
 
       kind = lambda names: {str(n).split("/")[0] for n in names or []}
+
+      def ips(host):
+          try:
+              return {a[4][0] for a in socket.getaddrinfo(host, None)}
+          except OSError:
+              return set()
+      gateways = {g: ips(g) for g in ("collector", "collector-2")}
+
       for c, cfg in cfgs.items():
-          pipes = [p or {} for p in ((cfg.get("service") or {}).get("pipelines") or {}).values()]
-          routed = [p for p in pipes if "loadbalancing" in kind(p.get("exporters"))]
+          # The services' receiver is whichever one listens on 4318, the port they send to.
+          services = set()
+          for name, r in (cfg.get("receivers") or {}).items():
+              protos = (r or {}).get("protocols") or {}
+              if (name.split("/")[0] == "otlp" and isinstance(protos, dict) and "http" in protos
+                      and str((protos["http"] or {}).get("endpoint", ":4318")).endswith(":4318")):
+                  services.add(name)
+          pipes = {n: p or {} for n, p in ((cfg.get("service") or {}).get("pipelines") or {}).items()}
+          traces = {n: p for n, p in pipes.items() if n.split("/")[0] == "traces"}
+          routed = {n: p for n, p in traces.items()
+                    if "loadbalancing" in kind(p.get("exporters")) and services & set(p.get("receivers") or [])}
           if not routed:
-              no(f"{c} sends nothing through a loadbalancing exporter. Traces are whole today, but whatever made",
-                 "them whole is not routing by trace ID, and the next gateway added splits them again.")
-          if any("tail_sampling" in kind(p.get("processors")) for p in routed):
-              no(f"{c} tail-samples in the same pipeline that routes by trace ID, so it decides on the half of",
-                 "the trace it was sent before routing. Route first; sample in a second pipeline.")
-          if any("tail_sampling" in kind(p.get("processors")) and "otlp" in (p.get("receivers") or []) for p in pipes):
-              no(f"{c}'s tail_sampling still reads straight from the services' otlp receiver, so it samples",
-                 "whatever half of a trace a service sent it. Sample only what the loadbalancing exporter routed.")
-          lb = [e for p in routed for e in p.get("exporters") or [] if e.split("/")[0] == "loadbalancing"]
-          if (cfg["exporters"][lb[0]] or {}).get("routing_key", "traceID") != "traceID":
-              no(f"{c}'s loadbalancing exporter routes by {cfg['exporters'][lb[0]].get('routing_key')}, not traceID.")
-          res = (cfg["exporters"][lb[0]] or {}).get("resolver") or {}
-          hosts = [str(h).split(":")[0] for h in (res.get("static") or {}).get("hostnames") or []]
-          if "dns" not in res and not {"collector", "collector-2"} <= set(hosts):
-              no(f"{c}'s loadbalancing exporter sends to {', '.join(hosts) or 'nothing'}. With one gateway in the list,",
-                 "that gateway samples every trace on its own; list both, so the load is shared by trace ID.")
+              no(f"{c} sends nothing from the services (its :4318 receiver) through a loadbalancing exporter in a",
+                 "traces pipeline. Traces are whole today, but whatever made them whole is not routing by trace",
+                 "ID, and the next gateway added splits them again.")
+          for n, p in routed.items():
+              if "tail_sampling" in kind(p.get("processors")):
+                  no(f"{c}'s pipeline {n} tail-samples and routes by trace ID in one go, so it decides on the half",
+                     "of the trace it was sent. Route first; sample in a second pipeline.")
+          for n, p in traces.items():
+              if "tail_sampling" in kind(p.get("processors")) and services & set(p.get("receivers") or []):
+                  no(f"{c}'s pipeline {n} tail-samples straight from the services' receiver, so it samples whatever",
+                     "half of a trace a service sent it. Sample only what the loadbalancing exporter routed.")
+          for e in sorted({e for p in routed.values() for e in p.get("exporters") or [] if e.split("/")[0] == "loadbalancing"}):
+              ex = (cfg.get("exporters") or {}).get(e) or {}
+              if ex.get("routing_key", "traceID") != "traceID":
+                  no(f"{c}'s exporter {e} routes by {ex.get('routing_key')}, not traceID.")
+              res = ex.get("resolver") or {}
+              names = [str(h).rsplit(":", 1)[0] for h in (res.get("static") or {}).get("hostnames") or []]
+              if "dns" in res:
+                  names.append(str((res.get("dns") or {}).get("hostname", "")))
+              reached = set().union(*(ips(h) for h in names)) if names else set()
+              missing = [g for g, a in gateways.items() if not a & reached]
+              if missing:
+                  no(f"{c}'s exporter {e} resolves to {', '.join(names) or 'nothing'} and never reaches {', '.join(missing)}.",
+                     "A gateway left out samples nothing, and the one left in samples every trace on its own;",
+                     "both have to be targets, so the load is shared by trace ID.")
       print(f"PASS — {len(errs)} error traces and {len(chk)} sampled traces in Tempo, every one with checkout")
       print("and ledger in it: both gateways route spans by trace ID before tail sampling.")
       PY
