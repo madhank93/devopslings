@@ -8,6 +8,16 @@
 #   checkout ──> broker ──> fulfil ──> ledger     traces ──> tempo
 #   billing ──> collector ──> loki                logs
 #   opensearch                                    (an index a lesson repairs)
+#   loki ruler ──> alertmanager                   alerts on logs
+#
+# Started by the lessons that use them, held down otherwise:
+#   collector-2                  a second gateway Collector
+#   prometheus-2, prometheus-3   Prometheus with lesson-chosen flags
+#   mimir                        long-term storage behind remote write
+#   portal (HTTPS) <── blackbox  a login page probed from outside
+#   nightly ──> pushgateway      a batch job that pushes its results
+#   lab                          a spare slot for a lesson's own service
+# Always up: pyroscope (continuous profiles), blackbox, pushgateway.
 #
 # Every editable file lives in one named volume mounted at /obs: Prometheus
 # config and rules, the Alertmanager config, the Collector config, the apps'
@@ -139,6 +149,89 @@ services:
     <<: *app
     command: ["supervise", "billing", "python3", "/obs/apps/billing.py"]
 
+  # A second gateway Collector, configured by /obs/otel/collector-2.yaml.
+  collector-2:
+    <<: *app
+    command: ["supervise", "collector-2", "otelcol-contrib", "--config", "/obs/otel/collector-2.yaml"]
+    mem_limit: 256m
+
+  # A second Prometheus whose flags a lesson can change: /obs/prometheus-2/run.sh.
+  prometheus-2:
+    <<: *app
+    command: ["supervise", "prometheus-2", "bash", "/obs/prometheus-2/run.sh"]
+    ports:
+      - "19092:9090"
+    mem_limit: 384m
+
+  # A third Prometheus, the same shape: /obs/prometheus-3/run.sh.
+  prometheus-3:
+    <<: *app
+    command: ["supervise", "prometheus-3", "bash", "/obs/prometheus-3/run.sh"]
+    ports:
+      - "19094:9090"
+    mem_limit: 384m
+
+  # Long-term storage behind remote write, with the HA tracker on.
+  mimir:
+    <<: *app
+    command: ["supervise", "mimir", "bash", "-c", "rm -rf /tmp/mimir && exec mimir -config.file=/obs/stack/mimir.yaml"]
+    ports:
+      - "19009:9009"
+    mem_limit: 768m
+
+  # The login page, over HTTPS on :8443.
+  portal:
+    <<: *app
+    command: ["supervise", "portal", "python3", "/obs/apps/portal.py"]
+
+  # A batch job that pushes to the Pushgateway when it succeeds.
+  nightly:
+    <<: *app
+    command: ["supervise", "nightly", "python3", "/obs/apps/nightly.py"]
+
+  # A spare slot for a lesson's own service: /obs/apps/lab.py.
+  lab:
+    <<: *app
+    command: ["supervise", "lab", "python3", "/obs/apps/lab.py"]
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    command: ["--config.file=/obs/blackbox/blackbox.yml"]
+    volumes:
+      - obs:/obs:ro
+    ports:
+      - "19115:9115"
+    depends_on:
+      box:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9115/-/healthy"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 64m
+
+  pushgateway:
+    image: prom/pushgateway:v1.11.1
+    # The admin API lets obs-reset wipe every pushed group between lessons.
+    command: ["--web.enable-admin-api"]
+    ports:
+      - "19091:9091"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9091/-/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 64m
+
+  # Continuous profiling. The image has no shell, so no healthcheck: a lesson
+  # that uses it waits for http://pyroscope:4040/ready itself.
+  pyroscope:
+    image: grafana/pyroscope:1.14.0
+    ports:
+      - "14040:4040"
+    mem_limit: 384m
+
   prometheus:
     image: prom/prometheus:v3.5.0
     command:
@@ -234,8 +327,9 @@ services:
     command: ["-config.file=/obs/stack/tempo.yaml"]
     volumes:
       - obs:/obs:ro
+    # tmpfs pages count toward mem_limit; retention in tempo.yaml bounds them.
     tmpfs:
-      - /var/tempo:uid=10001,gid=10001
+      - /var/tempo:uid=10001,gid=10001,size=600m
     ports:
       - "13200:3200"
     depends_on:
@@ -246,7 +340,8 @@ services:
       interval: 2s
       timeout: 3s
       retries: 60
-    mem_limit: 512m
+    restart: unless-stopped
+    mem_limit: 1g
 
   # One lesson's index lives here. No healthcheck, so `up --wait` does not hold
   # every other lesson for its start; that lesson waits for it instead.
