@@ -239,7 +239,7 @@ tasks:
           try:
               with urllib.request.urlopen("http://collector:8888/metrics", timeout=10) as r:
                   vals = [float(m.group(1)) for m in re.finditer(
-                      r'^otelcol_receiver_accepted_spans(?:_total)?\{[^}]*receiver="otlp"[^}]*\}\s+(\S+)',
+                      r'^otelcol_receiver_accepted_spans_total(?:\{[^}]*\})?\s+(\S+)',
                       r.read().decode(), re.M)]
           except OSError as e:
               lesson_error(f"the Collector's metrics on :8888 did not answer ({e}). The end of",
@@ -295,7 +295,7 @@ tasks:
           p = urllib.parse.urlencode({"q": q, "start": start - 1, "end": end + 2, "limit": limit, "spss": 1})
           try:
               return get(f"{TEMPO}/api/search?{p}").get("traces", [])
-          except OSError as e:
+          except (OSError, ValueError) as e:
               no(f"Tempo did not answer a search ({e}).")
 
       def probes():
@@ -323,10 +323,13 @@ tasks:
       slow = [i for i in range(ERRORS, ERRORS + SLOW) if i not in got]
       if s1 is None:
           if search('{resource.service.name="checkout"}', 1):
-              lesson_error("the Collector's metrics on :8888 have no accepted-spans series for its otlp receiver,",
+              lesson_error("the Collector's metrics on :8888 have no otelcol_receiver_accepted_spans_total series,",
                            "though spans reach Tempo, so the check cannot count the spans it receives. Keep the",
-                           "otlp receiver and its telemetry on :8888 as they were.")
+                           "Collector's own telemetry on :8888 as it was.")
           s1 = 0.0
+      if s1 < s0:
+          lesson_error(f"the Collector's accepted-spans counter went down ({s0:.0f} to {s1:.0f}) while the check",
+                       "ran: the Collector restarted mid-run. Run the check again once it stays up.")
       sent = (s1 - s0) / max(placed, 1)
       missed = errs + slow
       if missed and sent < 1.0 and all(i in HIDDEN for i in missed):
