@@ -410,7 +410,8 @@ tasks:
           what = ([f"changed {', '.join(changed[:5])} (restore from /obs/run/catalog-v2.orig)"] * bool(changed)
                   + [f"added {', '.join(added[:5])} (remove)"] * bool(added)
                   + [f"deleted {', '.join(removed[:5])} (restore from /obs/run/catalog-v2.orig)"] * bool(removed))
-          no(f"v2 {'; '.join(what)}.", "The rest of the release stays as it shipped; the fix belongs in money.py alone.")
+          other = [l for l in drift if not l.startswith(("Files", "Only in"))]
+          no(f"v2 {'; '.join(what + other[:3])}.", "The rest of the release stays as it shipped; the fix belongs in money.py alone.")
 
       # Faster must not mean different: v2's prices have to render exactly as v1's.
       grid = r'''
@@ -448,16 +449,18 @@ tasks:
               no(f"{d} does not run under bench.py:", *r.stderr.strip().splitlines()[-3:])
 
       # The traffic loops share the CPU with the benchmark; pause them while it runs.
-      # A harness timeout sends SIGTERM; turn it into SystemExit so the finally resumes the loops.
-      signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
-      subprocess.run("pkill -STOP -f '^python3 /obs/catalog/serve.py'", shell=True)
+      # A SIGTERM becomes SystemExit so the finally resumes the loops. The runner's own timeout
+      # is a SIGKILL, which skips it; the next init_scenario restarts the loops either way.
+      old_term = signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
       try:
+          subprocess.run("pkill -STOP -f '^python3 /obs/catalog/serve.py'", shell=True)
           runs = {"v1": [], "v2": []}
           for _ in range(3):
               for v in ("v1", "v2"):
                   runs[v].append(bench(f"/obs/catalog/{v}"))
       finally:
           subprocess.run("pkill -CONT -f '^python3 /obs/catalog/serve.py'", shell=True)
+          signal.signal(signal.SIGTERM, old_term)
       v1, v2 = sorted(runs["v1"])[1], sorted(runs["v2"])[1]
       print(f"this check benchmarked each version three times, alternating: v1 {v1:.0f}, v2 {v2:.0f} pages per CPU second")
       if v2 < 0.95 * v1:

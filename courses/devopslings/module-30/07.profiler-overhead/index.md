@@ -127,7 +127,7 @@ tasks:
     timeout_seconds: 240
     run: |
       python3 - <<'PY'
-      import configparser, json, subprocess, sys, time, urllib.parse, urllib.request
+      import configparser, http.client, json, subprocess, sys, time, urllib.parse, urllib.request
 
       def no(*lines):
           print("not yet: " + lines[0])
@@ -210,7 +210,7 @@ tasks:
       while True:
           try:
               fb = json.load(urllib.request.urlopen(url, timeout=15)).get("flamebearer") or {}
-          except (OSError, ValueError):
+          except (OSError, ValueError, http.client.HTTPException):
               fb = {}
           ticks = fb.get("numTicks") or 0
           same = same + 1 if ticks == prev else 0

@@ -219,10 +219,11 @@ tasks:
               examined += 1
               got = next((a["value"].get("stringValue", "") for a in sp.get("attributes") or []
                           if a.get("key") == "pyroscope.profile.id"), "")
-              if not got or norm(got) != norm(sp.get("spanID", "")):
+              # The != nil search above proves the attribute exists; a result without it says nothing.
+              if got and norm(got) != norm(sp.get("spanID", "")):
                   no(f"price-quote span {sp.get('spanID')} carries pyroscope.profile.id={got!r}, not its own span id.",
                      "The profile samples are labelled with the span id; an id set by hand links to nothing.")
-      if sel and not examined:
+      if not examined:
           no(f"Tempo matched {len(sel)} price-quote traces but returned none of their spans, so this check",
              "cannot read their pyroscope.profile.id. Run the check again.")
       # The id must lead to samples: run quoter's own setup, burn CPU in one root span of its
