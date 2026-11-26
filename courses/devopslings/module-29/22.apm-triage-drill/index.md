@@ -368,8 +368,8 @@ tasks:
           if field(k) in ("", "?"):
               no(f"{k} in {ANSWER} is not filled in.")
 
-      # cause and service are judged before any evidence, so at most fifteen guesses
-      # find them; the fix and the evidence are what this drill grades.
+      # cause and service are judged before any evidence, so they can be guessed;
+      # the fix and the evidence are what this drill grades.
       said = field("cause").lower()
       if said not in where:
           no(f"cause is '{said}'. It is one of: {', '.join(where)}.")
@@ -404,8 +404,14 @@ tasks:
       def place(o):
           t0 = time.monotonic()
           try:
-              o["answer"] = post("http://checkout:8080/checkout", {k: o[k] for k in ("order", "email", "skus")}, TIMEOUT)
-              o["code"] = 200
+              req = urllib.request.Request("http://checkout:8080/checkout", json.dumps({k: o[k] for k in ("order", "email", "skus")}).encode(),
+                                           {"Content-Type": "application/json"})
+              with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                  raw, o["code"] = r.read(), 200
+              try:
+                  o["answer"] = json.loads(raw)
+              except ValueError:
+                  o["answer"] = raw[:80].decode(errors="replace")
           except urllib.error.HTTPError as e:
               o["code"], o["err"] = e.code, f"HTTP {e.code} {e.read()[:100].decode(errors='replace')}"
           except Exception as e:
@@ -461,13 +467,13 @@ tasks:
       # order with no answer is lost, and a few of those in a thousand are tolerated.
       answered = [o for o in orders if o["code"] == 200]
       book = recorded([o["order"] for o in answered])
-      wrong = [o for o in answered if (o["answer"] or {}).get("total") != o["total"] or book.get(o["order"]) != o["total"]]
+      wrong = [o for o in answered if not (isinstance(o["answer"], dict) and o["answer"].get("total") == o["total"]) or book.get(o["order"]) != o["total"]]
       if wrong:
           w = wrong[0]
           no(f"{len(wrong)} of the grader's orders were answered as taken but are not in ledger's book at their",
              f"total. Order {w['order']}: checkout answered {json.dumps(w['answer'])[:80]}, ledger has {book.get(w['order'])}",
              f"for a total of {w['total']}. An answered order has to be recorded.")
-      lost = [o for o in orders if o["code"] != 200 and not (odd(o) and o["code"] == 400)]
+      lost = [o for o in orders if o["code"] != 200 and not (odd(o) and o["code"] is not None)]
       if len(lost) > len(orders) * 0.01:
           no(f"{len(lost)} of the grader's {len(orders)} orders got no answer or an error. A fast failure is still",
              "a lost order. The commonest:",
@@ -494,67 +500,168 @@ tasks:
       # The cause itself gone, not only diluted.
       src = {a: open(f"/obs/apps/{f}.py").read() for a, f in (("checkout", "checkout"), ("pricing", "fulfil"), ("ledger", "ledger"))}
 
+      # Code gates: each one says "not yet" only on a pattern it recognises as the
+      # cause still in place. Code it cannot follow is left to the behavioural
+      # checks above, which already passed.
+      class Skip(Exception):
+          pass
+
+      UNREADABLE = (Skip, ValueError, TypeError, KeyError, IndexError, OverflowError, AttributeError, RecursionError, SyntaxError)
+
       def tree_of(app):
           try:
               t = ast.parse(src[app])
-          except SyntaxError as e:
-              no(f"{app}'s source does not parse ({e}).")
+          except SyntaxError:
+              raise Skip
           for n in ast.walk(t):
               for c in ast.iter_child_nodes(n):
                   c.parent = n
           return t
 
       def consts(t):
+          """Module-level names bound once, to the expression they were given."""
           out = {}
           for n in t.body:
               if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
-                  try:
-                      out[n.targets[0].id] = ast.literal_eval(n.value)
-                  except (ValueError, TypeError, SyntaxError):
-                      pass
+                  out[n.targets[0].id] = n.value
+              elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name) and n.value is not None:
+                  out[n.target.id] = n.value
           return out
 
-      def value(e, known, scope=None):
-          """The literal an expression stands for: a literal, a module constant, or a parameter bound in scope."""
-          if isinstance(e, ast.Name) and scope and e.id in scope:
-              return value(scope[e.id], known)
-          if isinstance(e, ast.Name) and e.id in known:
-              return known[e.id]
-          return ast.literal_eval(e)
+      OPS = {ast.Add: lambda a, b: a + b, ast.Sub: lambda a, b: a - b, ast.Mult: lambda a, b: a * b,
+             ast.Div: lambda a, b: a / b, ast.FloorDiv: lambda a, b: a // b, ast.Mod: lambda a, b: a % b,
+             ast.USub: lambda a: -a, ast.UAdd: lambda a: +a}
+
+      def value(e, env, scope=None, depth=0):
+          """The number an expression stands for, through module constants and the parameters bound in scope."""
+          if depth > 20:
+              raise Skip
+          if isinstance(e, ast.Constant) and isinstance(e.value, (int, float)) and not isinstance(e.value, bool):
+              return e.value
+          if isinstance(e, ast.Name):
+              if scope and e.id in scope:
+                  return value(scope[e.id], env, None, depth + 1)
+              if e.id in env:
+                  return value(env[e.id], env, None, depth + 1)
+          if isinstance(e, ast.UnaryOp) and type(e.op) in OPS:
+              return OPS[type(e.op)](value(e.operand, env, scope, depth + 1))
+          if isinstance(e, ast.BinOp) and type(e.op) in OPS:
+              return OPS[type(e.op)](value(e.left, env, scope, depth + 1), value(e.right, env, scope, depth + 1))
+          raise Skip
 
       def ancestors(n):
           while hasattr(n, "parent"):
               n = n.parent
               yield n
 
-      def named(n, name):
-          return isinstance(n, ast.Call) and getattr(n.func, "id", getattr(n.func, "attr", None)) == name
+      def fname(f):
+          return getattr(f, "id", getattr(f, "attr", None))
 
-      if cause == "pool":
+      def named(n, name):
+          return isinstance(n, ast.Call) and fname(n.func) == name
+
+      def bound_to(t, kinds):
+          """Module-level names bound to a call of one of kinds (threading.Lock, an import alias of it, ...)."""
+          alias = {a.asname or a.name: a.name for n in ast.walk(t) if isinstance(n, ast.ImportFrom) for a in n.names}
+          out = {}
+          for n in t.body:
+              target = n.targets[0] if isinstance(n, ast.Assign) and len(n.targets) == 1 else getattr(n, "target", None)
+              if isinstance(target, ast.Name) and isinstance(n.value, ast.Call):
+                  f = fname(n.value.func)
+                  if alias.get(f, f) in kinds:
+                      out[target.id] = n.value
+          return out
+
+      def gate_pool():
           t = tree_of("ledger")
-          pools = [(n.targets[0].id, n.value) for n in t.body if isinstance(n, ast.Assign) and len(n.targets) == 1
-                   and isinstance(n.targets[0], ast.Name) and isinstance(n.value, ast.Call)
-                   and getattr(n.value.func, "attr", getattr(n.value.func, "id", "")).endswith("Semaphore")]
-          if len(pools) != 1 or not pools[0][1].args:
-              no("ledger no longer has one connection pool (a Semaphore of a number of connections). A database",
-                 "takes only so many connections at once; size the pool, don't remove it.")
-          name, ctor = pools[0]
+          pools = bound_to(t, {"Semaphore", "BoundedSemaphore"})
+          if len(pools) != 1:
+              return
+          (name, ctor), = pools.items()
+          arg = ctor.args[0] if ctor.args else next((k.value for k in ctor.keywords if k.arg == "value"), ast.Constant(1))
           try:
-              size = int(value(ctor.args[0], consts(t)))
-          except (ValueError, TypeError):
-              no(f"ledger's pool size {ast.unparse(ctor.args[0])} is not a number the grader can read.")
-          if size < 16:
+              size = int(value(arg, consts(t)))
+          except UNREADABLE:
+              size = None
+          if size is not None and size < 16:
               no(f"ledger's connection pool is {size}. At a burst its callers have more requests in flight",
                  "than that (pricing's four workers alone take four); size it for them, 16 or more.")
-          if size > 32:
+          if size is not None and size > 32:
               no(f"ledger's connection pool is {size}. The database behind it takes only so many connections;",
                  "a pool far past ledger's concurrent requests moves the queue into the database. 16 to 32.")
           fns = {n.name: n for n in t.body if isinstance(n, ast.FunctionDef)}
           for fn in ("prices", "entries"):
-              if fn not in fns or not any(isinstance(n, ast.With) and any(isinstance(i.context_expr, ast.Name) and
-                                          i.context_expr.id == name for i in n.items) for n in ast.walk(fns[fn])):
+              if fn in fns and not any(isinstance(n, ast.Name) and n.id == name for n in ast.walk(fns[fn])):
                   no(f"ledger's {fn} no longer takes a connection from {name}. Every query holds one while it works;",
                      "skipping the pool is the same as removing it.")
+
+      def gate_retry():
+          t = tree_of("checkout")
+          env = consts(t)
+          gq = next((n for n in t.body if isinstance(n, ast.FunctionDef) and n.name == "get_quote"), None)
+          if gq is None:
+              return
+          params = [a.arg for a in gq.args.args]
+          defaults = dict(zip(params[len(params) - len(gq.args.defaults):], gq.args.defaults))
+          calls = [n for n in ast.walk(gq) if named(n, "call")]
+          t_expr = None
+          if len(calls) == 1:
+              t_expr = next((k.value for k in calls[0].keywords if k.arg == "timeout"),
+                            calls[0].args[4] if len(calls[0].args) > 4 else ast.Constant(2.0))
+          loops = [n for n in ast.walk(gq) if isinstance(n, (ast.For, ast.While))]
+          r_args = loops[0].iter.args if len(loops) == 1 and isinstance(loops[0], ast.For) and named(loops[0].iter, "range") else None
+          for site in (n for n in ast.walk(t) if named(n, "get_quote")):
+              if any(isinstance(a, (ast.For, ast.While)) for a in ancestors(site)):
+                  no("checkout calls get_quote inside a loop: retries on top of get_quote's own retries multiply",
+                     "the quotes pricing has to serve. Retry in one place.")
+              scope = dict(defaults)
+              scope.update(zip(params, site.args))
+              scope.update((k.arg, k.value) for k in site.keywords if k.arg)
+              try:
+                  timeout = float(value(t_expr, env, scope)) if t_expr is not None else None
+              except UNREADABLE:
+                  timeout = None
+              try:
+                  attempts = len(range(*[int(value(a, env, scope)) for a in r_args])) if r_args else None
+              except UNREADABLE:
+                  attempts = None
+              if timeout is not None and timeout < 0.1:
+                  no(f"checkout still gives pricing {timeout}s to answer a quote, less than pricing takes under",
+                     "load, so a quote in a queue is asked for again while the first is still waiting.")
+              if timeout is not None and timeout > 2.0:
+                  no(f"checkout gives pricing {timeout}s to answer a quote. A customer will not wait that long, and",
+                     "a hung pricing holds every order that long; keep it above pricing's latency, at most 2s.")
+              if attempts is not None and attempts < 2:
+                  no("checkout's get_quote makes a single attempt. With retries off, one dropped connection to",
+                     "pricing loses the order; keep one retry and give pricing long enough to answer.")
+              if attempts is not None and attempts > 3:
+                  no(f"checkout still tries a quote {attempts} times. Under load each retry is another quote pricing",
+                     "has to serve; one retry is enough.")
+
+      def gate_lock():
+          t = tree_of("checkout")
+          locks = bound_to(t, {"Lock", "RLock", "Semaphore", "BoundedSemaphore"})
+          for c in (n for n in ast.walk(t) if named(n, "call") and any(isinstance(a, ast.Constant) and "ledger" in str(a.value) for a in n.args)):
+              for a in ancestors(c):
+                  for i in getattr(a, "items", []) if isinstance(a, ast.With) else []:
+                      if isinstance(i.context_expr, ast.Name) and i.context_expr.id in locks:
+                          no(f"checkout still holds {i.context_expr.id} across its call to ledger, so orders record one at a time.")
+              fn = next((a for a in ancestors(c) if isinstance(a, ast.FunctionDef)), None)
+              for name in locks:
+                  ops = sorted((n.lineno, n.func.attr) for n in ast.walk(fn or t) if isinstance(n, ast.Call)
+                               and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name)
+                               and n.func.value.id == name and n.func.attr in ("acquire", "release") and n.lineno < c.lineno)
+                  if ops and ops[-1][1] == "acquire":
+                      no(f"checkout still holds {name} (acquired before the call) across its call to ledger, so orders",
+                         "record one at a time.")
+
+      for c, gate in (("pool", gate_pool), ("retry-storm", gate_retry), ("lock", gate_lock)):
+          if cause == c:
+              try:
+                  gate()
+              except UNREADABLE:
+                  pass
+
       if cause == "n-plus-one":
           per = [len(s) for t in search('{resource.service.name="pricing" && kind=client}', spss=100)
                  for s in [[x for ss in t.get("spanSets", []) for x in ss.get("spans", [])]]]
@@ -580,58 +687,6 @@ tasks:
                  "pattern does not match; a faster pattern, not a skipped check.")
           if good["code"] != 200:
               no(f"checkout refused chen.li.93@shop.example ({good['err']}). The pattern has to accept a real address.")
-      if cause == "retry-storm":
-          t = tree_of("checkout")
-          known = consts(t)
-          gq = next((n for n in t.body if isinstance(n, ast.FunctionDef) and n.name == "get_quote"), None)
-          unreadable = ("checkout's get_quote no longer has the shape the grader reads: one call() to pricing, inside",
-                        "one 'for attempt in range(attempts)' loop, with numbers (or constants) for timeout and attempts.")
-          if gq is None:
-              no(*unreadable)
-          params = [a.arg for a in gq.args.args]
-          defaults = dict(zip(params[len(params) - len(gq.args.defaults):], gq.args.defaults))
-          calls = [n for n in ast.walk(gq) if named(n, "call")]
-          loops = [n for n in ast.walk(gq) if isinstance(n, ast.For) and named(n.iter, "range")]
-          if len(calls) != 1 or len(loops) != 1:
-              no(*unreadable)
-          t_expr = next((k.value for k in calls[0].keywords if k.arg == "timeout"),
-                        calls[0].args[4] if len(calls[0].args) > 4 else ast.Constant(2.0))
-          a_expr = loops[0].iter.args[-1]
-          sites = [n for n in ast.walk(t) if named(n, "get_quote")]
-          if not sites:
-              no(*unreadable)
-          for site in sites:
-              if any(isinstance(a, (ast.For, ast.While)) for a in ancestors(site)):
-                  no("checkout calls get_quote inside a loop: retries on top of get_quote's own retries multiply",
-                     "the quotes pricing has to serve. Retry in one place.")
-              scope = dict(defaults)
-              scope.update(zip(params, site.args))
-              scope.update((k.arg, k.value) for k in site.keywords)
-              try:
-                  timeout, attempts = float(value(t_expr, known, scope)), int(value(a_expr, known, scope))
-              except (ValueError, TypeError, KeyError):
-                  no(*unreadable)
-              if timeout < 0.1:
-                  no(f"checkout still gives pricing {timeout}s to answer a quote, less than pricing takes under",
-                     "load, so a quote in a queue is asked for again while the first is still waiting.")
-              if timeout > 2.0:
-                  no(f"checkout gives pricing {timeout}s to answer a quote. A customer will not wait that long, and",
-                     "a hung pricing holds every order that long; keep it above pricing's latency, at most 2s.")
-              if attempts < 2:
-                  no("checkout's get_quote makes a single attempt. With retries off, one dropped connection to",
-                     "pricing loses the order; keep one retry and give pricing long enough to answer.")
-              if attempts > 3:
-                  no(f"checkout still tries a quote {attempts} times. Under load each retry is another quote pricing",
-                     "has to serve; one retry is enough.")
-      if cause == "lock":
-          t = tree_of("checkout")
-          for c in (n for n in ast.walk(t) if named(n, "call") and any(isinstance(a, ast.Constant) and "ledger" in str(a.value) for a in n.args)):
-              held = [i.context_expr for a in ancestors(c) if isinstance(a, ast.With) for i in a.items
-                      if not named(i.context_expr, "start_as_current_span")]
-              fn = next((a for a in ancestors(c) if isinstance(a, ast.FunctionDef)), None)
-              if held or (fn and any(named(n, "acquire") for n in ast.walk(fn))):
-                  what = ast.unparse(held[0]) if held else "an acquire()"
-                  no(f"checkout still holds a lock ({what}) across its call to ledger, so orders record one at a time.")
 
       # The evidence.
       ex = field("exemplar").lower()
@@ -639,9 +694,13 @@ tasks:
           t = get(f"{TEMPO}/api/traces/{ex}")
           spans = [s for b in t.get("batches", []) for ss in b.get("scopeSpans", []) for s in ss.get("spans", [])]
           root = next(s for s in spans if s["name"] == "POST /checkout")
-          dur = (int(root["endTimeUnixNano"]) - int(root["startTimeUnixNano"])) / 1e6
-      except (OSError, StopIteration, KeyError, ValueError):
+      except (OSError, StopIteration, KeyError, ValueError, AttributeError):
           no(f"exemplar '{ex}' is not a checkout trace in Tempo. Paste the ID of a slow one you opened.")
+      try:
+          dur = (int(root["endTimeUnixNano"]) - int(root["startTimeUnixNano"])) / 1e6
+      except (KeyError, ValueError, TypeError):
+          no(f"exemplar {ex} is a checkout trace, but Tempo has no start and end time for its POST /checkout span.",
+             "Pick another slow trace.")
       if dur < BUDGET_MS:
           no(f"exemplar {ex} took {dur:.0f}ms, inside the budget: it is not one of the slow orders.")
       if cause == "regex" and not re.search(r"validat|regex|\bre\.\w|fullmatch|email", field("profile").lower()):
@@ -668,20 +727,28 @@ tasks:
           no("detect does not use the span metrics or the service graph, which is where this showed first.")
       if not r["data"]["result"]:
           no("detect returns nothing on the metrics Prometheus has: a query with no series never fires.")
-      m = re.search(r"\d+(\.\d+)?", field("threshold"))
+      m = re.search(r"\d*\.?\d+", field("threshold"))
       if not m:
           no(f"threshold is '{field('threshold')}'. It is a number the detect query crosses.")
       # While the exemplar was slow, the query has to have been at or over the
-      # threshold, or it would not have paged. No reading then is not held against it.
-      at = min(time.time(), int(root["endTimeUnixNano"]) / 1e9 + 30)
-      try:
-          then = [float(s["value"][1]) for s in prom(time=at)["data"]["result"]]
-      except (KeyError, TypeError, ValueError, IndexError):
-          then = []
-      then = [x for x in then if x == x and x not in (float("inf"), float("-inf"))]
-      if then and max(then) < float(m.group()):
+      # threshold (or true, for a comparison with bool), or it would not have paged.
+      then = []
+      for after in (30, 60):
+          at = min(time.time(), int(root["endTimeUnixNano"]) / 1e9 + after)
+          try:
+              then = [float(s["value"][1]) for s in prom(time=at)["data"]["result"]]
+          except (KeyError, TypeError, ValueError, IndexError):
+              then = []
+          then = [x for x in then if x == x and abs(x) != float("inf")]
+          if then:
+              break
+      if not then:
+          no("detect has no reading around your exemplar, while checkout was over budget: at the moment it",
+             "mattered, the query returned nothing to page on.")
+      line = 1 if re.search(r"\bbool\b", q) else float(m.group())
+      if max(then) < line:
           no(f"detect read {max(then):.3g} around your exemplar, while checkout was over budget, which is under",
-             f"the threshold {m.group()}: it would not have paged when it mattered.")
+             f"{'1 (true)' if line == 1 and 'bool' in q else 'the threshold ' + m.group()}: it would not have paged when it mattered.")
       print(f"PASS — {cause} in {where[cause]}, fixed where it lives; p99 {p99:.0f}ms under the {BUDGET_MS}ms budget")
       print(f"on {len(orders)} orders ({len(roots)} in Tempo), {len(lost)} lost, with evidence from each step and a detection signal.")
       PY
