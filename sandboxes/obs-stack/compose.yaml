@@ -327,7 +327,8 @@ services:
     command: ["-config.file=/obs/stack/tempo.yaml"]
     volumes:
       - obs:/obs:ro
-    # tmpfs pages count toward mem_limit; retention in tempo.yaml bounds them.
+    # tmpfs pages count toward mem_limit; the tmpfs size caps them, and
+    # block_retention in tempo.yaml drops old blocks before they fill it.
     tmpfs:
       - /var/tempo:uid=10001,gid=10001,size=600m
     ports:
