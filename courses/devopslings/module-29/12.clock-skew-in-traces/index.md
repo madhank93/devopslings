@@ -145,11 +145,33 @@ tasks:
       offset_ms: ?   # how far off, in milliseconds, as you measured it from a trace
       TXT
       for a in ledger fulfil checkout; do app_restart "$a"; app_up "$a"; done
-      # The check reads the real offset from this first trace.
-      tid=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')
-      curl -sf --retry 30 --retry-connrefused --retry-all-errors --retry-delay 1 -o /dev/null -X POST -d '{}' -H "traceparent: 00-$tid-$(od -An -tx1 -N8 /dev/urandom | tr -d ' \n')-01" \
-        http://checkout:8080/checkout
-      echo "$tid" > /obs/data/clock-skew.trace
+      # The check reads the real offset from this first trace. Spans sent while
+      # the Collector is still starting can be lost, so retry until Tempo has
+      # ledger's span under checkout's.
+      python3 - <<'PY'
+      import json, os, sys, time, urllib.request
+      for attempt in range(6):
+          tid = os.urandom(16).hex()
+          try:
+              urllib.request.urlopen(urllib.request.Request("http://checkout:8080/checkout", data=b"{}", headers={
+                  "traceparent": f"00-{tid}-{os.urandom(8).hex()}-01"}), timeout=10).read()
+          except OSError:
+              time.sleep(2)
+              continue
+          for _ in range(10):
+              time.sleep(2)
+              try:
+                  with urllib.request.urlopen(f"http://tempo:3200/api/traces/{tid}", timeout=10) as r:
+                      batches = json.load(r).get("batches", [])
+              except OSError:
+                  continue
+              svcs = {a["value"].get("stringValue") for b in batches
+                      for a in b.get("resource", {}).get("attributes", []) if a["key"] == "service.name"}
+              if {"checkout", "ledger"} <= svcs:
+                  open("/obs/data/clock-skew.trace", "w").write(tid + "\n")
+                  sys.exit(0)
+      sys.exit("no complete trace of POST /checkout reached Tempo")
+      PY
       echo "scenario ready: checkout takes an order every second or so, calls ledger, then fulfil."
       echo "Each app runs on a host of its own name. Spans go through the Collector to Tempo."
       echo "  curl -s 'http://tempo:3200/api/search?q={name=\"POST /checkout\"}&limit=3' | jq -r '.traces[].traceID'"
@@ -228,7 +250,8 @@ tasks:
       for k, v in (("cause", cause), ("host", host), ("offset_ms", off)):
           if not v or v == "?":
               no(f"{k} in {ANSWER} is not filled in.")
-      if not re.search(r"\b(clocks?|ntp|chronyd?|skew(ed)?|drift(ed|ing)?|time ?sync)\b", cause.lower()):
+      if re.search(r"time ?zone|\btz\b|collector", cause.lower()) or not re.search(
+              r"\b(clocks?|ntpd?|chronyd?|skew(ed)?|drift(ed|ing)?|time[ _-]?sync)\b", cause.lower()):
           no(f"cause is '{cause}'. Spans from one service sit where they should in the same trace, so",
              "context propagation and the span code work. What differs between the hosts?")
       if host != "ledger":
