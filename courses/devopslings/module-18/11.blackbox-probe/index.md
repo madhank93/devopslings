@@ -118,7 +118,7 @@ tasks:
 
       firing() { prom_count 'ALERTS{alertstate="firing"}'; }
       # pending_on METRIC — pending alerts whose rule reads METRIC, directly or
-      # through a recording rule; "!" when Prometheus' rules API did not answer.
+      # through one recording rule (one hop only); "!" when the rules API did not answer.
       pending_on() {
         local j
         j=$(curl -sf --max-time 10 "$PROM/api/v1/rules") || { echo "!"; return; }
