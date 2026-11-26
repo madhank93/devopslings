@@ -165,18 +165,30 @@ tasks:
               no(f"fulfil answered POST /orders with {code}, not 202. The request should still only queue",
                  "the job. The end of /obs/logs/fulfil.log:", *log_tail())
           traces.append((tid, sid))
-          time.sleep(0.5)
 
-      ok, short, inline = 0, [], []
-      for tid, sid in traces:
-          ss = []
-          for _ in range(25):
-              ss = spans(tid)
-              if ss and len(ss) > 1:
-                  break
-              time.sleep(1)
+      def tree(ss, sid):
           server = [s for s in ss if "flask" in s["scope"] and
                     base64.b64decode(s.get("parentSpanId", "")) == bytes.fromhex(sid)]
+          children = {}
+          for s in ss:
+              children.setdefault(s.get("parentSpanId"), []).append(s)
+          below, todo = [], [server[0]["spanId"]] if server else []
+          while todo:
+              for c in children.get(todo.pop(), []):
+                  below.append(c)
+                  todo.append(c["spanId"])
+          return server, below
+
+      # The orders go in back to back, so one worker draining the queue runs the jobs one after another.
+      ok, short, inline, jobs = 0, [], [], []
+      deadline = time.time() + 25
+      for tid, sid in traces:
+          while True:
+              ss = spans(tid)
+              server, below = tree(ss, sid)
+              if any(dur(s) >= JOB for s in below) or time.time() > deadline:
+                  break
+              time.sleep(1)
           if not server:
               if not ss:
                   no(f"Tempo has nothing for trace {tid}, which the check started on POST /orders. The request",
@@ -184,27 +196,29 @@ tasks:
                      "keep both. The end of /obs/logs/fulfil.log:", *log_tail())
               no(f"trace {tid} has no Flask request span under the check's own span.",
                  "Keep fulfil running under opentelemetry-instrument.")
-          root = server[0]["spanId"]
-          children = {}
-          for s in ss:
-              children.setdefault(s.get("parentSpanId"), []).append(s)
-          below, todo = [], [root]
-          while todo:
-              for c in children.get(todo.pop(), []):
-                  below.append(c)
-                  todo.append(c["spanId"])
           server_end = int(server[0]["endTimeUnixNano"])
           long_ = [s for s in below if dur(s) >= JOB]
+          late = [s for s in long_ if int(s["endTimeUnixNano"]) > server_end]
           if below and not long_:
               short = below
-          elif long_ and not any(int(s["endTimeUnixNano"]) > server_end for s in long_):
+          elif long_ and not late:
               inline = long_
-          elif below:
+          elif late:
               ok += 1
+              jobs.append(late[0])
 
       if ok == N:
+          jobs.sort(key=lambda s: int(s["startTimeUnixNano"]))
+          overlap = [(a, b) for a, b in zip(jobs, jobs[1:])
+                     if int(b["startTimeUnixNano"]) < int(a["endTimeUnixNano"])]
+          if overlap:
+              a, b = overlap[0]
+              no(f"the check sent its {N} orders back to back and their job spans ran at the same time",
+                 f"({a['name']!r} and {b['name']!r} overlap). One worker thread takes the jobs off JOBS one",
+                 "at a time, so they cannot overlap: the jobs no longer go through the queue. Keep",
+                 "JOBS.put() in the handler and start the span in the worker loop.")
           print(f"PASS — each of the check's {N} orders is one trace: the Flask request span from")
-          print("opentelemetry-instrument, and under it a span covering the worker's job.")
+          print("opentelemetry-instrument, and under it a span covering the job the worker ran from the queue.")
           sys.exit(0)
       if inline:
           names = ", ".join(sorted({f"{s['name']!r} ({dur(s) * 1000:.0f}ms)" for s in inline}))
