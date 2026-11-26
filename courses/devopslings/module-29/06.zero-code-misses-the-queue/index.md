@@ -167,7 +167,7 @@ tasks:
           traces.append((tid, sid))
           time.sleep(0.5)
 
-      ok, short = 0, []
+      ok, short, inline = 0, [], []
       for tid, sid in traces:
           ss = []
           for _ in range(25):
@@ -193,8 +193,12 @@ tasks:
               for c in children.get(todo.pop(), []):
                   below.append(c)
                   todo.append(c["spanId"])
-          if below and not any(dur(s) >= JOB for s in below):
+          server_end = int(server[0]["endTimeUnixNano"])
+          long_ = [s for s in below if dur(s) >= JOB]
+          if below and not long_:
               short = below
+          elif long_ and not any(int(s["endTimeUnixNano"]) > server_end for s in long_):
+              inline = long_
           elif below:
               ok += 1
 
@@ -202,6 +206,11 @@ tasks:
           print(f"PASS — each of the check's {N} orders is one trace: the Flask request span from")
           print("opentelemetry-instrument, and under it a span covering the worker's job.")
           sys.exit(0)
+      if inline:
+          names = ", ".join(sorted({f"{s['name']!r} ({dur(s) * 1000:.0f}ms)" for s in inline}))
+          no(f"the job's span, {names}, ends before the request span does: the job ran inside the",
+             "request handler, so POST /orders now waits for it. The request should only queue the job",
+             "and answer 202; the worker thread does the work and starts the span.")
       if short:
           names = ", ".join(sorted({f"{s['name']!r} ({dur(s) * 1000:.0f}ms)" for s in short}))
           no(f"the request span has a child, {names}, and none lasts as long as the job, which takes",
