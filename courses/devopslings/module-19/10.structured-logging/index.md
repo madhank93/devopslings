@@ -216,6 +216,14 @@ tasks:
       if len(orders) >= 10 and len(set(vals)) == len(vals):
           no(f"the answer names `{key}`, and no two order records share a value of it, e.g. `{vals[0]}`.",
              "A value new on every line describes the line, not the order. Name one that describes the order.")
+      # A time that only grows in log order is when the line was written; a
+      # business time (placed_at) jumps around from order to order.
+      if all(re.search(r"\d{4}-\d{2}-\d{2}|\d{2}:\d{2}:\d{2}|^\d{10}", v) for v in vals):
+          numeric = all(re.fullmatch(r"\d+(\.\d+)?", v) for v in vals)
+          keys = [float(v) for v in vals] if numeric else vals
+          if all(a <= b for a, b in zip(keys, keys[1:])):
+              no(f"the answer names `{key}`, which only ever grows with the log, e.g. `{vals[0]}`: it is",
+                 "when the line was written. Name a field that describes the order.")
       if all(v == str(r["order_id"]) for v, (_, r) in zip(vals, orders)):
           no(f"the answer names `{key}`, which holds the same value as order_id on every order record.",
              "That is order_id again. Name another field of the order.")
