@@ -76,6 +76,30 @@ every trace.
 
 </details>
 
+<details>
+<summary>Solution</summary>
+
+`ledger-legacy` listens on 9480, so discovery on 8080 attaches to nothing, and
+the 5% ratio sampler drops nineteen of every twenty spans. Select the right
+port, name the service, and leave out the sampler so every trace is kept:
+
+```yaml
+discovery:
+  instrument:
+    - open_ports: 9480
+      name: ledger-legacy
+
+otel_traces_export:
+  endpoint: http://tempo:4318
+
+prometheus_export:
+  port: 9400
+```
+
+Without `name`, Beyla names the service after the script, `ledger_legacy`.
+
+</details>
+
 ## Further reading
 
 - Beyla is the Grafana distribution of
