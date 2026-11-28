@@ -24,7 +24,7 @@ tasks:
       # ---- clean slate -------------------------------------------------
       systemctl stop far-store.service 2>/dev/null || true
       for ns in r1 r2 far; do ip netns del "$ns" 2>/dev/null || true; done
-      for l in to-r1 r1-r2 r2-far; do ip link del "$l" 2>/dev/null || true; done
+      for l in to-r1 r1-u r2-far; do ip link del "$l" 2>/dev/null || true; done
       ip route del 10.90.2.0/24 2>/dev/null || true
       install -d /opt/far /root/answers
 
@@ -65,9 +65,12 @@ tasks:
       ip addr add 10.90.0.1/24 dev to-r1
       ip link set to-r1 mtu 1500 up
 
-      ip link add r1-r2 type veth peer name r2-r1
-      ip link set r1-r2 netns r1
-      ip link set r2-r1 netns r2
+      # The tunnel is a real ipip tunnel over a 9000-byte underlay. A bare veth
+      # pair cannot model ends that disagree: a veth drops any frame larger than
+      # the *receiving* end's MTU, so 1500-byte return segments would vanish too.
+      ip link add r1-u type veth peer name r2-u
+      ip link set r1-u netns r1
+      ip link set r2-u netns r2
 
       ip link add r2-far type veth peer name far0
       ip link set r2-far netns r2
@@ -83,6 +86,9 @@ tasks:
         ip link set lo up
         ip addr add 10.90.0.2/24 dev r1-box
         ip link set r1-box mtu 1500 up
+        ip addr add 10.90.9.1/30 dev r1-u
+        ip link set r1-u mtu 9000 up
+        ip link add r1-r2 type ipip local 10.90.9.1 remote 10.90.9.2
         ip addr add 10.90.1.1/30 dev r1-r2
         ip link set r1-r2 mtu 1400 up
         ip route add 10.90.2.0/24 via 10.90.1.2
@@ -99,6 +105,9 @@ tasks:
       # there is only one narrow direction on this path.
       ip netns exec r2 sh -c '
         ip link set lo up
+        ip addr add 10.90.9.2/30 dev r2-u
+        ip link set r2-u mtu 9000 up
+        ip link add r2-r1 type ipip local 10.90.9.2 remote 10.90.9.1
         ip addr add 10.90.1.2/30 dev r2-r1
         ip link set r2-r1 mtu 1500 up
         ip addr add 10.90.2.1/24 dev r2-far
