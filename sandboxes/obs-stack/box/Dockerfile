@@ -2,13 +2,14 @@
 # the OpenTelemetry SDK and the Pyroscope SDK for the services; the Prometheus,
 # Alertmanager, Loki and Vector CLIs for the student; and the servers a lesson
 # starts and stops as supervised apps (the Collectors, a second Prometheus,
-# Mimir), so that saving their config restarts them.
+# Mimir, Beyla), so that saving their config restarts them.
 FROM prom/prometheus:v3.5.0 AS prom
 FROM prom/alertmanager:v0.28.1 AS am
 FROM grafana/logcli:3.5.1 AS logcli
 FROM timberio/vector:0.47.0-debian AS vector
 FROM otel/opentelemetry-collector-contrib:0.128.0 AS otelcol
 FROM grafana/mimir:2.17.0 AS mimir
+FROM grafana/beyla:3.44.0 AS beyla
 
 FROM python:3.12-slim-bookworm
 RUN apt-get update \
@@ -28,6 +29,7 @@ COPY --from=logcli /usr/bin/logcli /usr/local/bin/logcli
 COPY --from=vector /usr/bin/vector /usr/local/bin/vector
 COPY --from=otelcol /otelcol-contrib /usr/local/bin/otelcol-contrib
 COPY --from=mimir /bin/mimir /usr/local/bin/mimir
+COPY --from=beyla /beyla /usr/local/bin/beyla
 COPY tools/obs.sh /usr/local/lib/obs.sh
 COPY hostclock/ /usr/local/lib/python3.12/site-packages/
 COPY tools/ /usr/local/bin/

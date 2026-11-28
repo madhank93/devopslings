@@ -16,7 +16,7 @@ PYROSCOPE=${PYROSCOPE:-http://pyroscope:4040}
 # These idle until a lesson starts them: the tracing apps, so module 18 runs
 # without their traffic, and the servers and apps only some lessons use, so
 # the others do not pay for their memory.
-OBS_IDLE_APPS="checkout broker fulfil ledger billing collector-2 prometheus-2 prometheus-3 mimir portal nightly lab"
+OBS_IDLE_APPS="checkout broker fulfil ledger billing collector-2 prometheus-2 prometheus-3 mimir portal nightly lab ledger-legacy beyla"
 
 # Raw JSON of an instant query.
 prom_query() {

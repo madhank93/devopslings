@@ -41,13 +41,13 @@ the failure honestly — the entry says what it would take · everything else is
 specified and unbuilt.
 
 <!-- counts -->
-**359 exercises** across 28 modules, drills included, capstone stages not: 357 shipped, 2 blocked, 0 specified.
+**359 exercises** across 28 modules, drills included, capstone stages not: 358 shipped, 1 blocked, 0 specified.
 
 By tier: 33 intro · 201 core · 89 deep · 36 architect.
 
 Complete modules: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 15/15 · 19 13/13 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9 · 29 27/27 · 30 22/24.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 15/15 · 19 13/13 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9 · 29 27/27 · 30 23/24.
 <!-- /counts -->
 
 Every module opens at the tier its prerequisites allow. Modules 01–23, 25, 29 and 30
@@ -3073,16 +3073,20 @@ so every tool named here is a libbpf-tools CO-RE binary or a bpftrace `.bt` scri
   in `netlab` — and module 04's promised `d-state-and-the-wedged-mount`, which
   has no entry, should be folded into this one.
 
-- **ebpf-auto-instrumentation** *(core · blocked)* — a legacy service with no SDK
-  and no one willing to add one; Beyla should give RED metrics and spans from
-  the kernel.
-  *Check:* RED metrics and server spans for the service appear in `obs-stack`
-  without a code change, and match a request count the grader drives.
+- **ebpf-auto-instrumentation** *(core · shipped)* — a legacy service with no SDK
+  and no one willing to add one; Beyla is deployed beside it and the service is
+  still missing from Prometheus and Tempo.
+  *First guess:* add the SDK — a code change to the one service nobody can
+  rebuild.
+  *Check:* `ledger_legacy.py` is unchanged; the grader drives 20 requests and
+  Beyla's counter for `service_name="ledger-legacy"` rises by exactly 20, in
+  Prometheus too, with a Tempo server span for each. The shipped config selects
+  the wrong port and keeps 5% of traces.
   *Source:* own.
-  *Blocked:* Beyla 2.5 does not load on aarch64 — its uprobe programs fail the
-  verifier and it cannot parse Go symbol sections. CI runners are x86_64 but
-  local development is arm64, and a lesson has to pass on both. Unblocked by a
-  Beyla release that loads on arm64 (re-probe) or an x86_64-only host policy.
+  *Sandbox:* Beyla 3.44 in a privileged `beyla` container sharing
+  `ledger-legacy`'s PID namespace. Beyla 2.5 failed the arm64 verifier
+  (`beyla_handle_buf_with_args: invalid read from stack`); 3.44 and OBI v1.0.0
+  load on arm64 and trace both Go and Python services.
 
 - **hubble-flows** *(core · blocked)* — a pod's requests fail and the network
   policy looks right; Hubble shows the dropped flow and the verdict.

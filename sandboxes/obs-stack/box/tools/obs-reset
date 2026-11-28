@@ -6,7 +6,7 @@
 set -euo pipefail
 . /usr/local/lib/obs.sh
 
-for d in prometheus prometheus-2 prometheus-3 alertmanager blackbox loki-rules grafana apps queries otel vector answers portal hosts; do
+for d in prometheus prometheus-2 prometheus-3 alertmanager blackbox loki-rules grafana apps queries otel vector answers portal hosts beyla; do
   rm -rf "/obs/$d"
   [ -e "/opt/obs-baseline/$d" ] && cp -a "/opt/obs-baseline/$d" "/obs/$d"
 done

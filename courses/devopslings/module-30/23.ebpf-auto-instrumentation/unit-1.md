@@ -13,35 +13,73 @@ The first guess is to add the SDK. That is a code change, a rebuild and a
 redeploy of the one service nobody can rebuild with confidence.
 
 [Grafana Beyla](https://grafana.com/docs/beyla/latest/) instruments from
-outside the process: it attaches eBPF uprobes and kprobes to the running binary
-and the kernel's socket paths, reconstructs each HTTP request from them, and
-exports RED metrics and server spans over OTLP. The service is not touched.
+outside the process. It attaches eBPF programs to the kernel's socket paths
+(and, for Go binaries, uprobes on the runtime's HTTP functions), reconstructs
+each HTTP request from what it sees, and exports RED metrics and server spans.
+The service is not touched, and does not know.
 
-## What the lesson will grade
+Someone already deployed it. Beyla runs in the `beyla` container, which shares
+`ledger-legacy`'s PID namespace — the sidecar pattern — so it can see that
+process and nothing else on the host. Its config is `/obs/beyla/beyla.yaml`,
+adapted from the payments gateway's, and it restarts when you save the file.
+Prometheus scrapes its metrics endpoint as `job="beyla"`, and it sends spans to
+Tempo. A week later, `ledger-legacy` is in neither.
 
-- RED metrics and server spans for `ledger-legacy` appear in `obs-stack`
-  (Prometheus and Tempo) with no change to the service's code or image
-- the request count Beyla reports matches the count the grader drives
+## What to look at
 
-## Why this lesson cannot run yet
+- `/obs/logs/beyla.log`: what Beyla found when it started, and which processes
+  it decided to instrument. The absence of a line is information too.
+- `http://beyla:9400/metrics` from the box: Beyla's own view, before Prometheus
+  is involved. `http_server_request_duration_seconds_count` is the request
+  counter; its `service_name` label is how dashboards find a service.
+- Grafana at `http://localhost:13000`, Explore → Tempo:
+  `{resource.service.name="ledger-legacy"}`.
+- Send traffic yourself: `curl http://ledger-legacy:9480/entries/42`.
 
-Beyla 2.5 does not load on aarch64. Its uprobe programs are rejected by the
-kernel's eBPF verifier there, and it cannot parse the Go symbol sections it
-needs to find functions in Go binaries. The sandbox shares the Docker host's
-kernel, so a Mac (arm64) cannot run it at all.
+Beyla's [configuration reference](https://grafana.com/docs/beyla/latest/configure/options/)
+covers `discovery` and `otel_traces_export`.
 
-CI runners are x86_64, where Beyla loads, but a lesson in this course has to
-pass on the machines students actually use as well as on CI. A grader that only
-works on one architecture would fail half the people taking it for reasons that
-have nothing to do with their work.
+## Your objectives
 
-It is unblocked by either of:
+Change `/obs/beyla/beyla.yaml` so that every request `ledger-legacy` serves is
+counted in Prometheus and has a server span in Tempo, under the service name
+`ledger-legacy`. Do not touch `/obs/apps/ledger_legacy.py`.
 
-- a Beyla release whose programs pass the arm64 verifier — re-probe on an
-  arm64 Docker host before building the lesson
-- a decision that this lesson is x86_64-only, with a `requires:` check the
-  runner can actually evaluate
+## What you're being graded on
 
-Until then, `ebpf-in-production` in this module uses the same verifier failure
-as evidence: an eBPF agent that works on one kernel and architecture is not
-proven to work on the next.
+The check confirms `ledger_legacy.py` is the original, sends `ledger-legacy` 20
+requests, and then requires all three of:
+
+- Beyla's request counter for `service_name="ledger-legacy"` went up by exactly
+  20
+- Prometheus has those counts
+- Tempo has a span for each of the 20 requests
+
+<details>
+<summary>Hint 1 — Beyla attached to nothing</summary>
+
+Beyla logs `instrumenting process` with the command and pid of each process it
+attaches to. If there is no such line, its discovery rules matched nothing.
+`open_ports` selects a process by a port it listens on. Which port does
+`ledger-legacy` listen on, and which one does the config name?
+
+</details>
+
+<details>
+<summary>Hint 2 — counted, but only some spans</summary>
+
+Metrics count every request; traces go through a sampler first. The config
+came from a gateway serving thousands of requests a second, where keeping one
+trace in twenty is a cost decision. On a service that serves a few a minute it
+loses the one request anyone will ask about. Beyla's default sampler keeps
+every trace.
+
+</details>
+
+## Further reading
+
+- Beyla is the Grafana distribution of
+  [OpenTelemetry eBPF Instrumentation](https://opentelemetry.io/docs/zero-code/obi/)
+  (OBI), the project Grafana donated it to. The configuration is the same.
+- `ebpf-in-production` in this module: what an eBPF agent like this one needs
+  from the kernel and the host before it goes on a fleet.
