@@ -17,6 +17,7 @@
 #   portal (HTTPS) <── blackbox  a login page probed from outside
 #   nightly ──> pushgateway      a batch job that pushes its results
 #   lab                          a spare slot for a lesson's own service
+#   ledger-legacy <── beyla      an uninstrumented service, and eBPF instrumenting it
 # Always up: pyroscope (continuous profiles), blackbox, pushgateway.
 #
 # Every editable file lives in one named volume mounted at /obs: Prometheus
@@ -188,6 +189,20 @@ services:
   nightly:
     <<: *app
     command: ["supervise", "nightly", "python3", "/obs/apps/nightly.py"]
+
+  # An HTTP service with no instrumentation of its own, on :9480.
+  ledger-legacy:
+    <<: *app
+    command: ["supervise", "ledger-legacy", "python3", "/obs/apps/ledger_legacy.py"]
+
+  # eBPF auto-instrumentation, configured by /obs/beyla/beyla.yaml. It shares
+  # ledger-legacy's PID namespace, so it can see that process and no other.
+  beyla:
+    <<: *app
+    privileged: true
+    pid: "service:ledger-legacy"
+    command: ["supervise", "beyla", "beyla", "-config", "/obs/beyla/beyla.yaml"]
+    mem_limit: 512m
 
   # A spare slot for a lesson's own service: /obs/apps/lab.py.
   lab:
