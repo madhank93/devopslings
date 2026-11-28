@@ -6,7 +6,7 @@
 # count, and rank. The message is useless as a key; it embeds IDs.
 set -euo pipefail
 python3 - <<'PY'
-import collections, json, re, time, urllib.parse, urllib.request
+import collections, json, re, time, urllib.error, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 TEMPO = "http://tempo:3200"
@@ -19,9 +19,20 @@ now = int(time.time())
 found = get("/api/search", q='{resource.service.name="checkout" && status=error}',
             start=now - 3600, end=now, limit=100000)["traces"]
 
+def trace(tid):
+    # Tempo can list a trace in search a moment before it serves it by ID.
+    for _ in range(15):
+        try:
+            return get(f"/api/traces/{tid}")
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                raise
+            time.sleep(2)
+    return get(f"/api/traces/{tid}")
+
 def events(tid):
     out = []
-    t = get(f"/api/traces/{tid}")
+    t = trace(tid)
     for b in t.get("batches") or t.get("resourceSpans") or []:
         for ss in b.get("scopeSpans") or []:
             for s in ss.get("spans", []):
