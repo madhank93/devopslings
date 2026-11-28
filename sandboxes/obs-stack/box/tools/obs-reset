@@ -6,12 +6,24 @@
 set -euo pipefail
 . /usr/local/lib/obs.sh
 
-for d in prometheus alertmanager grafana apps queries otel vector answers; do
+for d in prometheus prometheus-2 prometheus-3 alertmanager blackbox loki-rules grafana apps queries otel vector answers portal hosts beyla; do
   rm -rf "/obs/$d"
   [ -e "/opt/obs-baseline/$d" ] && cp -a "/opt/obs-baseline/$d" "/obs/$d"
 done
 rm -f /obs/run/*.down /obs/run/*.restart /obs/run/*.fault /obs/run/*.slow
+# Lesson-written data and every log start empty. Writers open logs in append
+# mode, so truncating in place is safe while they run.
+rm -rf /obs/data
+mkdir -p /obs/data
+for f in /obs/logs/*.log /obs/run/ledger-*.log; do
+  [ -f "$f" ] && : > "$f"
+done
 for a in $OBS_IDLE_APPS; do app_down "$a"; done
+# Supervisors a lesson's init started in the box (`setsid supervise NAME ...`).
+# Baseline apps run in their own containers, where PID 1 is their supervisor.
+if grep -q obs-seed /proc/1/cmdline; then
+  pkill -TERM -f '^bash /usr/local/bin/supervise ' || true
+fi
 mkdir -p /obs/answers /obs/otel/out
 chmod -R a+rwX /obs/otel/out
 chmod -R a+rX /obs
@@ -19,3 +31,4 @@ chmod -R a+rX /obs
 obs_reload >/dev/null
 obs_expire_silences
 sink_reset
+curl -s --max-time 10 -X PUT "$PUSHGW/api/v1/admin/wipe" >/dev/null || true

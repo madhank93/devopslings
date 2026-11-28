@@ -1,6 +1,6 @@
 # Curriculum
 
-Twenty-eight modules. Ordering follows a progression that works pedagogically —
+Thirty modules. Ordering follows a progression that works pedagogically —
 you cannot debug a container until you can debug a process, you cannot read a
 query plan until you can read a process's memory, and you cannot set an SLO
 until you understand percentiles.
@@ -25,16 +25,16 @@ than at exercise one.
 | **architect** | A written decision or design, graded against a rubric. |
 
 <!-- counts -->
-**299 exercises** across 26 modules, drills included, capstone stages not: 299 shipped, 0 blocked, 0 specified.
+**359 exercises** across 28 modules, drills included, capstone stages not: 358 shipped, 1 blocked, 0 specified.
 
-By tier: 29 intro · 166 core · 74 deep · 30 architect.
+By tier: 33 intro · 201 core · 89 deep · 36 architect.
 
-Complete modules: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26.
+Complete modules: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29.
 
-Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 10/10 · 19 9/9 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9.
+Shipped per module: 01 19/19 · 02 10/10 · 03 11/11 · 04 20/20 · 05 15/15 · 06 12/12 · 07 13/13 · 08 9/9 · 09 13/13 · 10 18/18 · 11 9/9 · 12 12/12 · 13 10/10 · 14 6/6 · 15 6/6 · 16 7/7 · 17 10/10 · 18 15/15 · 19 13/13 · 20 15/15 · 21 14/14 · 22 12/12 · 23 10/10 · 24 13/13 · 25 7/7 · 26 9/9 · 29 27/27 · 30 23/24.
 <!-- /counts -->
 
-Modules 01–23 and 25 each open with an `intro` exercise. Modules 24, 26 and 27
+Modules 01–23, 25, 29 and 30 each open with an `intro` exercise. Modules 24, 26 and 27
 do not: they are built entirely on earlier modules, and starting there is the
 mistake rather than the on-ramp.
 
@@ -48,11 +48,11 @@ modules that title lives in.
 | Linux / system administrator | 01, 02, 03, 07, 15 |
 | Network engineer | 04, 05, 06, 22 |
 | Database administrator | 10, 22, 23 |
-| Systems engineer | 03, 09, 20 |
+| Systems engineer | 03, 09, 20, 30 |
 | DevOps engineer | 08, 09, 11, 12, 13, 15, 16 |
-| Platform engineer | 26, 12, 13, 16, 18 |
+| Platform engineer | 26, 12, 13, 16, 18, 29 |
 | Cloud engineer | 17, 13, 14, 22 |
-| Site reliability engineer | 18, 19, 20, 21, 22, 23, 24, 25 |
+| Site reliability engineer | 18, 19, 20, 21, 22, 23, 24, 25, 29, 30 |
 | Architect, from any of the above | every `architect` entry, then 27 |
 
 ---
@@ -907,18 +907,64 @@ an exporter** for the thing that has none, which reports zero rather than
 vanishing · Alertmanager routing, grouping and inhibition, delivering exactly
 one page for a correlated outage · **a dashboard that answers three stated
 questions** instead of forty panels nobody reads · a **cardinality explosion** ·
-`rate` versus `increase` across a counter reset · recording rules · and the
-alert that did not fire because the data stopped.
+`rate` versus `increase` across a counter reset · recording rules · the alert
+that did not fire because the data stopped · **blackbox probes** that see the
+outage every internal metric misses · the Pushgateway ghost that never goes
+stale · **delta versus cumulative** temporality and the sawtooth it draws ·
+**native histograms** for an SLO boundary no fixed bucket hits · and two HA
+replicas double-counting in long-term storage.
 
 ### 19 — Logs & Traces
 `obs-stack`
 
-Ship one log line and find it again · OTel Collector receivers/processors/
-exporters · **OTTL** transform · **Vector + VRL**: parse, redact PII, sample,
-route · Loki labels and the query that scans everything · OpenSearch index,
-mapping, retention · a Tempo trace that survives an async queue
-boundary · correlating trace ↔ log ↔ metric with exemplars · the pipeline
-silently dropping 4% of logs.
+Ship one log line and find it again · structured JSON logs with stable keys ·
+OTel Collector receivers/processors/exporters · **OTTL** transform · **Vector +
+VRL**: parse, redact PII, sample, route · a traceback that arrives as thirty
+lines · Loki labels and the query that scans everything · OpenSearch index,
+mapping, retention · a Tempo trace that survives an async queue boundary ·
+correlating trace ↔ log ↔ metric: **log → trace through an injected trace id**,
+metric → trace with exemplars · alerting on a log pattern's rate, not each line ·
+the pipeline silently dropping 4% of logs.
+
+### 29 — Tracing & APM · *specified*
+`obs-stack` (+ Pyroscope, a second gateway Collector) · `db-stack` for one entry
+
+Module 19 gets a trace across a queue; this one makes traces answer questions.
+
+The first span by hand · span status, kind and **semantic conventions** · a span
+name with a user id in it, and the cardinality bill · what auto-instrumentation
+does not see · **B3 on one side, W3C on the other**, and the trace that splits in
+two · baggage leaking to a third party on egress · span links for a fan-in batch ·
+an **N+1 read straight off a trace** · the critical path, not the longest span ·
+clock skew drawing a child before its parent · head versus **tail sampling**, and
+why tail sampling needs load-balancing by trace ID across gateways ·
+parent-based sampling · the `memory_limiter` that sheds instead of crashing ·
+OTLP on 4317 versus 4318 · RED from `spanmetrics` and a service map that draws
+itself · DB spans that name the query · grouping exceptions into issues · **an
+APM triage drill** where the slow request has one of five causes, drawn at
+random · RUM time versus server time · and, for the architect: agent versus
+gateway, **an observability cost budget**, an instrumentation standard teams
+will follow, and a vendor-to-OTel migration that keeps the dashboards honest.
+
+### 30 — Profiling, eBPF & Low-Level Debugging · *specified*
+`linux-box` (privileged profile) · profiling on `obs-stack` + Pyroscope
+
+Tools: libbpf-tools and bpftrace (bcc does not compile against the current
+kernel), `perf`, `strace`, `ltrace`, `gdb`, `py-spy`.
+
+**Continuous profiling** in Pyroscope · a **differential flame graph** between
+two releases · off-CPU time, where the slow request is waiting rather than
+working · heap growth over a day · span profiles linking a trace to its flame
+graph · what the profiler itself costs · bpftrace one-liners · `execsnoop` for
+the fork storm `top` never shows · `opensnoop` and the config file read from the
+wrong path · a **bimodal `biolatency`** an average hides · **`runqlat`** and the
+saturation no CPU graph shows · TCP retransmits per connection · a uprobe on one
+function · Beyla auto-instrumentation *(blocked: its eBPF programs fail the arm64 verifier)* · detecting a
+reverse shell from syscalls · an eBPF adoption policy · Hubble flows *(blocked:
+needs Cilium)* · `strace` on the process that exits silently · slow startup that
+is really DNS timeouts · **`py-spy dump` on the hang** · a core-dump post-mortem
+in `gdb` · `perf` for time spent in `sys` · debugging a distroless container
+with no shell · and a process stuck in **D state**, read from `wchan`.
 
 ---
 

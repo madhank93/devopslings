@@ -1,0 +1,72 @@
+# Mimir, single process, filesystem storage, for long-term storage behind
+# Prometheus remote write. Read-only infrastructure. It starts held down and
+# starts empty each time a lesson starts it.
+#   remote write:  http://mimir:9009/api/v1/push
+#   PromQL:        http://mimir:9009/prometheus/api/v1/query
+multitenancy_enabled: false
+target: all
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+  log_level: warn
+
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /tmp/mimir/data
+
+blocks_storage:
+  storage_prefix: blocks
+  tsdb:
+    dir: /tmp/mimir/tsdb
+  bucket_store:
+    sync_dir: /tmp/mimir/tsdb-sync
+
+compactor:
+  data_dir: /tmp/mimir/compactor
+  sharding_ring:
+    kvstore:
+      store: inmemory
+
+distributor:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+  # One sample stream per `cluster`, from whichever `__replica__` it elected.
+  # Short timeouts so a failover happens in seconds, not the default 30s.
+  ha_tracker:
+    enable_ha_tracker: true
+    ha_tracker_update_timeout: 2s
+    ha_tracker_update_timeout_jitter_max: 0s
+    ha_tracker_failover_timeout: 5s
+    kvstore:
+      store: inmemory
+
+ingester:
+  ring:
+    instance_addr: 127.0.0.1
+    replication_factor: 1
+    kvstore:
+      store: inmemory
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+    kvstore:
+      store: inmemory
+
+ruler:
+  ring:
+    kvstore:
+      store: inmemory
+
+limits:
+  accept_ha_samples: true
+  ha_cluster_label: cluster
+  ha_replica_label: __replica__
+
+usage_stats:
+  enabled: false
