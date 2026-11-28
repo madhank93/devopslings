@@ -3,6 +3,7 @@ package runner
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -111,6 +112,15 @@ func TestLessonContract(t *testing.T) {
 	only := os.Getenv("DEVOPSLINGS_CONTRACT_LESSON")
 	// CI shards the suite one job per stack; "none" selects stackless lessons.
 	onlyStack := os.Getenv("DEVOPSLINGS_CONTRACT_STACK")
+	// "k/n" keeps every nth lesson from the kth (1-based), so a stack too slow
+	// for one job's timeout splits across n jobs.
+	var shardK, shardN int
+	if s := os.Getenv("DEVOPSLINGS_CONTRACT_SHARD"); s != "" {
+		if _, err := fmt.Sscanf(s, "%d/%d", &shardK, &shardN); err != nil || shardK < 1 || shardK > shardN {
+			t.Fatalf("DEVOPSLINGS_CONTRACT_SHARD=%q: want k/n with 1 <= k <= n", s)
+		}
+	}
+	seen := 0
 
 	// Lessons that share a sandbox must not run concurrently: Contract tears the
 	// stack down before it starts, so two lessons on linux-box would destroy
@@ -132,6 +142,10 @@ func TestLessonContract(t *testing.T) {
 			continue
 		}
 		if stack := cmp.Or(l.Sandbox.Stack, "none"); onlyStack != "" && stack != onlyStack {
+			continue
+		}
+		seen++
+		if shardN > 0 && (seen-1)%shardN != shardK-1 {
 			continue
 		}
 		t.Run(l.Name, func(t *testing.T) {
